@@ -29,7 +29,7 @@
   "exports": "./lib/index.js",
   "type": "module",
   "dependencies": {
-    "@jsforce/jsforce-node": "^3.10.17",
+    "@jsforce/jsforce-node": "^3.10.25",
     "@salesforce/core": "^8.30.0",
     "@salesforce/kit": "^3.2.6",
     "csv-parse": "^7.0.2",
