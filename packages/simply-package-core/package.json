@@ -42,7 +42,7 @@
     "@salesforce/kit": "^3.2.6",
     "@salesforce/packaging": "^4.22.16",
     "@simplysf/simply-core": "workspace:^1.6.4",
-    "zod": "^4.1.12"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
