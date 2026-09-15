@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-community-core",
   "description": "Community publish/deploy/domain-verification logic and site-file discovery — the library layer behind @simplysf/simply-community, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -41,7 +41,7 @@
     "@salesforce/core": "^8.30.0",
     "@salesforce/kit": "^3.2.6",
     "@salesforce/source-deploy-retrieve": "^12.37.2",
-    "@simplysf/simply-core": "workspace:^1.6.4",
+    "@simplysf/simply-core": "workspace:^1.6.5",
     "glob": "^13.0.6",
     "xmlbuilder2": "^4.0.3"
   },
