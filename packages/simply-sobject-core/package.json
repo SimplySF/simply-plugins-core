@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-sobject-core",
   "description": "Field history object derivation/filtering and relationship-field discovery — the library layer behind @simplysf/simply-sobject, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
