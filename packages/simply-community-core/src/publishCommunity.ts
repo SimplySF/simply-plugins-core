@@ -19,6 +19,9 @@ import type { Connection } from '@salesforce/core';
 import { PollingClient } from '@salesforce/core';
 import { retryWithBackoff } from '@simplysf/simply-core';
 import { checkPublishStatus } from './checkPublishStatus.js';
+import { DEFAULT_PUBLISH_REQUEST_TIMEOUT } from './requestTimeout.js';
+
+export { DEFAULT_PUBLISH_REQUEST_TIMEOUT } from './requestTimeout.js';
 
 /** The response shape of `POST /connect/communities/{id}/publish`. */
 type CommunityPublishResponse = { id: string; jobId: string; name: string; url: string };
@@ -33,6 +36,12 @@ export type PublishCommunityOptions = {
   retryAttempts?: number;
   /** Factor the retry delay grows by after each failed attempt. Defaults to 2. */
   retryBackoff?: number;
+  /**
+   * Bounds each individual Connect/SOQL request this makes against the org. Defaults to
+   * {@link DEFAULT_PUBLISH_REQUEST_TIMEOUT}; overridable mainly so tests don't have to wait out the
+   * real default.
+   */
+  requestTimeout?: Duration;
 };
 
 /**
@@ -48,17 +57,23 @@ export type PublishCommunityOptions = {
  * @throws If the initial publish request fails and retries (if any) are exhausted.
  */
 export async function publishCommunity(options: PublishCommunityOptions): Promise<CommunityPublishResponse> {
+  const requestTimeout = options.requestTimeout ?? DEFAULT_PUBLISH_REQUEST_TIMEOUT;
+
   const publishResponse = await retryWithBackoff(
     async () =>
       options.connection.request<CommunityPublishResponse>({
         method: 'POST',
         url: `/connect/communities/${options.networkId}/publish`,
       }),
-    { retryAttempts: options.retryAttempts ?? 0, backoffFactor: options.retryBackoff ?? 2 },
+    {
+      retryAttempts: options.retryAttempts ?? 0,
+      backoffFactor: options.retryBackoff ?? 2,
+      attemptTimeout: requestTimeout,
+    },
   );
 
   const client = await PollingClient.create({
-    poll: checkPublishStatus(options.connection, publishResponse.jobId),
+    poll: checkPublishStatus(options.connection, publishResponse.jobId, requestTimeout),
     frequency: Duration.seconds(15),
     timeout: Duration.minutes(options.wait),
     timeoutErrorName: 'CommunityPublishTimeoutError',

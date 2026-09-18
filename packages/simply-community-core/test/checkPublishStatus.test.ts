@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { Duration } from '@salesforce/kit';
 import { Connection, SfError } from '@salesforce/core';
 import { MockTestOrgData, TestContext } from '@salesforce/core/testSetup';
 import sinon from 'sinon';
@@ -50,6 +51,17 @@ describe('checkPublishStatus', () => {
     $$.SANDBOX.stub(Connection.prototype, 'query').resolves({ done: true, totalSize: 0, records: [] });
 
     const poll = checkPublishStatus(connection, '08p000000000001');
+
+    await expect(poll()).resolves.to.deep.equal({ completed: false });
+  });
+
+  it('should report not completed, not hang forever, when the query never settles', async () => {
+    const connection = await testOrg.getConnection();
+    $$.SANDBOX.stub(Connection.prototype, 'query').returns(
+      new Promise(() => {}) as unknown as ReturnType<Connection['query']>,
+    );
+
+    const poll = checkPublishStatus(connection, '08p000000000001', Duration.milliseconds(5));
 
     await expect(poll()).resolves.to.deep.equal({ completed: false });
   });

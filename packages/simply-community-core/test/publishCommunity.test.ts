@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+import { Duration } from '@salesforce/kit';
 import { PollingClient } from '@salesforce/core';
 import { MockTestOrgData, TestContext } from '@salesforce/core/testSetup';
+import { RetryAttemptTimeoutError } from '@simplysf/simply-core';
 import sinon from 'sinon';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { publishCommunity } from '../src/publishCommunity.js';
@@ -86,5 +88,19 @@ describe('publishCommunity', () => {
 
     expect(result).to.deep.equal(publishResponse);
     expect(requestCount).to.equal(2);
+  });
+
+  it('rejects instead of hanging forever when the publish request never settles', async () => {
+    const connection = await testOrg.getConnection();
+    $$.fakeConnectionRequest = async () => new Promise<never>(() => {});
+
+    await expect(
+      publishCommunity({
+        connection,
+        networkId: '0DM000000000001',
+        wait: 10,
+        requestTimeout: Duration.milliseconds(5),
+      }),
+    ).rejects.toThrow(RetryAttemptTimeoutError);
   });
 });

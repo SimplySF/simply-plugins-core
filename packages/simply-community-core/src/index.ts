@@ -28,7 +28,7 @@ export {
   type DeployComponentFailure,
   type DeployChangedFilesResult,
 } from './deployChangedFiles.js';
-export { publishCommunity, type PublishCommunityOptions } from './publishCommunity.js';
+export { publishCommunity, DEFAULT_PUBLISH_REQUEST_TIMEOUT, type PublishCommunityOptions } from './publishCommunity.js';
 export {
   resolveSearchRoots,
   resolveRetrieveDestination,
