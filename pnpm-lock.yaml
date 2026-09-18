@@ -120,7 +120,7 @@ importers:
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.6.5
+        specifier: workspace:^1.6.6
         version: link:../simply-core
       zod:
         specifier: ^4.5.4
@@ -154,7 +154,7 @@ importers:
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.6.5
+        specifier: workspace:^1.6.6
         version: link:../simply-core
       glob:
         specifier: ^13.0.6
@@ -207,7 +207,7 @@ importers:
         specifier: ^8.30.0
         version: 8.32.6
       '@simplysf/simply-core':
-        specifier: workspace:^1.6.5
+        specifier: workspace:^1.6.6
         version: link:../simply-core
       csv-parse:
         specifier: ^7.0.2
@@ -245,7 +245,7 @@ importers:
         specifier: ^4.22.16
         version: 4.27.8(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.6.5
+        specifier: workspace:^1.6.6
         version: link:../simply-core
       zod:
         specifier: ^4.5.4

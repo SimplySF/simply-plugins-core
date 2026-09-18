@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.6](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.5...%40simplysf%2Fsimply-core%401.6.6) (2026-09-18)
+
+### Bug Fixes
+
+- **simply-core, simply-community-core:** bound per-attempt timeouts in community publish ([#207](https://github.com/SimplySF/simply-plugins-core/issues/207)) ([7b4cdcc](https://github.com/SimplySF/simply-plugins-core/commit/7b4cdcc3174e5990d83b7f5697fab84c5365a2d8))
+
 ## [1.6.5](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.4...%40simplysf%2Fsimply-core%401.6.5) (2026-09-15)
 
 ### Bug Fixes
