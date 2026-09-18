@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+import { Duration } from '@salesforce/kit';
 import { SfError, type Connection, type StatusResult } from '@salesforce/core';
+import { retryWithBackoff } from '@simplysf/simply-core';
+import { DEFAULT_PUBLISH_REQUEST_TIMEOUT } from './requestTimeout.js';
 
 /** The `BackgroundOperation` fields this needs, out of the full standard-object schema. */
 type BackgroundOperationRecord = {
@@ -34,14 +37,33 @@ type BackgroundOperationRecord = {
  *
  * @param connection - The org connection to poll against.
  * @param jobId - The `jobId` returned by `POST /connect/communities/{id}/publish`.
+ * @param requestTimeout - Bounds each status-check attempt. Defaults to `DEFAULT_PUBLISH_REQUEST_TIMEOUT`; overridable mainly so tests don't have to wait out the real default.
  * @returns A `poll()` function for `PollingClient.create({ poll, ... })`.
  * @throws {SfError} `CommunityPublishFailedError` if the job reaches a terminal failure state.
  */
-export function checkPublishStatus(connection: Connection, jobId: string): () => Promise<StatusResult> {
+export function checkPublishStatus(
+  connection: Connection,
+  jobId: string,
+  requestTimeout: Duration = DEFAULT_PUBLISH_REQUEST_TIMEOUT,
+): () => Promise<StatusResult> {
   return async (): Promise<StatusResult> => {
-    const result = await connection.query<BackgroundOperationRecord>(
-      `SELECT Id, Status, FinishedAt, Error FROM BackgroundOperation WHERE Id = '${jobId}'`,
-    );
+    let result;
+    try {
+      result = await retryWithBackoff(
+        () =>
+          Promise.resolve(
+            connection.query<BackgroundOperationRecord>(
+              `SELECT Id, Status, FinishedAt, Error FROM BackgroundOperation WHERE Id = '${jobId}'`,
+            ),
+          ),
+        { retryAttempts: 0, backoffFactor: 1, attemptTimeout: requestTimeout },
+      );
+    } catch {
+      // A stalled or failed status check isn't a publish failure — treat it the same as "not
+      // finished yet" below and let PollingClient's own timeout/frequency decide when to give up.
+      return { completed: false };
+    }
+
     const operation = result.records[0] as BackgroundOperationRecord | undefined;
 
     // The BackgroundOperation record may not be queryable in the instant right after the publish

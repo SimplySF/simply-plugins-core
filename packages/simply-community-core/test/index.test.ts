@@ -28,6 +28,7 @@ import * as api from '../src/index.js';
  */
 it('exports the expected set of runtime values', () => {
   expect(Object.keys(api).sort()).toStrictEqual([
+    'DEFAULT_PUBLISH_REQUEST_TIMEOUT',
     'checkPublishStatus',
     'deployChangedFiles',
     'patchCustomSiteXml',
