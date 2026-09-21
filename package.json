@@ -46,7 +46,7 @@
     "lint-staged": "^17.3.0",
     "minimatch": "^10.2.6",
     "oclif": "^4.24.0",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.7",
     "sinon": "^22.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
