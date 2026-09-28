@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@jsforce/jsforce-node': ^3.10.25
+  '@jsforce/jsforce-node': ^3.10.26
 
 importers:
 
@@ -174,7 +174,7 @@ importers:
   packages/simply-core:
     dependencies:
       '@jsforce/jsforce-node':
-        specifier: ^3.10.25
+        specifier: ^3.10.26
         version: 3.10.26
       '@salesforce/core':
         specifier: ^8.30.0
@@ -1393,10 +1393,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
-
-  '@jsforce/jsforce-node@3.10.25':
-    resolution: {integrity: sha512-L4GfTOzmGBypjG1O7aTxwbk4DTKitU7yvnnqQE7wypFyEyHH9VR6cVZxi4+Gfk7cmItHRHAV7MyBTFfrP5DaHA==}
-    engines: {node: '>=22'}
 
   '@jsforce/jsforce-node@3.10.26':
     resolution: {integrity: sha512-pfVkWJBEPiea7p+hi5IxBpvNg91agGfdRKtlYpx425J54DjFzj/5q2fdpgWdyttAckRxQmLfDtiTuM7L3SfYkA==}
@@ -3075,9 +3071,6 @@ packages:
   csso@5.0.5:
     resolution: {integrity: sha512-0LrrStPOdJj+SPCCrGhzryycLjwcgUSHBtxNA8aIDxf0GLsRh1cKYhB00Gd1lDOS4yGH69+SNn13+TWbVHETFQ==}
     engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0, npm: '>=7.0.0'}
-
-  csv-parse@5.6.0:
-    resolution: {integrity: sha512-l3nz3euub2QMg5ouu5U09Ew9Wf6/wQ8I++ch1loQ0ljmzhmfZYrH9fflS22i/PQEvsPvxCwxgz5q7UB8K1JO4Q==}
 
   csv-parse@7.0.2:
     resolution: {integrity: sha512-uKZghv9UmPkMVLYy//KZ9HFAIJsl7wkhoEdIL0+rhuSY9pZQlhaeGEDPIe+/w7eh81MOql8Q/9+inAGWG6ZHYA==}
@@ -7782,18 +7775,6 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@jsforce/jsforce-node@3.10.25':
-    dependencies:
-      '@sindresorhus/is': 4.6.0
-      base64url: 3.0.1
-      csv-parse: 5.6.0
-      csv-stringify: 6.8.3
-      faye: 1.4.1
-      form-data: 4.0.6
-      multistream: 3.1.0
-      undici: 8.11.2
-      xml2js: 0.6.2
-
   '@jsforce/jsforce-node@3.10.26':
     dependencies:
       '@sindresorhus/is': 4.6.0
@@ -8330,7 +8311,7 @@ snapshots:
 
   '@salesforce/core@8.32.6':
     dependencies:
-      '@jsforce/jsforce-node': 3.10.25
+      '@jsforce/jsforce-node': 3.10.26
       '@salesforce/kit': 3.2.6
       '@salesforce/ts-types': 2.0.12
       ajv: 8.20.0
@@ -8356,7 +8337,7 @@ snapshots:
 
   '@salesforce/packaging@4.27.8(supports-color@8.1.1)':
     dependencies:
-      '@jsforce/jsforce-node': 3.10.25
+      '@jsforce/jsforce-node': 3.10.26
       '@salesforce/core': 8.32.6
       '@salesforce/kit': 3.2.6
       '@salesforce/schemas': 1.10.3
@@ -9711,8 +9692,6 @@ snapshots:
   csso@5.0.5:
     dependencies:
       css-tree: 2.2.1
-
-  csv-parse@5.6.0: {}
 
   csv-parse@7.0.2: {}
 
