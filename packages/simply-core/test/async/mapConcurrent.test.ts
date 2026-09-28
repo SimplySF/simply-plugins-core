@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mapConcurrent } from '../../src/async/mapConcurrent.js';
 
 async function collect<T>(source: AsyncGenerator<T>): Promise<T[]> {
@@ -84,16 +84,23 @@ describe('mapConcurrent', () => {
   });
 
   it('yields in completion order, not source order', async () => {
-    const results = await collect(
-      mapConcurrent(toAsyncIterable([30, 10, 20]), 3, async (delay) => {
-        await new Promise((resolve) => {
-          setTimeout(resolve, delay);
-        });
-        return delay;
-      }),
-    );
+    // Fake timers keep this deterministic; real 10ms gaps are below Windows timer resolution.
+    vi.useFakeTimers();
+    try {
+      const pending = collect(
+        mapConcurrent(toAsyncIterable([30, 10, 20]), 3, async (delay) => {
+          await new Promise((resolve) => {
+            setTimeout(resolve, delay);
+          });
+          return delay;
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(30);
 
-    expect(results).to.deep.equal([10, 20, 30]);
+      expect(await pending).to.deep.equal([10, 20, 30]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('yields nothing for an empty source', async () => {
