@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.9](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.8...%40simplysf%2Fsimply-core%401.6.9) (2026-09-28)
+
+**Note:** Version bump only for package @simplysf/simply-core
+
 ## [1.6.8](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.7...%40simplysf%2Fsimply-core%401.6.8) (2026-09-28)
 
 ### Bug Fixes
