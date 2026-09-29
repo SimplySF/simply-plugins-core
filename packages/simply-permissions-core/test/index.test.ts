@@ -27,5 +27,17 @@ import * as api from '../src/index.js';
  * renamed key is the signal to treat the change as breaking (see `src/index.ts`'s header comment).
  */
 it('exports the expected set of runtime values', () => {
-  expect(Object.keys(api).sort()).toStrictEqual(['buildPermissionSetXml', 'buildPermissionsReportHtml']);
+  expect(Object.keys(api).sort()).toStrictEqual([
+    'PermissionSetBuildConfigSchema',
+    'PermissionSetBuildError',
+    'PermissionSetsFileSchema',
+    'buildPermissionSetXml',
+    'buildPermissionsReportHtml',
+    'compilePermissionSet',
+    'generatePermissionSets',
+    'loadPermissionSetBuildConfig',
+    'loadPermissionSetsFile',
+    'scanPermissionSetSource',
+    'writePermissionSet',
+  ]);
 });

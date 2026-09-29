@@ -37,3 +37,20 @@ export {
   type PermissionSetGroupReportEntry,
   type GroupedPermissionsData,
 } from './permissionsReportTemplate.js';
+export {
+  compilePermissionSet,
+  generatePermissionSets,
+  loadPermissionSetBuildConfig,
+  loadPermissionSetsFile,
+  PermissionSetBuildError,
+  scanPermissionSetSource,
+  writePermissionSet,
+  type PermissionSetBuildErrorCode,
+  type PermissionSetBuildOptions,
+  type PermissionSetBuildResult,
+  type PermissionSetSourceScan,
+  type PermissionSetSpec,
+  type PermissionSetType,
+} from './permissionSetBuild.js';
+export { PermissionSetBuildConfigSchema, type PermissionSetBuildConfig } from './schemas/permissionSetBuildConfig.js';
+export { PermissionSetsFileSchema, type PermissionSetsFile } from './schemas/permissionSetsFile.js';
