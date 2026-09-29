@@ -260,12 +260,21 @@ importers:
 
   packages/simply-permissions-core:
     dependencies:
+      '@salesforce/source-deploy-retrieve':
+        specifier: ^12.37.2
+        version: 12.37.2(supports-color@8.1.1)
+      '@simplysf/simply-core':
+        specifier: workspace:^1.6.10
+        version: link:../simply-core
       '@simplysf/simply-report':
         specifier: workspace:^1.0.6
         version: link:../simply-report
       xmlbuilder2:
         specifier: ^4.0.3
         version: 4.0.3
+      zod:
+        specifier: ^4.5.4
+        version: 4.6.5
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^4.1.10
