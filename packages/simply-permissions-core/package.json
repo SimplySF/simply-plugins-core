@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-permissions-core",
   "description": "Permission set generation, permission set XML, and permissions report rendering — the library layer behind @simplysf/simply-permissions, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",

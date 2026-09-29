@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.2.4...%40simplysf%2Fsimply-permissions-core%400.3.0) (2026-09-29)
+
+### Features
+
+- **simply-permissions-core:** add the permission set build service ([#219](https://github.com/SimplySF/simply-plugins-core/issues/219)) ([e78e54d](https://github.com/SimplySF/simply-plugins-core/commit/e78e54d874fe0c03e5354661454e65c7ed92eef0))
+
 ## [0.2.4](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.2.3...%40simplysf%2Fsimply-permissions-core%400.2.4) (2026-09-11)
 
 **Note:** Version bump only for package @simplysf/simply-permissions-core
