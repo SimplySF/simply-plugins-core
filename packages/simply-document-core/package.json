@@ -38,7 +38,7 @@
   },
   "type": "module",
   "dependencies": {
-    "handlebars": "^4.7.9"
+    "handlebars": "^4.7.10"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
