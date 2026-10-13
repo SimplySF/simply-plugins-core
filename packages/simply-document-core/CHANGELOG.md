@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.5](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-document-core%400.2.4...%40simplysf%2Fsimply-document-core%400.2.5) (2026-10-13)
+
+### Bug Fixes
+
+- **deps:** bump handlebars from 4.7.9 to 4.7.10 ([#226](https://github.com/SimplySF/simply-plugins-core/issues/226)) ([a700cb5](https://github.com/SimplySF/simply-plugins-core/commit/a700cb51f73a77df50302fcfa71f0fdc3a1a7bc6))
+
 ## [0.2.4](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-document-core%400.2.3...%40simplysf%2Fsimply-document-core%400.2.4) (2026-09-11)
 
 **Note:** Version bump only for package @simplysf/simply-document-core

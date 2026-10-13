@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-schema-core",
   "description": "sObject schema generation (CSV/Excel parsing, field/object normalization) and interactive schema-report rendering — the library layer behind @simplysf/simply-schema, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -37,7 +37,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@simplysf/simply-report": "workspace:^1.0.6",
+    "@simplysf/simply-report": "workspace:^1.0.7",
     "exceljs": "^4.4.0"
   },
   "devDependencies": {

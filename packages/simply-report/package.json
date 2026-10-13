@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-report",
   "description": "Shared HTML report scaffolding for SimplySF Salesforce CLI plugins",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
