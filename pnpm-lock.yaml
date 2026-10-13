@@ -186,8 +186,8 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       csv-stringify:
-        specifier: ^6.8.3
-        version: 6.8.3
+        specifier: ^6.9.0
+        version: 6.9.0
       fast-xml-parser:
         specifier: ^5.11.1
         version: 5.11.1
@@ -3078,8 +3078,8 @@ packages:
   csv-parse@7.0.2:
     resolution: {integrity: sha512-uKZghv9UmPkMVLYy//KZ9HFAIJsl7wkhoEdIL0+rhuSY9pZQlhaeGEDPIe+/w7eh81MOql8Q/9+inAGWG6ZHYA==}
 
-  csv-stringify@6.8.3:
-    resolution: {integrity: sha512-gIeSCvq5F4VtXV3naV3VAewLhBkiZBz+PPhTOA8H3Y8h/ELa+R1ml0GZck/4/Nzo9ep2lvOluilJ6MJlbZsKMA==}
+  csv-stringify@6.9.0:
+    resolution: {integrity: sha512-6b3e29CILFfSQ2nDRuZMRROzQOpPuJ+s8zPB5H7eK5ncXBbFOyVuRLU5Sx/zAUmVri3Ly49GyC8NEme4SVSAbA==}
 
   data-uri-to-buffer@6.0.2:
     resolution: {integrity: sha512-7hvf7/GW8e86rW0ptuwS3OcBGDjIi6SZva7hCyWC0yYry2cOPmLIjXAUHI6DK2HsnwJd9ifmt57i8eV2n4YNpw==}
@@ -7756,7 +7756,7 @@ snapshots:
       '@sindresorhus/is': 4.6.0
       base64url: 3.0.1
       csv-parse: 7.0.2
-      csv-stringify: 6.8.3
+      csv-stringify: 6.9.0
       faye: 1.4.1
       form-data: 4.0.6
       multistream: 3.1.0
@@ -9667,7 +9667,7 @@ snapshots:
 
   csv-parse@7.0.2: {}
 
-  csv-stringify@6.8.3: {}
+  csv-stringify@6.9.0: {}
 
   data-uri-to-buffer@6.0.2: {}
 
