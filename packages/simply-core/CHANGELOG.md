@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.11](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.10...%40simplysf%2Fsimply-core%401.6.11) (2026-10-13)
+
+### Bug Fixes
+
+- **deps:** bump csv-stringify from 6.8.3 to 6.9.0 ([#222](https://github.com/SimplySF/simply-plugins-core/issues/222)) ([448f665](https://github.com/SimplySF/simply-plugins-core/commit/448f665f7cf51db2667dd05873fd52e2bb4af846))
+
 ## [1.6.10](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.9...%40simplysf%2Fsimply-core%401.6.10) (2026-09-28)
 
 ### Bug Fixes
