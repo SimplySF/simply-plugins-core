@@ -82,6 +82,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0040](0040-community-publish-request-timeouts.md)                   | Bounded per-attempt timeouts for community publish network calls                      | Draft       |
 | [0041](0041-permissions-build-from-file.md)                          | `simply-permissions-core`: build service for `permissions build --file`               | Draft       |
 | [0042](0042-settings-address-states.md)                              | `simply-settings-core`: create/activate State and Country/Territory picklist states   | Implemented |
+| [0043](0043-settings-address-states-iso-codes.md)                    | `simply-settings-core`: fetch state definitions from an ISO 3166-2 source at run time | Planned     |
 
 ## Template
 
