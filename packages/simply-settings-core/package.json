@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-settings-core",
   "description": "State and Country/Territory picklist automation (create states via the Setup form, activate them via AddressSettings) — the library layer behind @simplysf/simply-settings, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
