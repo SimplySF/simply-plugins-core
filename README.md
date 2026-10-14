@@ -6,7 +6,7 @@ The core Node/TypeScript libraries behind [SimplySF](https://github.com/SimplySF
 
 ## Packages
 
-This repository is a monorepo. Thirteen packages are published independently to npm:
+This repository is a monorepo. Fourteen packages are published independently to npm:
 
 | Package                                                                     | What it's for                                                                                                                                      |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
