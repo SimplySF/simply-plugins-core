@@ -247,7 +247,7 @@ describe('fetchIsoCodesStateDefinitions (debian)', () => {
     const error = await failure(fetchDebian({ version: 'v4.20.1' }));
 
     expect(error.name).toBe('InvalidIsoCodesDataError');
-    expect(error.message).toMatch(new RegExp(`^${SALSA}.*: Invalid state key "FR-TOOLONG"`));
+    expect(error.message.startsWith(`${SALSA}${dataPath('v4.20.1')}: Invalid state key "FR-TOOLONG"`)).toBe(true);
   });
 
   it('rejects an unsupported source', async () => {
