@@ -1,7 +1,7 @@
 # 0042 — `simply settings address state create`/`activate`
 
-**Status:** Planned. Implemented and unit-tested, but not yet exercised against a live org (see
-Testing).
+**Status:** Implemented (PR #227, shipped as `@simplysf/simply-settings-core@0.2.0`; plugin
+SimplySF/simply-plugins#66). Not yet exercised against a live org; see Testing.
 **Package:** new `packages/simply-settings` (CLI, in `simply-plugins`); new
 `packages/simply-settings-core` (library, in `simply-plugins-core`). Duplicated from `simply-plugins`, where it is 0041.
 **Date:** 2026-10-14
@@ -314,9 +314,12 @@ Per the cross-repo recipe ([0027](0027-core-extraction-round-1-post-split.md)), 
    `CONTRIBUTING.md` (including how to refresh the HTML fixtures when Salesforce changes the page),
    and this doc as 0042. Register the package in that repo's `eslint.config.mjs` (both arrays), its
    README/CONTRIBUTING package tables, and the docs site (typedoc plugin, guide, sidebar, landing
-   card, getting-started). Open that PR, merge it, and publish `0.1.0`. As with earlier `-core`
-   packages, expect npm's trusted-publisher first-publish constraint to need a one-time manual
-   `pnpm publish`.
+   card, getting-started). Open that PR and merge it. The package is committed at `0.1.0`, and the
+   release workflow bumps it to `0.2.0` on merge, as it did for earlier `-core` packages. npm's
+   trusted publishing can only be attached to a package that already exists, so CI's first
+   publish fails. Publish `0.2.0` once by hand (`pnpm publish --access public --no-git-checks`
+   from the built release commit), then attach the GitHub Actions trusted publisher so later
+   releases publish from CI with provenance.
 2. **`simply-plugins`**: `packages/simply-settings`, scaffolded from `simply-community`'s
    `package.json`/`bin`/`tsconfig`/wireit block, with `oclif.topics` `simply → settings → address
 → state`. Add `src/commands/simply/settings/address/state/{create,activate}.ts`, a shared
@@ -324,7 +327,10 @@ Per the cross-repo recipe ([0027](0027-core-extraction-round-1-post-split.md)), 
    `messages/simply.settings.address.state{,.create,.activate}.md`, and tests. Register the package
    in `eslint.config.mjs`. Then `pnpm run build` (for `command-snapshot.json`) and `pnpm run readme`.
    Until the core package is published, verify against a `pnpm pack` tarball of it through a
-   temporary `file:` dependency spec, and restore `^0.1.0` before committing.
+   temporary `file:` dependency spec. The commit itself has to wait for the publish:
+   `simply-plugins`' pre-commit hook runs `pnpm exec`, which first checks the dependency is installable.
+   It then depends on `^0.2.0`, with `@simplysf/simply-settings-core@0.2.0` added to
+   `minimumReleaseAgeExclude`.
 3. **Register it**: add it to `packages/simply`'s `oclif.plugins`, `dependencies`, and
    `command-snapshot` wireit dependencies, then rebuild and run `pnpm run readme` there. Add it to
    `OTHER_PLUGIN_DIRS` in `site/scripts/sync-command-reference.mjs`, the sidebar in
