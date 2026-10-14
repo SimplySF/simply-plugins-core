@@ -193,4 +193,10 @@ describe('isLoginPage', () => {
   it('accepts the Setup page itself', () => {
     expect(isLoginPage({ url: `${INSTANCE}${PROBE}`, body: fixture('new-state-form.html') })).toBe(false);
   });
+
+  it('stays linear on many unclosed forms (CodeQL: polynomial regex)', () => {
+    const started = performance.now();
+    expect(isLoginPage({ url: `${INSTANCE}${PROBE}`, body: '<form'.repeat(50_000) })).toBe(false);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
 });

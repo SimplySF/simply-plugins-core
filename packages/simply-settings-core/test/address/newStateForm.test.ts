@@ -131,3 +131,33 @@ describe('classifyNewStateResponse', () => {
     });
   });
 });
+
+// CodeQL flagged quadratic regex behavior on inputs like these. Each must stay linear: at the old
+// patterns' O(n²), 100k characters takes many seconds; linear scans take milliseconds.
+describe('pathological input', () => {
+  const huge = 100_000;
+
+  it.each([
+    ['many "<"', '<'.repeat(huge)],
+    ['many unclosed forms', '<form '.repeat(huge / 6)],
+    ['many unclosed selects in a form', `<form>${'<select name="s">'.repeat(huge / 17)}</form>`],
+    ['many unclosed textareas in a form', `<form>${'<textarea name="t">'.repeat(huge / 19)}</form>`],
+  ])('parses %s quickly', (_label, html) => {
+    const started = performance.now();
+    parseNewStateForm(html);
+    classifyNewStateResponse({ status: 200, body: `<h4>Errors</h4>${html}` });
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  it('still reads controls after an unclosed textarea', () => {
+    const form = parseNewStateForm(
+      fixture('new-state-form.html').replace(
+        '<textarea name="configurenew:j_id1:blockNew:j_id9:notesSectionItem:notes">a &amp; b</textarea>',
+        '<textarea name="broken">',
+      ),
+    );
+
+    expect(form?.addButton[1]).toBe('Add');
+    expect(form?.fields).toContainEqual(['broken', '']);
+  });
+});

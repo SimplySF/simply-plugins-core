@@ -119,7 +119,9 @@ export function isLoginPage(response: Pick<SetupResponse, 'url' | 'body'>): bool
     hostname.startsWith('test.') ||
     pathname === '/' ||
     pathname.startsWith('/login') ||
-    /<form[^>]+id=["']login_form["']/i.test(response.body)
+    // `[^<>]`, not `[^>]`: a match can't run past the next tag, which keeps this linear on input
+    // like thousands of unclosed `<form`s.
+    /<form[^<>]+id=["']login_form["']/i.test(response.body)
   );
 }
 

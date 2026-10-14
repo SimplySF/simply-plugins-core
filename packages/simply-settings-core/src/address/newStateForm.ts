@@ -48,11 +48,15 @@ const CODE_SUFFIX = ':editIsoCode';
 const INTEGRATION_VALUE_SUFFIX = ':editIntVal';
 const ADD_BUTTON_SUFFIX = ':addButton';
 
-const FORM_PATTERN = /<form\b([^>]*)>([\s\S]*?)<\/form>/gi;
-// Either a `<textarea>`/`<select>` with its content (groups 1-3), or a void `<input>` (group 4).
-const CONTROL_PATTERN = /<(textarea|select)\b([^>]*)>([\s\S]*?)<\/\1\s*>|<input\b([^>]*)>/gi;
+// Every tag pattern stops at the next `<` (`[^<>]`, never `[^>]`), and element bodies are found with
+// `indexOf` rather than a lazy `[\s\S]*?` up to a closing tag. Both keep matching linear on
+// pathological input such as thousands of unclosed `<form` tags; the page is server HTML, but it's
+// still input this library doesn't control.
+// Start-tag patterns capture the tag name (group 1) and its attributes (group 2), for `elements()`.
+const FORM_START_PATTERN = /<(form)\b([^<>]*)>/gi;
+const CONTROL_START_PATTERN = /<(input|textarea|select)\b([^<>]*)>/gi;
 const ATTRIBUTE_PATTERN = /([^\s"'=<>`/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-const OPTION_PATTERN = /<option\b([^>]*)>([\s\S]*?)(?=<option\b|<\/select>|$)/gi;
+const OPTION_PATTERN = /<option\b([^<>]*)>([^<]*)/gi;
 
 const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
@@ -78,7 +82,7 @@ function parseAttributes(source: string): Map<string, string> {
 }
 
 function htmlToText(html: string): string {
-  return decodeEntities(html.replace(/<[^>]*>/g, ' '))
+  return decodeEntities(html.replace(/<[^<>]*>/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -110,6 +114,44 @@ function defaultSubmission(tag: string, attributes: Map<string, string>, content
   return attributes.get('value') ?? '';
 }
 
+type Element = { tag: string; attributes: string; content: string };
+
+/**
+ * Each element whose start tag `startPattern` matches, with its content up to its closing tag (none
+ * for `<input>`). Scanning resumes after each closing tag, so elements never overlap.
+ *
+ * An element with no closing tag gets empty content, and once one `<tag>` is found unclosed, later
+ * ones aren't searched for a close either: there can't be one after an unclosed earlier one. Each
+ * close search starts where the last one ended, which keeps the whole scan linear.
+ */
+function* elements(html: string, startPattern: RegExp): Generator<Element> {
+  const start = new RegExp(startPattern.source, 'gi');
+  const unclosed = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  while ((match = start.exec(html)) !== null) {
+    const tag = match[1].toLowerCase();
+    const contentStart = start.lastIndex;
+
+    if (tag === 'input' || unclosed.has(tag)) {
+      yield { tag, attributes: match[2], content: '' };
+      continue;
+    }
+
+    const close = new RegExp(`</${tag}\\s*>`, 'gi');
+    close.lastIndex = contentStart;
+    const end = close.exec(html);
+    if (!end) {
+      unclosed.add(tag);
+      yield { tag, attributes: match[2], content: '' };
+      continue;
+    }
+
+    yield { tag, attributes: match[2], content: html.slice(contentStart, end.index) };
+    start.lastIndex = close.lastIndex;
+  }
+}
+
 /**
  * Finds the "Configure New State" form in a `/i18n/ConfigureNewState.apexp` page.
  *
@@ -118,15 +160,15 @@ function defaultSubmission(tag: string, attributes: Map<string, string>, content
  * Salesforce changed the page (or that this isn't the page at all, e.g. a login page).
  */
 export function parseNewStateForm(html: string): NewStateForm | undefined {
-  for (const [, formAttributes, formBody] of html.matchAll(FORM_PATTERN)) {
+  for (const form of elements(html, FORM_START_PATTERN)) {
     const fields: Array<[string, string]> = [];
     let nameField: string | undefined;
     let codeField: string | undefined;
     let integrationValueField: string | undefined;
     let addButton: [string, string] | undefined;
 
-    for (const [, contentTag, contentAttributes, content, inputAttributes] of formBody.matchAll(CONTROL_PATTERN)) {
-      const attributes = parseAttributes(contentAttributes ?? inputAttributes);
+    for (const control of elements(form.content, CONTROL_START_PATTERN)) {
+      const attributes = parseAttributes(control.attributes);
       const name = attributes.get('name');
       if (!name || attributes.has('disabled')) continue;
 
@@ -135,14 +177,14 @@ export function parseNewStateForm(html: string): NewStateForm | undefined {
       else if (name.endsWith(INTEGRATION_VALUE_SUFFIX)) integrationValueField = name;
       else if (name.endsWith(ADD_BUTTON_SUFFIX)) addButton = [name, attributes.get('value') ?? ''];
       else {
-        const value = defaultSubmission(contentTag?.toLowerCase() ?? 'input', attributes, content);
+        const value = defaultSubmission(control.tag, attributes, control.content);
         if (value !== undefined) fields.push([name, value]);
       }
     }
 
     if (nameField && codeField && integrationValueField && addButton) {
       return {
-        action: parseAttributes(formAttributes).get('action') ?? '',
+        action: parseAttributes(form.attributes).get('action') ?? '',
         fields,
         nameField,
         codeField,
@@ -180,7 +222,7 @@ export function fillNewStateForm(form: NewStateForm, definition: StateDefinition
 function textAfter(body: string, marker: string): string | undefined {
   const start = body.indexOf(marker);
   if (start === -1) return undefined;
-  const rest = body.slice(start + marker.length).replace(/^(?:\s*<\/[^>]+>)+/, '');
+  const rest = body.slice(start + marker.length).replace(/^(?:\s*<\/[^<>]+>)+/, '');
   const end = rest.search(/<\/(?:li|div|td|span|p)\s*>/i);
   const message = htmlToText(rest.slice(0, end === -1 ? 500 : end));
   return message || undefined;
