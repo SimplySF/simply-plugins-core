@@ -1,0 +1,22 @@
+/*
+ * Starlight caps the content column at `--sl-content-width: 45rem` (~720px) at every window size, so
+ * a code block fits only ~85 characters of monospace, even on a very wide screen. The generated
+ * API signatures run well past that, so they scrolled sideways.
+ *
+ * On wide screens (where Starlight shows both sidebars, 72rem+), let the column grow with the
+ * window: from Starlight's 45rem default, up to 72rem (~140 characters of code). Starlight positions
+ * both sidebars from this same variable, so the layout follows. Below 72rem nothing changes.
+ */
+@media (min-width: 72rem) {
+  :root {
+    --sl-content-width: clamp(45rem, 100vw - 2 * var(--sl-sidebar-width) - 4rem, 72rem);
+  }
+}
+
+/*
+ * Only code and other wide content should use the extra width. Prose, lists, and headings keep
+ * Starlight's default measure, so line length stays readable.
+ */
+.sl-markdown-content :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) {
+  max-width: 45rem;
+}
