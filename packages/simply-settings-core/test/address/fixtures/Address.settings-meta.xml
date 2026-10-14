@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AddressSettings xmlns="http://soap.sforce.com/2006/04/metadata">
+    <countriesAndStates>
+        <countries>
+            <active>true</active>
+            <integrationValue>Andorra</integrationValue>
+            <isoCode>AD</isoCode>
+            <label>Andorra</label>
+            <orgDefault>false</orgDefault>
+            <standard>true</standard>
+            <states>
+                <active>false</active>
+                <integrationValue>Canillo</integrationValue>
+                <isoCode>02</isoCode>
+                <label>Canillo</label>
+                <standard>false</standard>
+                <visible>false</visible>
+            </states>
+            <visible>true</visible>
+        </countries>
+        <countries>
+            <active>true</active>
+            <integrationValue>United States</integrationValue>
+            <isoCode>US</isoCode>
+            <label>United States</label>
+            <orgDefault>true</orgDefault>
+            <standard>true</standard>
+            <states>
+                <active>true</active>
+                <integrationValue>California</integrationValue>
+                <isoCode>CA</isoCode>
+                <label>California</label>
+                <standard>true</standard>
+                <visible>true</visible>
+            </states>
+            <states>
+                <active>false</active>
+                <integrationValue>Guam</integrationValue>
+                <isoCode>GU</isoCode>
+                <label>Guam</label>
+                <standard>true</standard>
+                <visible>false</visible>
+            </states>
+            <states>
+                <active>true</active>
+                <integrationValue>Puerto Rico &amp; Islands</integrationValue>
+                <isoCode>PR</isoCode>
+                <label>Puerto Rico &amp; Islands</label>
+                <standard>true</standard>
+                <visible>false</visible>
+            </states>
+            <visible>true</visible>
+        </countries>
+    </countriesAndStates>
+</AddressSettings>
