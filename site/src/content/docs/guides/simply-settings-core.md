@@ -26,6 +26,18 @@ const all = parseStateDefinitions(JSON.parse(await readFile('states.json', 'utf8
 const justTheUs = filterStateDefinitions(all, ['US']);
 ```
 
+Or download them at run time from an ISO 3166-2 source. `debian` (Debian's
+[`iso-codes`](https://salsa.debian.org/iso-codes-team/iso-codes)) is the only source today. Nothing
+is cached or written to disk:
+
+```ts
+import { fetchIsoCodesStateDefinitions, filterStateDefinitions } from '@simplysf/simply-settings-core';
+
+// version defaults to the latest release tag; allLevels adds nested subdivisions (e.g. French departments)
+const { version, definitions } = await fetchIsoCodesStateDefinitions({ source: 'debian', version: 'v4.20.1' });
+const france = filterStateDefinitions(definitions, ['FR']);
+```
+
 ## Creating missing states
 
 Salesforce has no API for creating states, so `createStates` submits Setup's _Configure New State_

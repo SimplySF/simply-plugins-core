@@ -28,6 +28,8 @@ import * as api from '../src/index.js';
 it('exports the expected set of runtime values', () => {
   expect(Object.keys(api).sort()).toStrictEqual([
     'DEFAULT_CREATE_CONCURRENCY',
+    'ISO_CODES_SOURCES',
+    'ISO_CODES_SOURCE_IDS',
     'NEW_STATE_FORM_PATH',
     'SetupSession',
     'SetupTransportError',
@@ -36,6 +38,7 @@ it('exports the expected set of runtime values', () => {
     'createState',
     'createStates',
     'deployAddressSettingsXml',
+    'fetchIsoCodesStateDefinitions',
     'fillNewStateForm',
     'filterStateDefinitions',
     'formatStateKey',
@@ -47,5 +50,6 @@ it('exports the expected set of runtime values', () => {
     'planStateActivation',
     'planStateCreation',
     'retrieveAddressSettingsXml',
+    'subdivisionsToStateDefinitions',
   ]);
 });

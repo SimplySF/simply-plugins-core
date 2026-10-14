@@ -287,7 +287,8 @@ inside an Apache-2.0 package. A Wikidata export (CC0) has no licensing friction,
 and naming vary and would need a curation pass and a refresh script. Either way, someone has to
 choose subdivision _levels_ (ISO lists both France's regions and its departments, for example).
 Rejected for v1: requiring `--file` has no licensing risk, and a dataset can be added later without
-changing any flag's shape.
+changing any flag's shape. [0043](0043-settings-address-states-iso-codes.md) later did exactly that,
+by fetching Debian `iso-codes` at run time instead of bundling it.
 
 **Parse the page with an HTML library (`node-html-parser`).** This was the original plan. The
 implementation uses a ~60-line scanner over `<form>`/`<input>`/`<select>`/`<textarea>` tags
@@ -386,5 +387,6 @@ automates this is follow-up work.
    instead of the hours a serial run takes. Measure against a sandbox and adjust.
 4. **Separate integration values** (for example, ISO code as the integration value). Not in v1.
    It would be a value-shape extension to `--file`, not a new flag.
-5. **A bundled dataset**, if one is wanted later. See Alternatives considered for the licensing
-   and subdivision-level questions it raises.
+5. **A bundled dataset.** Resolved by [0043](0043-settings-address-states-iso-codes.md):
+   `--iso-codes debian` fetches one at run time, which avoids both the licensing and staleness
+   problems.
