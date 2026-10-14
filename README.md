@@ -23,6 +23,7 @@ This repository is a monorepo. Thirteen packages are published independently to 
 | [`@simplysf/simply-schema-core`](packages/simply-schema-core)               | sObject schema generation (CSV/Excel parsing, field/object normalization) and interactive schema-report rendering                                  |
 | [`@simplysf/simply-project-setup-core`](packages/simply-project-setup-core) | Salesforce DX project file/dependency standardization engine (template packs, `.gitignore` composition, `package.json` scripts/dependency merging) |
 | [`@simplysf/simply-cicd-core`](packages/simply-cicd-core)                   | ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab)                                                                       |
+| [`@simplysf/simply-settings-core`](packages/simply-settings-core)           | State and Country/Territory picklist automation: create states through Setup and activate them via AddressSettings                                 |
 
 See each package's README for its full API reference and usage examples, or browse the [documentation site](https://simplysf.github.io/simply-plugins-core/) for API docs and code snippets across all thirteen.
 
@@ -44,6 +45,7 @@ npm install @simplysf/simply-package-core
 npm install @simplysf/simply-schema-core
 npm install @simplysf/simply-project-setup-core
 npm install @simplysf/simply-cicd-core
+npm install @simplysf/simply-settings-core
 ```
 
 ## Contributing

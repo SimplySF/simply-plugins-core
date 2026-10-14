@@ -63,6 +63,7 @@ const allPackages = [
   'packages/simply-project-setup-core',
   'packages/simply-report',
   'packages/simply-schema-core',
+  'packages/simply-settings-core',
   'packages/simply-sobject-core',
 ];
 
@@ -80,6 +81,7 @@ const libraryPackages = [
   'packages/simply-project-setup-core',
   'packages/simply-report',
   'packages/simply-schema-core',
+  'packages/simply-settings-core',
   'packages/simply-sobject-core',
 ];
 
