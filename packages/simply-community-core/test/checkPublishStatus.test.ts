@@ -15,7 +15,7 @@
  */
 
 import { Duration } from '@salesforce/kit';
-import { Connection, SfError } from '@salesforce/core';
+import { SfError } from '@salesforce/core';
 import { MockTestOrgData, TestContext } from '@salesforce/core/testSetup';
 import sinon from 'sinon';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -35,7 +35,7 @@ describe('checkPublishStatus', () => {
 
   it('should report not completed while the job has not finished', async () => {
     const connection = await testOrg.getConnection();
-    $$.SANDBOX.stub(Connection.prototype, 'query').resolves({
+    $$.fakeConnectionRequest = async () => ({
       done: true,
       totalSize: 1,
       records: [{ Id: '08p000000000001', Status: 'InProgress', FinishedAt: null, Error: null }],
@@ -48,7 +48,7 @@ describe('checkPublishStatus', () => {
 
   it('should report not completed when the record is not yet queryable', async () => {
     const connection = await testOrg.getConnection();
-    $$.SANDBOX.stub(Connection.prototype, 'query').resolves({ done: true, totalSize: 0, records: [] });
+    $$.fakeConnectionRequest = async () => ({ done: true, totalSize: 0, records: [] });
 
     const poll = checkPublishStatus(connection, '08p000000000001');
 
@@ -57,18 +57,49 @@ describe('checkPublishStatus', () => {
 
   it('should report not completed, not hang forever, when the query never settles', async () => {
     const connection = await testOrg.getConnection();
-    $$.SANDBOX.stub(Connection.prototype, 'query').returns(
-      new Promise(() => {}) as unknown as ReturnType<Connection['query']>,
-    );
+    $$.fakeConnectionRequest = async () => new Promise<never>(() => {});
 
     const poll = checkPublishStatus(connection, '08p000000000001', Duration.milliseconds(5));
 
     await expect(poll()).resolves.to.deep.equal({ completed: false });
   });
 
+  it('should query BackgroundOperation through a request jsforce cancels on timeout', async () => {
+    const connection = await testOrg.getConnection();
+    let seen: { request: unknown; options: unknown } | undefined;
+    $$.fakeConnectionRequest = async (request, options) => {
+      seen = { request, options };
+      return { done: true, totalSize: 0, records: [] };
+    };
+
+    await checkPublishStatus(connection, '08p000000000001', Duration.seconds(30))();
+
+    expect(seen?.request).to.deep.equal({
+      method: 'GET',
+      url: `/query?q=${encodeURIComponent(
+        "SELECT Id, Status, FinishedAt, Error FROM BackgroundOperation WHERE Id = '08p000000000001'",
+      )}`,
+    });
+    expect(seen?.options).to.deep.equal({ timeout: 31_000 });
+  });
+
+  it('should report a failed status check to onPollError and keep polling', async () => {
+    const connection = await testOrg.getConnection();
+    const queryError = new Error('INVALID_TYPE: sObject type BackgroundOperation is not supported.');
+    $$.fakeConnectionRequest = async () => {
+      throw queryError;
+    };
+    const errors: unknown[] = [];
+
+    const poll = checkPublishStatus(connection, '08p000000000001', undefined, (error) => errors.push(error));
+
+    await expect(poll()).resolves.to.deep.equal({ completed: false });
+    expect(errors).to.deep.equal([queryError]);
+  });
+
   it('should report completed once the job finishes successfully', async () => {
     const connection = await testOrg.getConnection();
-    $$.SANDBOX.stub(Connection.prototype, 'query').resolves({
+    $$.fakeConnectionRequest = async () => ({
       done: true,
       totalSize: 1,
       records: [
@@ -83,7 +114,7 @@ describe('checkPublishStatus', () => {
 
   it('should throw a CommunityPublishFailedError once the job finishes with an error', async () => {
     const connection = await testOrg.getConnection();
-    $$.SANDBOX.stub(Connection.prototype, 'query').resolves({
+    $$.fakeConnectionRequest = async () => ({
       done: true,
       totalSize: 1,
       records: [

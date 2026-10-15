@@ -103,4 +103,53 @@ describe('publishCommunity', () => {
       }),
     ).rejects.toThrow(RetryAttemptTimeoutError);
   });
+
+  it('sends a body and a jsforce timeout, so the request is actually sent and cancelled on timeout', async () => {
+    const connection = await testOrg.getConnection();
+    let seen: { request: unknown; options: unknown } | undefined;
+    $$.fakeConnectionRequest = async (request, options) => {
+      seen = { request, options };
+      return publishResponse;
+    };
+    $$.SANDBOX.stub(PollingClient, 'create').resolves({ subscribe: async () => undefined } as unknown as PollingClient);
+
+    await publishCommunity({
+      connection,
+      networkId: '0DM000000000001',
+      wait: 10,
+      requestTimeout: Duration.seconds(30),
+    });
+
+    // A bodyless POST is never sent by jsforce: it streams the body and only ends the stream when
+    // `body` is defined.
+    expect(seen?.request).to.have.property('body').that.is.a('string');
+    // The attempt timeout plus a short grace, so jsforce aborts the socket just after ours fires.
+    expect(seen?.options).to.deep.equal({ timeout: 31_000 });
+  });
+
+  it('forwards onPollError to the status poll', async () => {
+    const connection = await testOrg.getConnection();
+    const pollError = new Error('INVALID_TYPE: sObject type BackgroundOperation is not supported.');
+    $$.fakeConnectionRequest = async (request) => {
+      if ((request as { method: string }).method === 'POST') {
+        return publishResponse;
+      }
+      throw pollError;
+    };
+    const create = $$.SANDBOX.stub(PollingClient, 'create').resolves({
+      subscribe: async () => undefined,
+    } as unknown as PollingClient);
+    const errors: unknown[] = [];
+
+    await publishCommunity({
+      connection,
+      networkId: '0DM000000000001',
+      wait: 10,
+      onPollError: (error) => errors.push(error),
+    });
+    const { poll } = create.firstCall.args[0] as { poll: () => Promise<unknown> };
+    await poll();
+
+    expect(errors).to.deep.equal([pollError]);
+  });
 });

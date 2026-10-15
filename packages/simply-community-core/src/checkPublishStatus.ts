@@ -15,8 +15,8 @@
  */
 
 import { Duration } from '@salesforce/kit';
-import { SfError, type Connection, type StatusResult } from '@salesforce/core';
-import { retryWithBackoff } from '@simplysf/simply-core';
+import { Logger, SfError, type Connection, type StatusResult } from '@salesforce/core';
+import { boundedQuery } from './boundedRequest.js';
 import { DEFAULT_PUBLISH_REQUEST_TIMEOUT } from './requestTimeout.js';
 
 /** The `BackgroundOperation` fields this needs, out of the full standard-object schema. */
@@ -38,6 +38,7 @@ type BackgroundOperationRecord = {
  * @param connection - The org connection to poll against.
  * @param jobId - The `jobId` returned by `POST /connect/communities/{id}/publish`.
  * @param requestTimeout - Bounds each status-check attempt. Defaults to `DEFAULT_PUBLISH_REQUEST_TIMEOUT`; overridable mainly so tests don't have to wait out the real default.
+ * @param onPollError - Called with the error whenever a status check fails, so the caller can surface it (the poll itself still reports "not finished yet").
  * @returns A `poll()` function for `PollingClient.create({ poll, ... })`.
  * @throws {SfError} `CommunityPublishFailedError` if the job reaches a terminal failure state.
  */
@@ -45,22 +46,23 @@ export function checkPublishStatus(
   connection: Connection,
   jobId: string,
   requestTimeout: Duration = DEFAULT_PUBLISH_REQUEST_TIMEOUT,
+  onPollError?: (error: unknown) => void,
 ): () => Promise<StatusResult> {
   return async (): Promise<StatusResult> => {
     let result;
     try {
-      result = await retryWithBackoff(
-        () =>
-          Promise.resolve(
-            connection.query<BackgroundOperationRecord>(
-              `SELECT Id, Status, FinishedAt, Error FROM BackgroundOperation WHERE Id = '${jobId}'`,
-            ),
-          ),
-        { retryAttempts: 0, backoffFactor: 1, attemptTimeout: requestTimeout },
+      result = await boundedQuery<BackgroundOperationRecord>(
+        connection,
+        `SELECT Id, Status, FinishedAt, Error FROM BackgroundOperation WHERE Id = '${jobId}'`,
+        requestTimeout,
       );
-    } catch {
+    } catch (err) {
       // A stalled or failed status check isn't a publish failure — treat it the same as "not
       // finished yet" below and let PollingClient's own timeout/frequency decide when to give up.
+      // But don't swallow it: a failure that repeats every poll (e.g. the user can't query
+      // BackgroundOperation) would otherwise only show up as a timeout once --wait runs out.
+      Logger.childFromRoot('checkPublishStatus').debug(`Status check for publish job ${jobId} failed: ${String(err)}`);
+      onPollError?.(err);
       return { completed: false };
     }
 

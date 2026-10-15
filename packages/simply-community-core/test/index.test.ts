@@ -34,6 +34,7 @@ it('exports the expected set of runtime values', () => {
     'patchCustomSiteXml',
     'patchNetworkXml',
     'publishCommunity',
+    'queryNetworkByName',
     'readNetworkSiteName',
     'resolveNetworkFile',
     'resolveRetrieveDestination',

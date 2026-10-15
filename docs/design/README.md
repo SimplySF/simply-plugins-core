@@ -79,10 +79,11 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0037](0037-simply-cicd-core.md)                                     | Splitting `simply-cicd-core` out of `simply-cicd`                                     | Draft       |
 | [0038](0038-simply-project-setup-core-file-write-strategies.md)      | `simply-project-setup-core`: `jsonMergeFiles`/`regexCustomizations` file strategies   | Draft       |
 | [0039](0039-package-dependencies-install-service.md)                 | `simply-package-core`: `installPackageDependencies` service (used by `simply-cicd`)   | Implemented |
-| [0040](0040-community-publish-request-timeouts.md)                   | Bounded per-attempt timeouts for community publish network calls                      | Draft       |
+| [0040](0040-community-publish-request-timeouts.md)                   | Bounded per-attempt timeouts for community publish network calls                      | Implemented |
 | [0041](0041-permissions-build-from-file.md)                          | `simply-permissions-core`: build service for `permissions build --file`               | Draft       |
 | [0042](0042-settings-address-states.md)                              | `simply-settings-core`: create/activate State and Country/Territory picklist states   | Implemented |
 | [0043](0043-settings-address-states-iso-codes.md)                    | `simply-settings-core`: fetch state definitions from an ISO 3166-2 source at run time | Planned     |
+| [0044](0044-community-publish-cancel-stalled-requests.md)            | Send the community publish POST, and cancel (not abandon) stalled requests            | In progress |
 
 ## Template
 

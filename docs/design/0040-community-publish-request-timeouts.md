@@ -1,6 +1,6 @@
 # 0040 — Bounded per-attempt timeouts for community publish network calls
 
-**Status:** Draft
+**Status:** Implemented — but see [0044](0044-community-publish-cancel-stalled-requests.md): this did not stop the hang. The publish POST was never being sent at all, and a timed-out request kept the process alive.
 **Package:** `simply-core`, `simply-community-core`
 **Date:** 2026-09-17
 
