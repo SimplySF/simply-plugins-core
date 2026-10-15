@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.15.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.14.3...%40simplysf%2Fsimply-aep-core%400.15.0) (2026-10-15)
+
+### Features
+
+- **simply-aep-core:** port the AEP generation engine from apx-core ([#232](https://github.com/SimplySF/simply-plugins-core/issues/232)) ([09bf214](https://github.com/SimplySF/simply-plugins-core/commit/09bf214654b3486c7554d990f23f30a576b8fc1c))
+
 ## [0.14.3](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.14.2...%40simplysf%2Fsimply-aep-core%400.14.3) (2026-09-11)
 
 **Note:** Version bump only for package @simplysf/simply-aep-core

@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-aep-core",
   "description": "Apex Enterprise Patterns (fflib, force-di, AT4DX) scan, resolution, and code generation logic — the library layer behind @simplysf/simply-aep, published separately for direct consumption (e.g. editor tooling) without the CLI framework",
-  "version": "0.14.3",
+  "version": "0.15.0",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
