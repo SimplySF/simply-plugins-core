@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.15.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.15.0...%40simplysf%2Fsimply-aep-core%400.15.1) (2026-10-15)
+
+### Bug Fixes
+
+- **simply-aep-core:** harden generation engine per PR [#232](https://github.com/SimplySF/simply-plugins-core/issues/232) review ([#233](https://github.com/SimplySF/simply-plugins-core/issues/233)) ([0b1ebee](https://github.com/SimplySF/simply-plugins-core/commit/0b1ebeeb4b5c81aa86e003c7685e2bb0cb0b6469))
+
 # [0.15.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.14.3...%40simplysf%2Fsimply-aep-core%400.15.0) (2026-10-15)
 
 ### Features
