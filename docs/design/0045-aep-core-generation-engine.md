@@ -1,6 +1,6 @@
 # 0045 — `simply-aep-core`: the AEP generation engine, ported from `apx-core`
 
-**Status:** Draft
+**Status:** Implemented ([PR #232](https://github.com/SimplySF/simply-plugins-core/pull/232))
 **Package:** `simply-aep-core`
 **Date:** 2026-10-15
 
@@ -67,7 +67,22 @@ Behavior that changed, beyond the overwrite default:
 - The action/criteria and field-set-inclusion review lines no longer name a nil `…Alternate__c`
   field, since which field is nil now depends on the object.
 
-Everything else keeps its `apx-core` name, signature, and behavior.
+Post-merge fixes:
+
+- Dry runs enforce `error` overwrite preflight. `renderGenerationPlan(preview, policy = 'error')`
+  labels existing files `EXISTS (will fail)`, `OVERWRITE`, or `SKIP` according to policy.
+- All emitted CMDT DeveloperNames use the shared create/write validation rule. Invalid derived names
+  throw `invalid-developer-name`, including the source name, derived name, and broken rule; they are
+  never silently renamed. Builders throw before a preview can reach `planValidation`, so that path
+  needs no duplicate DeveloperName check.
+- Binding sequences accept only finite, non-negative plain decimals, using `ORDER_PATTERN`.
+- Cancellation stops between files. An abort after the final file returns the completed manifest.
+  Writes are not atomic or rolled back; `write-failed` includes `data.created` just as cancellation does.
+- Option schemas reject unsafe SObject/class/service identifiers. The engine resolves every target
+  and rejects absolute or escaping paths with `invalid-path` before writing any artifact.
+
+Inherited Apex naming quirks (underscore removal and non-anchored `__c` stripping) are deliberately
+unchanged for reference parity. Everything else keeps its `apx-core` name, signature, and behavior.
 
 ### Intentional CMDT differences
 

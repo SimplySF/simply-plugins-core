@@ -42,17 +42,12 @@ import { scanOrgPlatformEventSubscriptions } from './at4dxPlatformEventSubscript
 import { validatePlatformEventSubscriptions } from './at4dxPlatformEventSubscriptionResolve.js';
 import { UnpatchableValueShapeError } from './customMetadataXml.js';
 
-const DEVELOPER_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
+import { developerNameIssue } from './developerName.js';
 const DEFAULT_WAIT = Duration.minutes(33);
 
 /** @throws {PlatformEventSubscriptionWriteError} `invalid-developer-name` if `developerName` doesn't match Custom Metadata's DeveloperName rules. */
 function checkDeveloperName(developerName: string): void {
-  if (
-    developerName.length > 40 ||
-    !DEVELOPER_NAME_PATTERN.test(developerName) ||
-    developerName.includes('__') ||
-    developerName.endsWith('_')
-  ) {
+  if (developerNameIssue(developerName)) {
     throw new PlatformEventSubscriptionWriteError(
       'invalid-developer-name',
       `"${developerName}" is not a valid DeveloperName: it must start with a letter, contain only letters, numbers, and single underscores, not end with an underscore, and be 40 characters or fewer.`,

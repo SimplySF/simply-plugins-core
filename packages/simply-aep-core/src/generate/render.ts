@@ -16,6 +16,7 @@
 
 import { ZodError } from 'zod';
 import { isAepGenerationError } from './errors.js';
+import type { OverwritePolicy } from './model.js';
 import type { GenerationOutcome, GenerationPreview } from './generation.js';
 
 // Runtime English text shared by callers; help and flag descriptions stay in the CLI.
@@ -31,12 +32,16 @@ const renderManualSteps = (steps?: string[]): string[] =>
 
 /**
  * @param preview - From `planGeneration`.
- * @returns One line per planned file (`NEW` or `OVERWRITE`), then any manual steps.
+ * @param policy - Overwrite policy, defaulting to `error`.
+ * @returns One policy-aware line per planned file, then any manual steps.
  */
-export const renderGenerationPlan = (preview: GenerationPreview): string[] => [
-  ...preview.files.map((file) => `${file.status === 'new' ? 'NEW' : 'OVERWRITE'}  ${file.relativePath}`),
-  ...renderManualSteps(preview.manualSteps),
-];
+export const renderGenerationPlan = (preview: GenerationPreview, policy: OverwritePolicy = 'error'): string[] => {
+  const existingLabel = { error: 'EXISTS (will fail)', overwrite: 'OVERWRITE', skip: 'SKIP' }[policy];
+  return [
+    ...preview.files.map((file) => `${file.status === 'new' ? 'NEW' : existingLabel}  ${file.relativePath}`),
+    ...renderManualSteps(preview.manualSteps),
+  ];
+};
 
 /**
  * @param outcome - From `applyGeneration`, or a dry run's `wouldCreate`.
@@ -58,6 +63,8 @@ export const renderGenerationResult = (outcome: GenerationOutcome, options: { co
 };
 
 /**
+ * Typed errors include `invalid-developer-name` (derived CMDT name) and `invalid-path` (outside baseDir).
+ *
  * @param error - Anything a use case threw, including a zod validation error from its options schema.
  * @returns A one-line title and, for several validation issues, the rest as detail.
  */

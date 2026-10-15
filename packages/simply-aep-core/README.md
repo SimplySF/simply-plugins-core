@@ -228,7 +228,7 @@ Each generator is a use case with a `plan` (validate options, describe the SObje
 | `generationUseCases`, `generationCommandDescriptors`                                                                                                                                   | The same, keyed by id, and their descriptors (`id`, `cliId`, `title`, `requiresOrg`, `optionsSchema`).                                                                                                                                                                   |
 | `planValidation(preview, sourceDirs)`                                                                                                                                                  | The validation issues a preview's CMDT records would introduce into `sourceDirs` — pre-existing problems aren't included. Each `GenerationIssue` is tagged `record: 'binding' \| 'domain-process-binding' \| 'field-set-inclusion'`.                                     |
 | `generate*OptionsSchema`, `uiHints(schema)`                                                                                                                                            | The zod option schemas, and the prompt hints (`label`, `kind`) a form or interactive CLI renders from.                                                                                                                                                                   |
-| `renderGenerationPlan(preview)`, `renderGenerationResult(outcome, { commandId })`, `describeGenerationError(error)`                                                                    | Human-readable lines for a preview, a result, and an error (including a zod validation error).                                                                                                                                                                           |
+| `renderGenerationPlan(preview, policy?)`, `renderGenerationResult(outcome, { commandId })`, `describeGenerationError(error)`                                                                    | Human-readable lines for a preview, a result, and an error (including a zod validation error).                                                                                                                                                                           |
 | `AepGenerationError`, `isAepGenerationError`                                                                                                                                           | What the engine throws on purpose, with a stable `code` (`org-required`, `nothing-selected`, `file-exists`, `sobject-not-found`, ...).                                                                                                                                   |
 | `build*Names`, `PathResolver`, `DEFAULT_LAYOUT`, `build*Plan`, `combinePlans`, `GenerationEngine`, `planGeneration`, `applyGeneration`, `describeTarget`, `toDescribeView`, `resolve*` | The lower layers the use cases are built from: naming rules, the output layout, per-artifact plan builders, the write engine, and describe/API-version/output-path resolution.                                                                                           |
 
@@ -256,3 +256,12 @@ This package is part of the [`@simplysf/simply`](https://github.com/SimplySF/sim
 ## License
 
 Licensed under the [Apache-2.0](https://raw.githubusercontent.com/SimplySF/simply-plugins-core/main/LICENSE.txt) license.
+
+Generation validates SObject, class, and service identifiers and requires binding sequences to be
+finite, non-negative plain decimals. Derived CMDT DeveloperNames must follow Salesforce's
+40-character rule (letter first, letters/numbers/single underscores, no trailing underscore);
+invalid names throw `invalid-developer-name` rather than being renamed. Artifact paths outside
+`baseDir` throw `invalid-path` before any write. Dry runs honor the default `file-exists` policy.
+Preview rendering defaults to `EXISTS (will fail)`; pass `'overwrite'` or `'skip'` for the matching
+label. Writes are not atomic: `write-failed` and `cancelled` carry already written paths in
+`data.created`. Cancellation after the final write returns the completed manifest.

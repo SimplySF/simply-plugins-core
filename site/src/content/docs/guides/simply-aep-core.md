@@ -119,3 +119,10 @@ if (!issues.some((issue) => issue.severity === 'error')) {
 
 `generateService`, `generateSelectorMethod`, `generateFieldSetInclusion`, `generateAction`, and
 `generateCriteria` don't need an org: pass `undefined` as the connection.
+
+Generation rejects invalid derived CMDT DeveloperNames rather than renaming them. SObject, class,
+and service inputs must be identifiers; binding sequences must be finite, non-negative plain
+decimals. `renderGenerationPlan(preview, policy?)` defaults to `EXISTS (will fail)` for existing
+files; use `'overwrite'` or `'skip'` to reflect the chosen apply policy. Dry runs also refuse
+existing files under the default policy. Writes are not atomic; `write-failed` and `cancelled`
+errors include `data.created` so callers can report partial work.

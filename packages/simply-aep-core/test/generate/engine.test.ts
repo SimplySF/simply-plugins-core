@@ -40,7 +40,12 @@ describe('aep generation engine', () => {
     const absolutePath = join(blocker, 'A.cls');
     try {
       await GenerationEngine.execute(
-        { artifacts: [{ id: 'serviceInterface', relativePath: 'blocker/A.cls', content: 'x' }] },
+        {
+          artifacts: [
+            { id: 'serviceInterface', relativePath: 'first.cls', content: 'ok' },
+            { id: 'serviceInterface', relativePath: 'blocker/A.cls', content: 'x' },
+          ],
+        },
         { baseDir: dir },
       );
       expect.fail('Expected write failure');
@@ -48,9 +53,10 @@ describe('aep generation engine', () => {
       expect(isAepGenerationError(error)).to.equal(true);
       if (!isAepGenerationError(error)) throw error;
       expect(error.code).to.equal('write-failed');
-      const data = error.data as { absolutePath: string; cause: Error };
+      const data = error.data as { absolutePath: string; cause: Error; created: string[] };
       expect(data.absolutePath).to.equal(absolutePath);
       expect(data.cause).to.be.instanceOf(Error);
+      expect(data.created).to.deep.equal([join(dir, 'first.cls')]);
       expect(error.message).to.equal(`Failed to write artifact "${absolutePath}": ${data.cause.message}`);
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -194,4 +200,66 @@ describe('aep generation engine', () => {
     expect(await exists(join(dir, 'B.cls'))).to.equal(false);
     await rm(dir, { recursive: true, force: true });
   });
+});
+
+describe('generation engine review regressions', () => {
+  it.each(['error', 'skip', 'overwrite'] as const)('honors %s in dry runs', async (overwrite) => {
+    const dir = mkdtempSync(join(tmpdir(), 'simply-aep-engine-'));
+    try {
+      const target = join(dir, 'A.cls');
+      await writeFile(target, 'old');
+      const run = GenerationEngine.execute(
+        { artifacts: [{ id: 'serviceInterface', relativePath: 'A.cls', content: 'new' }] },
+        { baseDir: dir, dryRun: true, overwrite },
+      );
+      if (overwrite === 'error')
+        await expect(run).rejects.toMatchObject({ code: 'file-exists', data: { absolutePaths: [target] } });
+      else expect(await run).toMatchObject({ created: [], skipped: [], wouldCreate: [target] });
+      expect(readFileSync(target, 'utf8')).toBe('old');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns a complete manifest when the final callback aborts', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'simply-aep-engine-'));
+    const controller = new AbortController();
+    try {
+      const manifest = await GenerationEngine.execute(
+        { artifacts: [{ id: 'serviceInterface', relativePath: 'A.cls', content: 'a' }] },
+        {
+          baseDir: dir,
+          signal: controller.signal,
+          onFile: ({ done, total }) => {
+            if (done === total) controller.abort();
+          },
+        },
+      );
+      expect(manifest).toEqual({ created: [join(dir, 'A.cls')], skipped: [] });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['../escape.cls', '/tmp/escape.cls', 'C:\\escape.cls', '..\\escape.cls'])(
+    'rejects unsafe target %s before any write',
+    async (relativePath) => {
+      const dir = mkdtempSync(join(tmpdir(), 'simply-aep-engine-'));
+      try {
+        const artifacts: GenerationPlan['artifacts'] = [
+          { id: 'serviceInterface', relativePath: 'safe.cls', content: 'a' },
+          { id: 'serviceInterface', relativePath, content: 'b' },
+        ];
+        await expect(GenerationEngine.execute({ artifacts }, { baseDir: dir })).rejects.toMatchObject({
+          code: 'invalid-path',
+        });
+        expect(await exists(join(dir, 'safe.cls'))).toBe(false);
+        await expect(GenerationEngine.execute({ artifacts }, { baseDir: dir, dryRun: true })).rejects.toMatchObject({
+          code: 'invalid-path',
+        });
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

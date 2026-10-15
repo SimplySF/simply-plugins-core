@@ -16,7 +16,7 @@
 
 /* eslint-disable no-await-in-loop -- Writes must finish in order for progress and partial cancellation. */
 import { access, mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep, win32 } from 'node:path';
 import { AepGenerationError } from './errors.js';
 import type { EngineOptions, GenerationManifest, GenerationPlan, OverwritePolicy } from './model.js';
 
@@ -51,18 +51,34 @@ const fileExists = async (absolutePath: string): Promise<boolean> => {
  * Writes a plan's artifacts under `options.baseDir`.
  *
  * Under the default `error` policy nothing is written when any planned path exists, and the
- * `file-exists` error lists every one of them in `data.absolutePaths`.
+ * `file-exists` error lists every one of them in `data.absolutePaths`, including during dry runs.
+ * Writes are not atomic and are not rolled back. `cancelled` means stopped before completing;
+ * cancellation and write failures include already written paths in `data.created`.
  */
 export class GenerationEngine {
   public static async execute(plan: GenerationPlan, options: EngineOptions): Promise<GenerationManifest> {
     ensureNoPlanCollisions(plan);
     const overwritePolicy: OverwritePolicy = options.overwrite ?? 'error';
-    const absoluteArtifacts = plan.artifacts.map((artifact) => ({
-      ...artifact,
-      absolutePath: join(options.baseDir, artifact.relativePath),
-    }));
-
-    if (options.dryRun) return { created: [], skipped: [], wouldCreate: absoluteArtifacts.map((a) => a.absolutePath) };
+    const baseDir = resolve(options.baseDir);
+    const absoluteArtifacts = plan.artifacts.map((artifact) => {
+      const absolutePath = resolve(baseDir, artifact.relativePath);
+      const fromBase = relative(baseDir, absolutePath);
+      if (
+        isAbsolute(artifact.relativePath) ||
+        win32.isAbsolute(artifact.relativePath) ||
+        artifact.relativePath.includes('\\') ||
+        fromBase === '..' ||
+        fromBase.startsWith(`..${sep}`) ||
+        isAbsolute(fromBase)
+      ) {
+        throw new AepGenerationError(
+          'invalid-path',
+          `Artifact path "${artifact.relativePath}" must stay within baseDir.`,
+          { relativePath: artifact.relativePath, baseDir },
+        );
+      }
+      return { ...artifact, absolutePath };
+    });
 
     if (overwritePolicy === 'error') {
       const existence = await Promise.all(absoluteArtifacts.map((artifact) => fileExists(artifact.absolutePath)));
@@ -75,6 +91,8 @@ export class GenerationEngine {
         );
       }
     }
+
+    if (options.dryRun) return { created: [], skipped: [], wouldCreate: absoluteArtifacts.map((a) => a.absolutePath) };
 
     const created: string[] = [];
     const skipped: string[] = [];
@@ -112,7 +130,7 @@ export class GenerationEngine {
           throw new AepGenerationError(
             'write-failed',
             `Failed to write artifact "${artifact.absolutePath}": ${message}`,
-            { absolutePath: artifact.absolutePath, cause: error },
+            { absolutePath: artifact.absolutePath, cause: error, created: [...created] },
           );
         }
       }
@@ -123,7 +141,6 @@ export class GenerationEngine {
         total: absoluteArtifacts.length,
       });
     }
-    checkCancellation();
 
     return { created, skipped };
   }
