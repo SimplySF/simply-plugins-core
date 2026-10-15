@@ -17,7 +17,7 @@
 import { Duration } from '@salesforce/kit';
 import type { Connection } from '@salesforce/core';
 import { PollingClient } from '@salesforce/core';
-import { retryWithBackoff } from '@simplysf/simply-core';
+import { boundedRequest } from './boundedRequest.js';
 import { checkPublishStatus } from './checkPublishStatus.js';
 import { DEFAULT_PUBLISH_REQUEST_TIMEOUT } from './requestTimeout.js';
 
@@ -42,6 +42,11 @@ export type PublishCommunityOptions = {
    * real default.
    */
   requestTimeout?: Duration;
+  /**
+   * Called with the error whenever a status check fails while polling. Polling carries on regardless
+   * — a failed check counts as "not finished yet" — so this is how a caller surfaces it.
+   */
+  onPollError?: (error: unknown) => void;
 };
 
 /**
@@ -59,21 +64,18 @@ export type PublishCommunityOptions = {
 export async function publishCommunity(options: PublishCommunityOptions): Promise<CommunityPublishResponse> {
   const requestTimeout = options.requestTimeout ?? DEFAULT_PUBLISH_REQUEST_TIMEOUT;
 
-  const publishResponse = await retryWithBackoff(
-    async () =>
-      options.connection.request<CommunityPublishResponse>({
-        method: 'POST',
-        url: `/connect/communities/${options.networkId}/publish`,
-      }),
-    {
-      retryAttempts: options.retryAttempts ?? 0,
-      backoffFactor: options.retryBackoff ?? 2,
-      attemptTimeout: requestTimeout,
-    },
+  const publishResponse = await boundedRequest<CommunityPublishResponse>(
+    options.connection,
+    // The endpoint takes no input, but the body must be set: jsforce streams a POST's body and only
+    // ends that stream when `body` is defined, so a bodyless POST is never actually sent — undici
+    // holds the request until the first body chunk. See docs/design/0044.
+    { method: 'POST', url: `/connect/communities/${options.networkId}/publish`, body: '{}' },
+    requestTimeout,
+    { retryAttempts: options.retryAttempts ?? 0, backoffFactor: options.retryBackoff ?? 2 },
   );
 
   const client = await PollingClient.create({
-    poll: checkPublishStatus(options.connection, publishResponse.jobId, requestTimeout),
+    poll: checkPublishStatus(options.connection, publishResponse.jobId, requestTimeout, options.onPollError),
     frequency: Duration.seconds(15),
     timeout: Duration.minutes(options.wait),
     timeoutErrorName: 'CommunityPublishTimeoutError',

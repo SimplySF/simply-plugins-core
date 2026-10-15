@@ -35,6 +35,7 @@ export {
   resolveSiteFile,
   resolveNetworkFile,
 } from './resolveSiteFiles.js';
+export { queryNetworkByName, type NetworkRecord } from './queryNetworkByName.js';
 export { retrieveCustomSite } from './retrieveCustomSite.js';
 export {
   patchCustomSiteXml,
