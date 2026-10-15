@@ -6,7 +6,7 @@
 
 ## Problem
 
-`simply-plugins`' [0045](https://github.com/SimplySF/simply-plugins/blob/main/docs/design/0045-apx-generation-into-simply-aep.md)
+`simply-plugins`' [0045](https://github.com/SimplySF/simply-plugins/blob/main/docs/design/0045-migrate-apx-into-simply-aep.md)
 moves `apx`'s code generators into `simply aep generate …`. Its phase 1 is this package: the
 generation engine has to live somewhere the CLI and, later, `simply-vscode` can both import, and the
 CMDT records it writes have to come from the same serializer the `simply aep at4dx … create`
