@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-community-core",
   "description": "Community publish/deploy/domain-verification logic and site-file discovery — the library layer behind @simplysf/simply-community, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",

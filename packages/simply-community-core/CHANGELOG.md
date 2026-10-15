@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.13](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-community-core%400.2.12...%40simplysf%2Fsimply-community-core%400.2.13) (2026-10-15)
+
+### Bug Fixes
+
+- **simply-community-core:** send the community publish request and cancel stalled requests ([#231](https://github.com/SimplySF/simply-plugins-core/issues/231)) ([7268798](https://github.com/SimplySF/simply-plugins-core/commit/7268798f54e661c67d91572f1aa3fcc567be9abd))
+
 ## [0.2.12](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-community-core%400.2.11...%40simplysf%2Fsimply-community-core%400.2.12) (2026-10-13)
 
 **Note:** Version bump only for package @simplysf/simply-community-core
