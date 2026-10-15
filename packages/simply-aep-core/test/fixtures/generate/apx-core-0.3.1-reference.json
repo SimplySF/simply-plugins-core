@@ -1,0 +1,1173 @@
+{
+  "source": "@syntax-syllogism/apx-core@0.3.1",
+  "cases": {
+    "selector/at4dx/Account": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/AccountsSelector.cls",
+        "content": "public inherited sharing class AccountsSelector extends ApplicationSObjectSelector implements IAccountsSelector {\n  public static IAccountsSelector newInstance() {\n    return (IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Account.SObjectType;\n  }\n\n  public override List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Account.Id,\n      Account.Name,\n      Account.OwnerId\n    };\n  }\n\n  @TestVisible\n  private List<Schema.SObjectField> getAdditionalSObjectFieldList() {\n    return new List<Schema.SObjectField>();\n  }\n\n  public List<Account> selectById(Set<Id> idSet) {\n    return (List<Account>) Database.query(newQueryFactory().setCondition('id in :idSet').toSOQL());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/AccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/IAccountsSelector.cls",
+        "content": "public interface IAccountsSelector extends IApplicationSObjectSelector {\n  List<Account> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/IAccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/AccountsSelectorTest.cls",
+        "content": "@IsTest\nprivate class AccountsSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(AccountsSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Account.SObjectType)}).isEmpty(), 'AccountsSelector selectById verification method failed.');\n    System.assert(new AccountsSelector().getAdditionalSObjectFieldList().isEmpty(), 'AccountsSelector getAdditionalSObjectFieldList verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/AccountsSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorBindings/ApplicationFactory_SelectorBinding.Account.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Account</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">AccountsSelector</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "domain/at4dx/Account": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/Accounts.cls",
+        "content": "public inherited sharing class Accounts extends ApplicationSObjectDomain implements IAccounts {\n  public static IAccounts newInstance(List<Account> records) {\n    return (IAccounts) Application.Domain.newInstance(records);\n  }\n\n  public static IAccounts newInstance(Set<Id> recordIds) {\n    return (IAccounts) Application.Domain.newInstance(recordIds);\n  }\n\n  public Accounts() {\n    super(new List<Account>());\n  }\n\n  public Accounts(List<Account> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new Accounts(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/Accounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/IAccounts.cls",
+        "content": "public interface IAccounts extends IApplicationSObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/IAccounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/AccountsTest.cls",
+        "content": "@IsTest\nprivate class AccountsTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Account.SObjectType);\n    Account record = new Account(Id = recordId);\n\n    Test.startTest();\n    Accounts.newInstance(new List<Account>{ record });\n    Accounts.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/AccountsTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/Accounts.trigger",
+        "content": "trigger Accounts on Account (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(Accounts.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/Accounts.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      },
+      {
+        "id": "domainBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainBindings/ApplicationFactory_DomainBinding.Account.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Account</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">Accounts</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "unit-of-work/at4dx/Account": [
+      {
+        "id": "unitOfWorkBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/unitOfWorkBindings/ApplicationFactory_UnitOfWorkBinding.Account.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Account</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>BindingSequence__c</field>\n        <value xsi:type=\"xsd:double\">1000.0</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "selector/at4dx/Account/acme": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/ACME_AccountsSelector.cls",
+        "content": "public inherited sharing class ACME_AccountsSelector extends ApplicationSObjectSelector implements ACME_IAccountsSelector {\n  public static ACME_IAccountsSelector newInstance() {\n    return (ACME_IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Account.SObjectType;\n  }\n\n  public override List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Account.Id,\n      Account.Name,\n      Account.OwnerId\n    };\n  }\n\n  @TestVisible\n  private List<Schema.SObjectField> getAdditionalSObjectFieldList() {\n    return new List<Schema.SObjectField>();\n  }\n\n  public List<Account> selectById(Set<Id> idSet) {\n    return (List<Account>) Database.query(newQueryFactory().setCondition('id in :idSet').toSOQL());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_AccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/ACME_IAccountsSelector.cls",
+        "content": "public interface ACME_IAccountsSelector extends IApplicationSObjectSelector {\n  List<Account> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_IAccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/ACME_AccountsSelectorTest.cls",
+        "content": "@IsTest\nprivate class ACME_AccountsSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(ACME_AccountsSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Account.SObjectType)}).isEmpty(), 'ACME_AccountsSelector selectById verification method failed.');\n    System.assert(new ACME_AccountsSelector().getAdditionalSObjectFieldList().isEmpty(), 'ACME_AccountsSelector getAdditionalSObjectFieldList verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/ACME_AccountsSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorBindings/ApplicationFactory_SelectorBinding.Account.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Account</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">ACME_AccountsSelector</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "domain/at4dx/Account/acme": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/ACME_Accounts.cls",
+        "content": "public inherited sharing class ACME_Accounts extends ApplicationSObjectDomain implements ACME_IAccounts {\n  public static ACME_IAccounts newInstance(List<Account> records) {\n    return (ACME_IAccounts) Application.Domain.newInstance(records);\n  }\n\n  public static ACME_IAccounts newInstance(Set<Id> recordIds) {\n    return (ACME_IAccounts) Application.Domain.newInstance(recordIds);\n  }\n\n  public ACME_Accounts() {\n    super(new List<Account>());\n  }\n\n  public ACME_Accounts(List<Account> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new ACME_Accounts(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_Accounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/ACME_IAccounts.cls",
+        "content": "public interface ACME_IAccounts extends IApplicationSObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_IAccounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/ACME_AccountsTest.cls",
+        "content": "@IsTest\nprivate class ACME_AccountsTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Account.SObjectType);\n    Account record = new Account(Id = recordId);\n\n    Test.startTest();\n    ACME_Accounts.newInstance(new List<Account>{ record });\n    ACME_Accounts.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/ACME_AccountsTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/ACME_Accounts.trigger",
+        "content": "trigger ACME_Accounts on Account (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(ACME_Accounts.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/ACME_Accounts.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      },
+      {
+        "id": "domainBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainBindings/ApplicationFactory_DomainBinding.Account.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Account</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">ACME_Accounts</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "unit-of-work/at4dx/Account/acme": [
+      {
+        "id": "unitOfWorkBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/unitOfWorkBindings/ApplicationFactory_UnitOfWorkBinding.Account.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Account</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>BindingSequence__c</field>\n        <value xsi:type=\"xsd:double\">1000.0</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "selector/at4dx/Property__c": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/PropertiesSelector.cls",
+        "content": "public inherited sharing class PropertiesSelector extends ApplicationSObjectSelector implements IPropertiesSelector {\n  public static IPropertiesSelector newInstance() {\n    return (IPropertiesSelector) Application.Selector.newInstance(Property__c.SObjectType);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Property__c.SObjectType;\n  }\n\n  public override List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Property__c.Id,\n      Property__c.Name,\n      Property__c.Slogan__c\n    };\n  }\n\n  @TestVisible\n  private List<Schema.SObjectField> getAdditionalSObjectFieldList() {\n    return new List<Schema.SObjectField>();\n  }\n\n  public List<Property__c> selectById(Set<Id> idSet) {\n    return (List<Property__c>) Database.query(newQueryFactory().setCondition('id in :idSet').toSOQL());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/PropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/IPropertiesSelector.cls",
+        "content": "public interface IPropertiesSelector extends IApplicationSObjectSelector {\n  List<Property__c> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/IPropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/PropertiesSelectorTest.cls",
+        "content": "@IsTest\nprivate class PropertiesSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(PropertiesSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Property__c.SObjectType)}).isEmpty(), 'PropertiesSelector selectById verification method failed.');\n    System.assert(new PropertiesSelector().getAdditionalSObjectFieldList().isEmpty(), 'PropertiesSelector getAdditionalSObjectFieldList verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/PropertiesSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorBindings/ApplicationFactory_SelectorBinding.Property.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Property</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">PropertiesSelector</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "domain/at4dx/Property__c": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/Properties.cls",
+        "content": "public inherited sharing class Properties extends ApplicationSObjectDomain implements IProperties {\n  public static IProperties newInstance(List<Property__c> records) {\n    return (IProperties) Application.Domain.newInstance(records);\n  }\n\n  public static IProperties newInstance(Set<Id> recordIds) {\n    return (IProperties) Application.Domain.newInstance(recordIds);\n  }\n\n  public Properties() {\n    super(new List<Property__c>());\n  }\n\n  public Properties(List<Property__c> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new Properties(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/Properties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/IProperties.cls",
+        "content": "public interface IProperties extends IApplicationSObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/IProperties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/PropertiesTest.cls",
+        "content": "@IsTest\nprivate class PropertiesTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Property__c.SObjectType);\n    Property__c record = new Property__c(Id = recordId);\n\n    Test.startTest();\n    Properties.newInstance(new List<Property__c>{ record });\n    Properties.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/PropertiesTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/Properties.trigger",
+        "content": "trigger Properties on Property__c (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(Properties.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/Properties.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      },
+      {
+        "id": "domainBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainBindings/ApplicationFactory_DomainBinding.Property.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Property</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">Properties</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "unit-of-work/at4dx/Property__c": [
+      {
+        "id": "unitOfWorkBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/unitOfWorkBindings/ApplicationFactory_UnitOfWorkBinding.Property.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Property</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSequence__c</field>\n        <value xsi:type=\"xsd:double\">1000.0</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "selector/at4dx/Property__c/acme": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/ACME_PropertiesSelector.cls",
+        "content": "public inherited sharing class ACME_PropertiesSelector extends ApplicationSObjectSelector implements ACME_IPropertiesSelector {\n  public static ACME_IPropertiesSelector newInstance() {\n    return (ACME_IPropertiesSelector) Application.Selector.newInstance(Property__c.SObjectType);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Property__c.SObjectType;\n  }\n\n  public override List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Property__c.Id,\n      Property__c.Name,\n      Property__c.Slogan__c\n    };\n  }\n\n  @TestVisible\n  private List<Schema.SObjectField> getAdditionalSObjectFieldList() {\n    return new List<Schema.SObjectField>();\n  }\n\n  public List<Property__c> selectById(Set<Id> idSet) {\n    return (List<Property__c>) Database.query(newQueryFactory().setCondition('id in :idSet').toSOQL());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_PropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/ACME_IPropertiesSelector.cls",
+        "content": "public interface ACME_IPropertiesSelector extends IApplicationSObjectSelector {\n  List<Property__c> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_IPropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/ACME_PropertiesSelectorTest.cls",
+        "content": "@IsTest\nprivate class ACME_PropertiesSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(ACME_PropertiesSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Property__c.SObjectType)}).isEmpty(), 'ACME_PropertiesSelector selectById verification method failed.');\n    System.assert(new ACME_PropertiesSelector().getAdditionalSObjectFieldList().isEmpty(), 'ACME_PropertiesSelector getAdditionalSObjectFieldList verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/ACME_PropertiesSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorBindings/ApplicationFactory_SelectorBinding.Property.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Property</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">ACME_PropertiesSelector</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "domain/at4dx/Property__c/acme": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/ACME_Properties.cls",
+        "content": "public inherited sharing class ACME_Properties extends ApplicationSObjectDomain implements ACME_IProperties {\n  public static ACME_IProperties newInstance(List<Property__c> records) {\n    return (ACME_IProperties) Application.Domain.newInstance(records);\n  }\n\n  public static ACME_IProperties newInstance(Set<Id> recordIds) {\n    return (ACME_IProperties) Application.Domain.newInstance(recordIds);\n  }\n\n  public ACME_Properties() {\n    super(new List<Property__c>());\n  }\n\n  public ACME_Properties(List<Property__c> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new ACME_Properties(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_Properties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/ACME_IProperties.cls",
+        "content": "public interface ACME_IProperties extends IApplicationSObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_IProperties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/ACME_PropertiesTest.cls",
+        "content": "@IsTest\nprivate class ACME_PropertiesTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Property__c.SObjectType);\n    Property__c record = new Property__c(Id = recordId);\n\n    Test.startTest();\n    ACME_Properties.newInstance(new List<Property__c>{ record });\n    ACME_Properties.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/ACME_PropertiesTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/ACME_Properties.trigger",
+        "content": "trigger ACME_Properties on Property__c (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(ACME_Properties.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/ACME_Properties.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      },
+      {
+        "id": "domainBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainBindings/ApplicationFactory_DomainBinding.Property.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Property</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">ACME_Properties</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "unit-of-work/at4dx/Property__c/acme": [
+      {
+        "id": "unitOfWorkBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/unitOfWorkBindings/ApplicationFactory_UnitOfWorkBinding.Property.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>Property</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSequence__c</field>\n        <value xsi:type=\"xsd:double\">1000.0</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "service/at4dx/LimitMonitors": [
+      {
+        "id": "serviceFacade",
+        "relativePath": "main/classes/services/LimitMonitorsService.cls",
+        "content": "public inherited sharing class LimitMonitorsService {\n  private static ILimitMonitorsService service() {\n    return (ILimitMonitorsService) Application.Service.newInstance(ILimitMonitorsService.class);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/LimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceInterface",
+        "relativePath": "main/classes/services/ILimitMonitorsService.cls",
+        "content": "public interface ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ILimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceImpl",
+        "relativePath": "main/classes/services/LimitMonitorsServiceImpl.cls",
+        "content": "public with sharing class LimitMonitorsServiceImpl implements ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/LimitMonitorsServiceImpl.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceException",
+        "relativePath": "main/classes/services/LimitMonitorsServiceException.cls",
+        "content": "public class LimitMonitorsServiceException extends Exception {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/LimitMonitorsServiceException.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceUnitTest",
+        "relativePath": "test/classes/services/LimitMonitorsServiceTest.cls",
+        "content": "@IsTest\nprivate class LimitMonitorsServiceTest {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/services/LimitMonitorsServiceTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/serviceBindings/ApplicationFactory_ServiceBinding.ILimitMonitorsService.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>ILimitMonitorsService</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingInterface__c</field>\n        <value xsi:type=\"xsd:string\">ILimitMonitorsService</value>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">LimitMonitorsServiceImpl</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "service/at4dx/LimitMonitors/acme": [
+      {
+        "id": "serviceFacade",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsService.cls",
+        "content": "public inherited sharing class ACME_LimitMonitorsService {\n  private static ACME_ILimitMonitorsService service() {\n    return (ACME_ILimitMonitorsService) Application.Service.newInstance(ACME_ILimitMonitorsService.class);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceInterface",
+        "relativePath": "main/classes/services/ACME_ILimitMonitorsService.cls",
+        "content": "public interface ACME_ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_ILimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceImpl",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceImpl.cls",
+        "content": "public with sharing class ACME_LimitMonitorsServiceImpl implements ACME_ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceImpl.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceException",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceException.cls",
+        "content": "public class ACME_LimitMonitorsServiceException extends Exception {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceException.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceUnitTest",
+        "relativePath": "test/classes/services/ACME_LimitMonitorsServiceTest.cls",
+        "content": "@IsTest\nprivate class ACME_LimitMonitorsServiceTest {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/services/ACME_LimitMonitorsServiceTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/serviceBindings/ApplicationFactory_ServiceBinding.ACME_ILimitMonitorsService.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>ACME_ILimitMonitorsService</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingInterface__c</field>\n        <value xsi:type=\"xsd:string\">ACME_ILimitMonitorsService</value>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type=\"xsd:string\">ACME_LimitMonitorsServiceImpl</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "selector/fflib/Account": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/AccountsSelector.cls",
+        "content": "public inherited sharing class AccountsSelector extends fflib_SObjectSelector implements IAccountsSelector {\n  public static IAccountsSelector newInstance() {\n    return (IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);\n  }\n\n  public AccountsSelector() {\n    super(false, fflib_SObjectSelector.DataAccess.USER_MODE);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Account.SObjectType;\n  }\n\n  public List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Account.Id,\n      Account.Name,\n      Account.OwnerId\n    };\n  }\n\n  public List<Account> selectById(Set<Id> idSet) {\n    return (List<Account>) selectSObjectsById(idSet);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/AccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/IAccountsSelector.cls",
+        "content": "public interface IAccountsSelector extends fflib_ISObjectSelector\n{\n    List<Account> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/IAccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/AccountsSelectorTest.cls",
+        "content": "@IsTest\nprivate class AccountsSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(AccountsSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Account.SObjectType)}).isEmpty(), 'AccountsSelector selectById verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/AccountsSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "domain/fflib/Account": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/Accounts.cls",
+        "content": "public inherited sharing class Accounts extends fflib_SObjectDomain implements IAccounts {\n  public static IAccounts newInstance(List<Account> records) {\n    return (IAccounts) Application.Domain.newInstance(records);\n  }\n\n  public static IAccounts newInstance(Set<Id> recordIds) {\n    return (IAccounts) Application.Domain.newInstance(recordIds);\n  }\n\n  public Accounts(List<Account> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new Accounts(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/Accounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/IAccounts.cls",
+        "content": "public interface IAccounts extends fflib_ISObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/IAccounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/AccountsTest.cls",
+        "content": "@IsTest\nprivate class AccountsTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Account.SObjectType);\n    Account record = new Account(Id = recordId);\n\n    Test.startTest();\n    Accounts.newInstance(new List<Account>{ record });\n    Accounts.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/AccountsTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/Accounts.trigger",
+        "content": "trigger Accounts on Account (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(Accounts.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/Accounts.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      }
+    ],
+    "unit-of-work/fflib/Account": [],
+    "selector/fflib/Account/acme": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/ACME_AccountsSelector.cls",
+        "content": "public inherited sharing class ACME_AccountsSelector extends fflib_SObjectSelector implements ACME_IAccountsSelector {\n  public static ACME_IAccountsSelector newInstance() {\n    return (ACME_IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);\n  }\n\n  public ACME_AccountsSelector() {\n    super(false, fflib_SObjectSelector.DataAccess.USER_MODE);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Account.SObjectType;\n  }\n\n  public List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Account.Id,\n      Account.Name,\n      Account.OwnerId\n    };\n  }\n\n  public List<Account> selectById(Set<Id> idSet) {\n    return (List<Account>) selectSObjectsById(idSet);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_AccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/ACME_IAccountsSelector.cls",
+        "content": "public interface ACME_IAccountsSelector extends fflib_ISObjectSelector\n{\n    List<Account> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_IAccountsSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/ACME_AccountsSelectorTest.cls",
+        "content": "@IsTest\nprivate class ACME_AccountsSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(ACME_AccountsSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Account.SObjectType)}).isEmpty(), 'ACME_AccountsSelector selectById verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/ACME_AccountsSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "domain/fflib/Account/acme": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/ACME_Accounts.cls",
+        "content": "public inherited sharing class ACME_Accounts extends fflib_SObjectDomain implements ACME_IAccounts {\n  public static ACME_IAccounts newInstance(List<Account> records) {\n    return (ACME_IAccounts) Application.Domain.newInstance(records);\n  }\n\n  public static ACME_IAccounts newInstance(Set<Id> recordIds) {\n    return (ACME_IAccounts) Application.Domain.newInstance(recordIds);\n  }\n\n  public ACME_Accounts(List<Account> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new ACME_Accounts(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_Accounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/ACME_IAccounts.cls",
+        "content": "public interface ACME_IAccounts extends fflib_ISObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_IAccounts.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/ACME_AccountsTest.cls",
+        "content": "@IsTest\nprivate class ACME_AccountsTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Account.SObjectType);\n    Account record = new Account(Id = recordId);\n\n    Test.startTest();\n    ACME_Accounts.newInstance(new List<Account>{ record });\n    ACME_Accounts.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/ACME_AccountsTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/ACME_Accounts.trigger",
+        "content": "trigger ACME_Accounts on Account (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(ACME_Accounts.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/ACME_Accounts.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      }
+    ],
+    "unit-of-work/fflib/Account/acme": [],
+    "selector/fflib/Property__c": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/PropertiesSelector.cls",
+        "content": "public inherited sharing class PropertiesSelector extends fflib_SObjectSelector implements IPropertiesSelector {\n  public static IPropertiesSelector newInstance() {\n    return (IPropertiesSelector) Application.Selector.newInstance(Property__c.SObjectType);\n  }\n\n  public PropertiesSelector() {\n    super(false, fflib_SObjectSelector.DataAccess.USER_MODE);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Property__c.SObjectType;\n  }\n\n  public List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Property__c.Id,\n      Property__c.Name,\n      Property__c.Slogan__c\n    };\n  }\n\n  public List<Property__c> selectById(Set<Id> idSet) {\n    return (List<Property__c>) selectSObjectsById(idSet);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/PropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/IPropertiesSelector.cls",
+        "content": "public interface IPropertiesSelector extends fflib_ISObjectSelector\n{\n    List<Property__c> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/IPropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/PropertiesSelectorTest.cls",
+        "content": "@IsTest\nprivate class PropertiesSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(PropertiesSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Property__c.SObjectType)}).isEmpty(), 'PropertiesSelector selectById verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/PropertiesSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "domain/fflib/Property__c": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/Properties.cls",
+        "content": "public inherited sharing class Properties extends fflib_SObjectDomain implements IProperties {\n  public static IProperties newInstance(List<Property__c> records) {\n    return (IProperties) Application.Domain.newInstance(records);\n  }\n\n  public static IProperties newInstance(Set<Id> recordIds) {\n    return (IProperties) Application.Domain.newInstance(recordIds);\n  }\n\n  public Properties(List<Property__c> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new Properties(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/Properties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/IProperties.cls",
+        "content": "public interface IProperties extends fflib_ISObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/IProperties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/PropertiesTest.cls",
+        "content": "@IsTest\nprivate class PropertiesTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Property__c.SObjectType);\n    Property__c record = new Property__c(Id = recordId);\n\n    Test.startTest();\n    Properties.newInstance(new List<Property__c>{ record });\n    Properties.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/PropertiesTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/Properties.trigger",
+        "content": "trigger Properties on Property__c (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(Properties.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/Properties.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      }
+    ],
+    "unit-of-work/fflib/Property__c": [],
+    "selector/fflib/Property__c/acme": [
+      {
+        "id": "selectorClass",
+        "relativePath": "main/classes/selectors/ACME_PropertiesSelector.cls",
+        "content": "public inherited sharing class ACME_PropertiesSelector extends fflib_SObjectSelector implements ACME_IPropertiesSelector {\n  public static ACME_IPropertiesSelector newInstance() {\n    return (ACME_IPropertiesSelector) Application.Selector.newInstance(Property__c.SObjectType);\n  }\n\n  public ACME_PropertiesSelector() {\n    super(false, fflib_SObjectSelector.DataAccess.USER_MODE);\n  }\n\n  public Schema.SObjectType getSObjectType() {\n    return Property__c.SObjectType;\n  }\n\n  public List<Schema.SObjectField> getSObjectFieldList() {\n    return new List<Schema.SObjectField>{\n      Property__c.Id,\n      Property__c.Name,\n      Property__c.Slogan__c\n    };\n  }\n\n  public List<Property__c> selectById(Set<Id> idSet) {\n    return (List<Property__c>) selectSObjectsById(idSet);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_PropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorInterface",
+        "relativePath": "main/classes/selectors/ACME_IPropertiesSelector.cls",
+        "content": "public interface ACME_IPropertiesSelector extends fflib_ISObjectSelector\n{\n    List<Property__c> selectById(Set<Id> idSet);\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/ACME_IPropertiesSelector.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorUnitTest",
+        "relativePath": "test/classes/selectors/ACME_PropertiesSelectorTest.cls",
+        "content": "@IsTest\nprivate class ACME_PropertiesSelectorTest {\n  @IsTest\n  private static void testKnownSelectorMethods() {\n    Test.startTest();\n\n    System.assert(ACME_PropertiesSelector.newInstance().selectById(new Set<Id>{fflib_IDGenerator.generate(Property__c.SObjectType)}).isEmpty(), 'ACME_PropertiesSelector selectById verification method failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/ACME_PropertiesSelectorTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "domain/fflib/Property__c/acme": [
+      {
+        "id": "domainClass",
+        "relativePath": "main/classes/domains/ACME_Properties.cls",
+        "content": "public inherited sharing class ACME_Properties extends fflib_SObjectDomain implements ACME_IProperties {\n  public static ACME_IProperties newInstance(List<Property__c> records) {\n    return (ACME_IProperties) Application.Domain.newInstance(records);\n  }\n\n  public static ACME_IProperties newInstance(Set<Id> recordIds) {\n    return (ACME_IProperties) Application.Domain.newInstance(recordIds);\n  }\n\n  public ACME_Properties(List<Property__c> records) {\n    super(records);\n  }\n\n  public class Constructor implements fflib_SObjectDomain.IConstructable {\n    public fflib_SObjectDomain construct(List<SObject> sObjectList) {\n      return new ACME_Properties(sObjectList);\n    }\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_Properties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainInterface",
+        "relativePath": "main/classes/domains/ACME_IProperties.cls",
+        "content": "public interface ACME_IProperties extends fflib_ISObjectDomain {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/domains/ACME_IProperties.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainUnitTest",
+        "relativePath": "test/classes/domains/ACME_PropertiesTest.cls",
+        "content": "@IsTest\nprivate class ACME_PropertiesTest {\n  @IsTest\n  private static void testNewInstanceMethod() {\n    Id recordId = fflib_IDGenerator.generate(Property__c.SObjectType);\n    Property__c record = new Property__c(Id = recordId);\n\n    Test.startTest();\n    ACME_Properties.newInstance(new List<Property__c>{ record });\n    ACME_Properties.newInstance(new Set<Id>{ recordId });\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/domains/ACME_PropertiesTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainTrigger",
+        "relativePath": "main/schema/triggers/ACME_Properties.trigger",
+        "content": "trigger ACME_Properties on Property__c (after delete, after insert, after update, before delete, before insert, before update) {\n  fflib_SObjectDomain.triggerHandler(ACME_Properties.class);\n}"
+      },
+      {
+        "id": "triggerMeta",
+        "relativePath": "main/schema/triggers/ACME_Properties.trigger-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexTrigger xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexTrigger>"
+      }
+    ],
+    "unit-of-work/fflib/Property__c/acme": [],
+    "service/fflib/LimitMonitors": [
+      {
+        "id": "serviceFacade",
+        "relativePath": "main/classes/services/LimitMonitorsService.cls",
+        "content": "public inherited sharing class LimitMonitorsService {\n  private static ILimitMonitorsService service() {\n    return (ILimitMonitorsService) Application.Service.newInstance(ILimitMonitorsService.class);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/LimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceInterface",
+        "relativePath": "main/classes/services/ILimitMonitorsService.cls",
+        "content": "public interface ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ILimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceImpl",
+        "relativePath": "main/classes/services/LimitMonitorsServiceImpl.cls",
+        "content": "public with sharing class LimitMonitorsServiceImpl implements ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/LimitMonitorsServiceImpl.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceException",
+        "relativePath": "main/classes/services/LimitMonitorsServiceException.cls",
+        "content": "public class LimitMonitorsServiceException extends Exception {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/LimitMonitorsServiceException.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceUnitTest",
+        "relativePath": "test/classes/services/LimitMonitorsServiceTest.cls",
+        "content": "@IsTest\nprivate class LimitMonitorsServiceTest {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/services/LimitMonitorsServiceTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "service/fflib/LimitMonitors/acme": [
+      {
+        "id": "serviceFacade",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsService.cls",
+        "content": "public inherited sharing class ACME_LimitMonitorsService {\n  private static ACME_ILimitMonitorsService service() {\n    return (ACME_ILimitMonitorsService) Application.Service.newInstance(ACME_ILimitMonitorsService.class);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceInterface",
+        "relativePath": "main/classes/services/ACME_ILimitMonitorsService.cls",
+        "content": "public interface ACME_ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_ILimitMonitorsService.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceImpl",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceImpl.cls",
+        "content": "public with sharing class ACME_LimitMonitorsServiceImpl implements ACME_ILimitMonitorsService {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceImpl.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceException",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceException.cls",
+        "content": "public class ACME_LimitMonitorsServiceException extends Exception {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/services/ACME_LimitMonitorsServiceException.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "serviceUnitTest",
+        "relativePath": "test/classes/services/ACME_LimitMonitorsServiceTest.cls",
+        "content": "@IsTest\nprivate class ACME_LimitMonitorsServiceTest {}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/services/ACME_LimitMonitorsServiceTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "selector-method/at4dx/SelectBySloganMethod": [
+      {
+        "id": "selectorMethodClass",
+        "relativePath": "main/classes/selectors/SelectBySloganMethod.cls",
+        "content": "/**\n* AT4DX Selector Method Injection class\n*\n* @Usage\n*   SelectBySloganMethod.Parameters queryParams = new SelectBySloganMethod.Parameters();\n*   List<Account> records = AccountsSelector.newInstance().selectInjection(SelectBySloganMethod.class, queryParams);\n*/\npublic inherited sharing class SelectBySloganMethod extends AbstractSelectorMethodInjectable implements ISelectorMethodInjectable {\n  public List<SObject> selectQuery() {\n    SelectBySloganMethod.Parameters params = (SelectBySloganMethod.Parameters) getParams();\n    fflib_QueryFactory qf = newQueryFactory();\n    qf.setCondition('');\n    return Database.query(qf.toSOQL());\n  }\n\n  public class Parameters implements ISelectorMethodParameterable {}\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/selectors/SelectBySloganMethod.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "selectorMethodUnitTest",
+        "relativePath": "test/classes/selectors/SelectBySloganMethodTest.cls",
+        "content": "@IsTest\nprivate class SelectBySloganMethodTest {\n  @IsTest\n  private static void testSelectQueryMethod() {\n    Test.startTest();\n\n    System.assert(AccountsSelector.newInstance().selectInjection(SelectBySloganMethod.class, null) != null, 'AccountsSelector\\'s selectInjection verification method for SelectBySloganMethod selector method injection failed.');\n\n    Test.stopTest();\n  }\n}"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/selectors/SelectBySloganMethodTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      }
+    ],
+    "action/at4dx/Account": [
+      {
+        "id": "actionClass",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls",
+        "content": "public inherited sharing class DefaultSloganAction extends DomainProcessAbstractAction {\n  public override void runInProcess() {\n    // TODO: implement domain action behavior.\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "actionUnitTest",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganActionTest {\n  @IsTest\n  private static void testInstantiation() {\n    DefaultSloganAction actionInstance = new DefaultSloganAction();\n\n    Test.startTest();\n    Test.stopTest();\n\n    System.assertNotEquals(null, actionInstance);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.DefaultSloganAction.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>DefaultSloganAction</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganAction</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated action binding for DefaultSloganAction.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.2</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Action</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "action/at4dx/Account/FishCompanySlogans": [
+      {
+        "id": "actionClass",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls",
+        "content": "public inherited sharing class DefaultSloganAction extends DomainProcessAbstractAction {\n  public override void runInProcess() {\n    // TODO: implement domain action behavior.\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "actionUnitTest",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganActionTest {\n  @IsTest\n  private static void testInstantiation() {\n    DefaultSloganAction actionInstance = new DefaultSloganAction();\n\n    Test.startTest();\n    Test.stopTest();\n\n    System.assertNotEquals(null, actionInstance);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.FishCompanySlogans10_2Action.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>FishCompanySlogans10_2Action</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganAction</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated action binding for DefaultSloganAction.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.2</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Action</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "action/at4dx/Property__c": [
+      {
+        "id": "actionClass",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls",
+        "content": "public inherited sharing class DefaultSloganAction extends DomainProcessAbstractAction {\n  public override void runInProcess() {\n    // TODO: implement domain action behavior.\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "actionUnitTest",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganActionTest {\n  @IsTest\n  private static void testInstantiation() {\n    DefaultSloganAction actionInstance = new DefaultSloganAction();\n\n    Test.startTest();\n    Test.stopTest();\n\n    System.assertNotEquals(null, actionInstance);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.DefaultSloganAction.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>DefaultSloganAction</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganAction</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated action binding for DefaultSloganAction.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.2</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Action</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "action/at4dx/Property__c/FishCompanySlogans": [
+      {
+        "id": "actionClass",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls",
+        "content": "public inherited sharing class DefaultSloganAction extends DomainProcessAbstractAction {\n  public override void runInProcess() {\n    // TODO: implement domain action behavior.\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/actions/DefaultSloganAction.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "actionUnitTest",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganActionTest {\n  @IsTest\n  private static void testInstantiation() {\n    DefaultSloganAction actionInstance = new DefaultSloganAction();\n\n    Test.startTest();\n    Test.stopTest();\n\n    System.assertNotEquals(null, actionInstance);\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/actions/DefaultSloganActionTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.FishCompanySlogans10_2Action.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>FishCompanySlogans10_2Action</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganAction</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated action binding for DefaultSloganAction.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.2</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Action</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "criteria/at4dx/Account": [
+      {
+        "id": "criteriaClass",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls",
+        "content": "public inherited sharing class DefaultSloganCriteria implements IDomainProcessCriteria {\n  private List<SObject> recordsToEvaluate = new List<SObject>();\n\n  public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> recordsToEvaluate) {\n    this.recordsToEvaluate = recordsToEvaluate == null ? new List<SObject>() : recordsToEvaluate;\n    return this;\n  }\n\n  public List<SObject> run() {\n    List<Account> scopedRecords = (List<Account>) this.recordsToEvaluate;\n    // TODO: implement criteria evaluation and return matching records.\n    if (scopedRecords.isEmpty()) return new List<SObject>();\n    List<SObject> result = new List<SObject>();\n    for (Account recordValue : scopedRecords) {\n      result.add(recordValue);\n    }\n    return result;\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "criteriaUnitTest",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganCriteriaTest {\n  @IsTest\n  private static void testRun() {\n    DefaultSloganCriteria criteria = new DefaultSloganCriteria();\n    criteria.setRecordsToEvaluate(new List<SObject>{ new Account() });\n\n    Test.startTest();\n    List<SObject> result = criteria.run();\n    Test.stopTest();\n\n    System.assertEquals(1, result.size());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.DefaultSloganCriteria.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>DefaultSloganCriteria</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganCriteria</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated criteria binding for DefaultSloganCriteria.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.1</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Criteria</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "criteria/at4dx/Account/FishCompanySlogans": [
+      {
+        "id": "criteriaClass",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls",
+        "content": "public inherited sharing class DefaultSloganCriteria implements IDomainProcessCriteria {\n  private List<SObject> recordsToEvaluate = new List<SObject>();\n\n  public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> recordsToEvaluate) {\n    this.recordsToEvaluate = recordsToEvaluate == null ? new List<SObject>() : recordsToEvaluate;\n    return this;\n  }\n\n  public List<SObject> run() {\n    List<Account> scopedRecords = (List<Account>) this.recordsToEvaluate;\n    // TODO: implement criteria evaluation and return matching records.\n    if (scopedRecords.isEmpty()) return new List<SObject>();\n    List<SObject> result = new List<SObject>();\n    for (Account recordValue : scopedRecords) {\n      result.add(recordValue);\n    }\n    return result;\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "criteriaUnitTest",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganCriteriaTest {\n  @IsTest\n  private static void testRun() {\n    DefaultSloganCriteria criteria = new DefaultSloganCriteria();\n    criteria.setRecordsToEvaluate(new List<SObject>{ new Account() });\n\n    Test.startTest();\n    List<SObject> result = criteria.run();\n    Test.stopTest();\n\n    System.assertEquals(1, result.size());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.FishCompanySlogans10_1Criteria.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>FishCompanySlogans10_1Criteria</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganCriteria</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated criteria binding for DefaultSloganCriteria.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.1</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Criteria</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "criteria/at4dx/Property__c": [
+      {
+        "id": "criteriaClass",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls",
+        "content": "public inherited sharing class DefaultSloganCriteria implements IDomainProcessCriteria {\n  private List<SObject> recordsToEvaluate = new List<SObject>();\n\n  public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> recordsToEvaluate) {\n    this.recordsToEvaluate = recordsToEvaluate == null ? new List<SObject>() : recordsToEvaluate;\n    return this;\n  }\n\n  public List<SObject> run() {\n    List<Property__c> scopedRecords = (List<Property__c>) this.recordsToEvaluate;\n    // TODO: implement criteria evaluation and return matching records.\n    if (scopedRecords.isEmpty()) return new List<SObject>();\n    List<SObject> result = new List<SObject>();\n    for (Property__c recordValue : scopedRecords) {\n      result.add(recordValue);\n    }\n    return result;\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "criteriaUnitTest",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganCriteriaTest {\n  @IsTest\n  private static void testRun() {\n    DefaultSloganCriteria criteria = new DefaultSloganCriteria();\n    criteria.setRecordsToEvaluate(new List<SObject>{ new Property__c() });\n\n    Test.startTest();\n    List<SObject> result = criteria.run();\n    Test.stopTest();\n\n    System.assertEquals(1, result.size());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.DefaultSloganCriteria.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>DefaultSloganCriteria</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganCriteria</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated criteria binding for DefaultSloganCriteria.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.1</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Criteria</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "criteria/at4dx/Property__c/FishCompanySlogans": [
+      {
+        "id": "criteriaClass",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls",
+        "content": "public inherited sharing class DefaultSloganCriteria implements IDomainProcessCriteria {\n  private List<SObject> recordsToEvaluate = new List<SObject>();\n\n  public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> recordsToEvaluate) {\n    this.recordsToEvaluate = recordsToEvaluate == null ? new List<SObject>() : recordsToEvaluate;\n    return this;\n  }\n\n  public List<SObject> run() {\n    List<Property__c> scopedRecords = (List<Property__c>) this.recordsToEvaluate;\n    // TODO: implement criteria evaluation and return matching records.\n    if (scopedRecords.isEmpty()) return new List<SObject>();\n    List<SObject> result = new List<SObject>();\n    for (Property__c recordValue : scopedRecords) {\n      result.add(recordValue);\n    }\n    return result;\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "main/classes/criteria/DefaultSloganCriteria.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "criteriaUnitTest",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls",
+        "content": "@IsTest\nprivate class DefaultSloganCriteriaTest {\n  @IsTest\n  private static void testRun() {\n    DefaultSloganCriteria criteria = new DefaultSloganCriteria();\n    criteria.setRecordsToEvaluate(new List<SObject>{ new Property__c() });\n\n    Test.startTest();\n    List<SObject> result = criteria.run();\n    Test.stopTest();\n\n    System.assertEquals(1, result.size());\n  }\n}\n"
+      },
+      {
+        "id": "apexClassMeta",
+        "relativePath": "test/classes/criteria/DefaultSloganCriteriaTest.cls-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ApexClass xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <apiVersion>62.0</apiVersion>\n    <status>Active</status>\n</ApexClass>"
+      },
+      {
+        "id": "domainProcessBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/domainProcessBindings/DomainProcessBinding.FishCompanySlogans10_1Criteria.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>FishCompanySlogans10_1Criteria</label>\n    <protected>false</protected>\n    <values>\n        <field>ClassToInject__c</field>\n        <value xsi:type=\"xsd:string\">DefaultSloganCriteria</value>\n    </values>\n    <values>\n        <field>Description__c</field>\n        <value xsi:type=\"xsd:string\">Review generated criteria binding for DefaultSloganCriteria.</value>\n    </values>\n    <values>\n        <field>DomainMethodToken__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>ExecuteAsynchronous__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n    <values>\n        <field>LogicalInverse__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>OrderOfExecution__c</field>\n        <value xsi:type=\"xsd:double\">10.1</value>\n    </values>\n    <values>\n        <field>PreventRecursive__c</field>\n        <value xsi:type=\"xsd:boolean\">false</value>\n    </values>\n    <values>\n        <field>ProcessContext__c</field>\n        <value xsi:type=\"xsd:string\">TriggerExecution</value>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>RelatedDomainBindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>TriggerOperation__c</field>\n        <value xsi:type=\"xsd:string\">Before_Insert</value>\n    </values>\n    <values>\n        <field>Type__c</field>\n        <value xsi:type=\"xsd:string\">Criteria</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "field-set-inclusion/at4dx/Account": [
+      {
+        "id": "selectorInclusionFieldSet",
+        "relativePath": "main/schema/objects/Account/fieldSets/SelectorInclusion_AccountFields.fieldSet-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<FieldSet xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <fullName>SelectorInclusion_AccountFields</fullName>\n    <description>Generated selector field inclusion for Account.</description>\n    <displayedFields>\n        <field>Name</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <displayedFields>\n        <field>Slogan__c</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <label>SelectorInclusion_AccountFields</label>\n</FieldSet>\n"
+      },
+      {
+        "id": "selectorConfigFieldSetInclusionBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorConfigFieldSetInclusions/SelectorConfig_FieldSetInclusion.SelectorInclusion_AccountFields.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>SelectorInclusion_AccountFields</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>FieldsetName__c</field>\n        <value xsi:type=\"xsd:string\">SelectorInclusion_AccountFields</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "field-set-inclusion/at4dx/Account/CustomInclusion": [
+      {
+        "id": "selectorInclusionFieldSet",
+        "relativePath": "main/schema/objects/Account/fieldSets/CustomInclusion.fieldSet-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<FieldSet xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <fullName>CustomInclusion</fullName>\n    <description>Generated selector field inclusion for Account.</description>\n    <displayedFields>\n        <field>Name</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <displayedFields>\n        <field>Slogan__c</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <label>CustomInclusion</label>\n</FieldSet>\n"
+      },
+      {
+        "id": "selectorConfigFieldSetInclusionBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorConfigFieldSetInclusions/SelectorConfig_FieldSetInclusion.CustomInclusion.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>CustomInclusion</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Account</value>\n    </values>\n    <values>\n        <field>FieldsetName__c</field>\n        <value xsi:type=\"xsd:string\">CustomInclusion</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "field-set-inclusion/at4dx/Property__c": [
+      {
+        "id": "selectorInclusionFieldSet",
+        "relativePath": "main/schema/objects/Property__c/fieldSets/SelectorInclusion_PropertyFields.fieldSet-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<FieldSet xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <fullName>SelectorInclusion_PropertyFields</fullName>\n    <description>Generated selector field inclusion for Property__c.</description>\n    <displayedFields>\n        <field>Name</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <displayedFields>\n        <field>Slogan__c</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <label>SelectorInclusion_PropertyFields</label>\n</FieldSet>\n"
+      },
+      {
+        "id": "selectorConfigFieldSetInclusionBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorConfigFieldSetInclusions/SelectorConfig_FieldSetInclusion.SelectorInclusion_PropertyFields.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>SelectorInclusion_PropertyFields</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>FieldsetName__c</field>\n        <value xsi:type=\"xsd:string\">SelectorInclusion_PropertyFields</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ],
+    "field-set-inclusion/at4dx/Property__c/CustomInclusion": [
+      {
+        "id": "selectorInclusionFieldSet",
+        "relativePath": "main/schema/objects/Property__c/fieldSets/CustomInclusion.fieldSet-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<FieldSet xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <fullName>CustomInclusion</fullName>\n    <description>Generated selector field inclusion for Property__c.</description>\n    <displayedFields>\n        <field>Name</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <displayedFields>\n        <field>Slogan__c</field>\n        <isFieldManaged>false</isFieldManaged>\n        <isRequired>false</isRequired>\n    </displayedFields>\n    <label>CustomInclusion</label>\n</FieldSet>\n"
+      },
+      {
+        "id": "selectorConfigFieldSetInclusionBinding",
+        "relativePath": "main/schema/custommetadata/applicationFactoryBindings/selectorConfigFieldSetInclusions/SelectorConfig_FieldSetInclusion.CustomInclusion.md-meta.xml",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CustomMetadata xmlns=\"http://soap.sforce.com/2006/04/metadata\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n    <label>CustomInclusion</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        <value xsi:nil=\"true\"/>\n    </values>\n    <values>\n        <field>BindingSObject__c</field>\n        <value xsi:type=\"xsd:string\">Property__c</value>\n    </values>\n    <values>\n        <field>FieldsetName__c</field>\n        <value xsi:type=\"xsd:string\">CustomInclusion</value>\n    </values>\n    <values>\n        <field>IsActive__c</field>\n        <value xsi:type=\"xsd:boolean\">true</value>\n    </values>\n</CustomMetadata>\n"
+      }
+    ]
+  }
+}

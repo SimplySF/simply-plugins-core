@@ -203,3 +203,130 @@ export {
   createPlatformEventSubscription,
   updatePlatformEventSubscription,
 } from './at4dxPlatformEventSubscriptionWrite.js';
+
+// AEP code generation (docs/design/0045), ported from @syntax-syllogism/apx-core: naming, the
+// opinionated path layout, plan builders, templates, the write engine, and the use cases the
+// `simply aep generate` commands and editor tooling drive. CMDT records are serialized by the
+// build*Xml functions above, and planValidation runs the validators above on what a run would add.
+export { AepGenerationError, isAepGenerationError, type AepGenerationErrorCode } from './generate/errors.js';
+export {
+  TRIGGER_OPERATION_OPTIONS,
+  type AepCommandResult,
+  type ArtifactId,
+  type EngineOptions,
+  type Flavor,
+  type GenerationManifest,
+  type GenerationPlan,
+  type OverwritePolicy,
+  type PlannedArtifact,
+} from './generate/model.js';
+export {
+  checkCancelled,
+  endProgress,
+  requireConnection,
+  startProgress,
+  uiHints,
+  type AepUseCaseContext,
+  type CommandDescriptor,
+  type GenerationApplyContext,
+  type OrgRequirement,
+  type ProgressEvent,
+  type UiHint,
+  type UseCaseContext,
+  type WriteUseCase,
+} from './generate/useCase.js';
+export {
+  generateActionOptionsSchema,
+  generateCriteriaOptionsSchema,
+  generateDomainOptionsSchema,
+  generateFieldSetInclusionOptionsSchema,
+  generateOptionsSchema,
+  generateSelectorMethodOptionsSchema,
+  generateSelectorOptionsSchema,
+  generateServiceOptionsSchema,
+  generateUnitOfWorkOptionsSchema,
+  type GenerateActionOptions,
+  type GenerateCriteriaOptions,
+  type GenerateDomainOptions,
+  type GenerateFieldSetInclusionOptions,
+  type GenerateOptions,
+  type GenerateSelectorMethodOptions,
+  type GenerateSelectorOptions,
+  type GenerateServiceOptions,
+  type GenerateUnitOfWorkOptions,
+} from './generate/options.js';
+export {
+  generate,
+  generateAction,
+  generateCriteria,
+  generateDomain,
+  generateFieldSetInclusion,
+  generateSelector,
+  generateSelectorMethod,
+  generateService,
+  generateUnitOfWork,
+  generationCommandDescriptors,
+  generationUseCases,
+  type GenerationUseCase,
+} from './generate/useCases.js';
+export {
+  applyGeneration,
+  planGeneration,
+  type GenerationOutcome,
+  type GenerationPreview,
+  type PlannedFile,
+} from './generate/generation.js';
+export { PLANNED_SOURCE, planValidation, type GenerationIssue } from './generate/planValidation.js';
+export {
+  FFLIB_UNIT_OF_WORK_SNIPPET,
+  FIELD_INJECTION_BINDING_REVIEW,
+  PROCESS_BINDING_REVIEW,
+  describeGenerationError,
+  renderGenerationPlan,
+  renderGenerationResult,
+} from './generate/render.js';
+export { toDescribeView, type SObjectDescribeView } from './generate/describe.js';
+export {
+  DEFAULT_API_VERSION,
+  DEFAULT_OUTPUT_PATH,
+  ORDER_PATTERN,
+  describeTarget,
+  isValidOrderValue,
+  isWithinCustomMetadataNameLimit,
+  resolveApiVersion,
+  resolveOutputBase,
+  resolveProjectApiVersion,
+  type ApiVersionOptions,
+} from './generate/support.js';
+export {
+  buildActionNames,
+  buildCriteriaNames,
+  buildFieldInjectionNames,
+  buildSObjectNames,
+  buildSelectorMethodNames,
+  buildServiceNames,
+  domainProcessBindingDeveloperName,
+  type DomainProcessNameInput,
+  type DomainProcessNames,
+  type FieldInjectionNameInput,
+  type FieldInjectionNames,
+  type SObjectNameInput,
+  type SObjectNames,
+  type SelectorMethodNameInput,
+  type SelectorMethodNames,
+  type ServiceNameInput,
+  type ServiceNames,
+} from './generate/naming.js';
+export { DEFAULT_LAYOUT, PathResolver, type AepLayout } from './generate/paths.js';
+export {
+  buildActionPlan,
+  buildCriteriaPlan,
+  buildDomainPlan,
+  buildFieldInjectionPlan,
+  buildSelectorMethodPlan,
+  buildSelectorPlan,
+  buildServicePlan,
+  buildUnitOfWorkPlan,
+  combinePlans,
+} from './generate/planBuilders.js';
+export { GenerationEngine } from './generate/engine.js';

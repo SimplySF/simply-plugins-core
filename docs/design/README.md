@@ -84,6 +84,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0042](0042-settings-address-states.md)                              | `simply-settings-core`: create/activate State and Country/Territory picklist states   | Implemented |
 | [0043](0043-settings-address-states-iso-codes.md)                    | `simply-settings-core`: fetch state definitions from an ISO 3166-2 source at run time | Planned     |
 | [0044](0044-community-publish-cancel-stalled-requests.md)            | Send the community publish POST, and cancel (not abandon) stalled requests            | In progress |
+| [0045](0045-aep-core-generation-engine.md)                           | `simply-aep-core`: the AEP generation engine, ported from `apx-core`                  | Draft       |
 
 ## Template
 

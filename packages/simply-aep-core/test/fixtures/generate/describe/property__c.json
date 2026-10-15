@@ -1,0 +1,11 @@
+{
+  "name": "Property__c",
+  "custom": true,
+  "fields": [
+    { "name": "Id", "type": "id", "filterable": true },
+    { "name": "Name", "type": "string", "filterable": true },
+    { "name": "Slogan__c", "type": "string", "filterable": true },
+    { "name": "LongNotes__c", "type": "textarea", "filterable": true },
+    { "name": "IsDeleted", "type": "boolean", "filterable": true }
+  ]
+}
