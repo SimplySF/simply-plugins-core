@@ -154,6 +154,7 @@ planValidation(preview: GenerationPreview, sourceDirs: string[]): GenerationIssu
 | `generate/cmdt.test`      | each generated record re-scans with no `malformed`/`ambiguous`, and validates clean in isolation            |
 | `generate/planValidation` | introduced vs. pre-existing issues; overwrite replacement; no CMDT → no scan; missing source dirs           |
 | `generate/engine`         | `error` policy lists every existing path and writes nothing; `skip`/`overwrite`; cancellation               |
+| `generate/reviewFixes`    | CMDT DeveloperName rule and typed error; binding-sequence and identifier schemas; plan labels               |
 | ported `apx-core` suites  | naming, paths, describe, support, plan builders, templates, use cases                                       |
 
 ## Open questions
