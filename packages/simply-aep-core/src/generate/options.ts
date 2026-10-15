@@ -32,7 +32,9 @@ const requiredText = (label: string): z.ZodString => field(z.string().min(1), { 
 
 const output = { outputPath: text('Output folder', { kind: 'folder' }).default(DEFAULT_OUTPUT_PATH) };
 const common = { ...output, apiVersion: text('API version').optional() };
-const object = { sobject: requiredText('SObject API name') };
+const identifier = (label: string): z.ZodString =>
+  requiredText(label).regex(/^[A-Za-z][A-Za-z0-9_]*$/, `${label} must be a valid identifier.`);
+const object = { sobject: identifier('SObject API name') };
 const flavored = {
   ...common,
   ...object,
@@ -43,7 +45,7 @@ const bindingSequence = field(
   z
     .string()
     .refine(
-      (value) => value.trim() !== '' && !Number.isNaN(Number(value)),
+      (value) => isValidOrderValue(value) && Number.isFinite(Number(value)),
       'The binding sequence must be a number, such as `1000` or `1000.5`.',
     ),
   { kind: 'string', label: 'Binding sequence' },
@@ -72,14 +74,14 @@ export const generateDomainOptionsSchema = z.object(flavored);
 export const generateUnitOfWorkOptionsSchema = z.object({ ...flavored, bindingSequence });
 export const generateServiceOptionsSchema = z.object({
   ...common,
-  serviceBasename: requiredText('Service basename'),
+  serviceBasename: identifier('Service basename'),
   flavor: enumValue(['fflib', 'at4dx'], 'Framework'),
   prefix: text('Prefix').optional(),
 });
 export const generateSelectorMethodOptionsSchema = z.object({
   ...common,
   ...object,
-  className: requiredText('Class name'),
+  className: identifier('Class name'),
   sobjectSelectorClassName: requiredText('SObject selector class name'),
 });
 export const generateFieldSetInclusionOptionsSchema = z.object({
@@ -106,7 +108,7 @@ export const generateFieldSetInclusionOptionsSchema = z.object({
 const processFields = {
   ...common,
   ...object,
-  className: requiredText('Class name'),
+  className: identifier('Class name'),
   triggerOperation: enumValue(TRIGGER_OPERATION_OPTIONS, 'Trigger operation').default('Before_Insert'),
   order: field(
     z.string().refine(isValidOrderValue, '`--order` must be a decimal-like value such as `10.1` or `10.2`.'),

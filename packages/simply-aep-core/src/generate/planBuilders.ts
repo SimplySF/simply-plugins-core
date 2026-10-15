@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+import { developerNameIssue } from '../developerName.js';
 import { buildBindingXml } from '../at4dxBuildXml.js';
 import { buildDomainProcessBindingXml } from '../at4dxDomainProcessBuildXml.js';
 import type { DomainProcessType, TriggerOperation } from '../at4dxDomainProcessBindingTypes.js';
 import { buildFieldSetInclusionXml } from '../at4dxFieldSetInclusionBuildXml.js';
 import { ENTITY_DEFINITION_STANDARD_OBJECTS, isCustomObjectApiName } from '../entityDefinitionEligibility.js';
 import type { SObjectDescribeView } from './describe.js';
+import { AepGenerationError } from './errors.js';
 import type { Flavor, GenerationPlan, PlannedArtifact } from './model.js';
 import {
   type DomainProcessNames,
@@ -40,6 +42,16 @@ const artifact = (id: PlannedArtifact['id'], relativePath: string, content: stri
   relativePath,
   content,
 });
+
+const checkBindingName = (developerName: string, source: string): void => {
+  const rule = developerNameIssue(developerName);
+  if (rule)
+    throw new AepGenerationError(
+      'invalid-developer-name',
+      `Invalid generated DeveloperName "${developerName}" for "${source}": ${rule}.`,
+      { developerName, source, rule },
+    );
+};
 
 const escapeXmlText = (value: string): string =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -104,6 +116,7 @@ export const buildSelectorPlan = (args: {
   ];
 
   if (args.includeBinding) {
+    checkBindingName(names.applicationFactoryLabel, names.apiName);
     artifacts.push(
       artifact(
         'selectorBinding',
@@ -188,6 +201,7 @@ export const buildDomainPlan = (args: {
   ];
 
   if (args.includeBinding) {
+    checkBindingName(names.applicationFactoryLabel, names.apiName);
     artifacts.push(
       artifact(
         'domainBinding',
@@ -284,6 +298,7 @@ export const buildServicePlan = (args: {
   ];
 
   if (includeBinding) {
+    checkBindingName(names.interfaceClassName, names.facadeClassName);
     artifacts.push(
       artifact(
         'serviceBinding',
@@ -306,6 +321,7 @@ export const buildUnitOfWorkPlan = (args: {
   bindingSequenceValue: string;
 }): GenerationPlan => {
   if (args.flavor !== 'at4dx') return { artifacts: [] };
+  checkBindingName(args.names.applicationFactoryLabel, args.names.apiName);
   return {
     artifacts: [
       artifact(
@@ -376,8 +392,9 @@ type DomainProcessPlanArgs = {
   paths: PathResolver;
 };
 
-const domainProcessBindingArtifact = (args: DomainProcessPlanArgs, type: DomainProcessType): PlannedArtifact =>
-  artifact(
+const domainProcessBindingArtifact = (args: DomainProcessPlanArgs, type: DomainProcessType): PlannedArtifact => {
+  checkBindingName(args.names.bindingDeveloperName, args.names.sobjectApiName);
+  return artifact(
     'domainProcessBinding',
     `${args.paths.domainProcessBindingDir()}/${args.names.bindingMetadataFileName}`,
     buildDomainProcessBindingXml(
@@ -399,6 +416,7 @@ const domainProcessBindingArtifact = (args: DomainProcessPlanArgs, type: DomainP
       { label: args.names.bindingDeveloperName },
     ),
   );
+};
 
 export const buildCriteriaPlan = (args: DomainProcessPlanArgs): GenerationPlan => {
   const { names, flavor, apiVersion, paths } = args;
@@ -481,6 +499,7 @@ export const buildFieldInjectionPlan = (args: {
   paths: PathResolver;
 }): GenerationPlan => {
   const { names, flavor, fieldNames, label, description, paths } = args;
+  checkBindingName(names.bindingDeveloperName, names.sobjectApiName);
   return {
     artifacts: [
       artifact(

@@ -22,6 +22,8 @@ export type AepGenerationErrorCode =
   | 'duplicate-path'
   | 'file-exists'
   | 'write-failed'
+  | 'invalid-developer-name'
+  | 'invalid-path'
   | 'template-missing'
   | 'template-empty'
   | 'sobject-not-found'
