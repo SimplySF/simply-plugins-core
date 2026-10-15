@@ -100,7 +100,19 @@ importers:
       '@salesforce/source-deploy-retrieve':
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
+      eta:
+        specifier: ^4.6.0
+        version: 4.6.0
+      pluralize:
+        specifier: ^8.0.0
+        version: 8.0.0
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
+      '@types/pluralize':
+        specifier: ^0.0.33
+        version: 0.0.33
       '@vitest/coverage-v8':
         specifier: ^4.1.10
         version: 4.1.11(vitest@4.1.11)
@@ -2558,6 +2570,10 @@ packages:
     resolution:
       { integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg== }
 
+  '@types/pluralize@0.0.33':
+    resolution:
+      { integrity: sha512-JOqsl+ZoCpP4e8TDke9W79FDcSgPAR0l6pixx2JHkhnRjvShyYiAYw2LVsnA7K08Y6DeOnaU6ujmENO4os/cYg== }
+
   '@types/responselike@1.0.3':
     resolution:
       { integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw== }
@@ -4224,6 +4240,11 @@ packages:
     resolution:
       { integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g== }
     engines: { node: '>=0.10.0' }
+
+  eta@4.6.0:
+    resolution:
+      { integrity: sha512-lW6is4T1NFOYnmqGZIfvixqj7A7sSvScF+DN8EK6K58xI5MZ5UvYe0GjopxOXQtZvUn4eDdVuZ8XSoYWTMEKwA== }
+    engines: { node: '>=20' }
 
   event-target-shim@5.0.1:
     resolution:
@@ -8167,10 +8188,6 @@ packages:
       { integrity: sha512-9qv4rlDiopXg4E69k+vMHjNN63YFMe9sZMrdlvKnCjlCRWeCBswPPMPUfx+ipsAWq1LXHe70RcbaHdJJpS6hyQ== }
     engines: { node: '>= 10' }
 
-  zod@4.4.3:
-    resolution:
-      { integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ== }
-
   zod@4.5.4:
     resolution:
       { integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA== }
@@ -9850,7 +9867,7 @@ snapshots:
       proper-lockfile: 4.1.2
       semver: 7.8.5
       ts-retry-promise: 0.8.1
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@salesforce/kit@3.2.6':
     dependencies:
@@ -10185,6 +10202,8 @@ snapshots:
   '@types/node@26.6.5':
     dependencies:
       undici-types: 8.9.0
+
+  '@types/pluralize@0.0.33': {}
 
   '@types/responselike@1.0.3':
     dependencies:
@@ -11680,6 +11699,8 @@ snapshots:
       '@types/estree': 1.0.9
 
   esutils@2.0.3: {}
+
+  eta@4.6.0: {}
 
   event-target-shim@5.0.1: {}
 
@@ -15544,8 +15565,6 @@ snapshots:
       archiver-utils: 3.0.4
       compress-commons: 4.1.2
       readable-stream: 3.6.2
-
-  zod@4.4.3: {}
 
   zod@4.5.4: {}
 

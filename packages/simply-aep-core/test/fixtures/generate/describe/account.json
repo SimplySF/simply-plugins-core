@@ -1,0 +1,12 @@
+{
+  "name": "Account",
+  "custom": false,
+  "fields": [
+    { "name": "Id", "type": "id", "filterable": true },
+    { "name": "Name", "type": "string", "filterable": true },
+    { "name": "OwnerId", "type": "reference", "filterable": true },
+    { "name": "Description", "type": "textarea", "filterable": true },
+    { "name": "IsDeleted", "type": "boolean", "filterable": true },
+    { "name": "UnfilterableField__c", "type": "string", "filterable": false }
+  ]
+}

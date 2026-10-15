@@ -5,7 +5,7 @@ description: Usage examples for @simplysf/simply-aep-core.
 
 Apex Enterprise Patterns ([fflib](https://github.com/apex-enterprise-patterns/fflib-apex-common),
 [force-di](https://github.com/apex-enterprise-patterns/force-di),
-[AT4DX](https://github.com/apex-enterprise-patterns/at4dx)) binding scan and resolution logic. Full
+[AT4DX](https://github.com/apex-enterprise-patterns/at4dx)) binding scan, resolution, and code generation. Full
 signatures and types are in the [API reference](/api/simply-aep-core/readme/).
 
 ```sh
@@ -97,3 +97,25 @@ const { matches, misses } = resolvePlatformEventDistribution(
   scan.records,
 );
 ```
+
+## Generating a layer
+
+Each generator plans first and writes second, so a caller can show what it would write, check it,
+and only then apply it. `planValidation` reports what the planned binding records would break in the
+project — a second Domain binding for the same SObject, say — without counting problems that were
+already there:
+
+```ts
+import { generateDomain, planValidation } from '@simplysf/simply-aep-core';
+
+const preview = await generateDomain.plan(connection, { sobject: 'Account', flavor: 'at4dx' }, { projectRoot });
+for (const file of preview.files) console.log(file.status, file.relativePath);
+
+const issues = planValidation(preview, ['force-app', preview.baseDir]);
+if (!issues.some((issue) => issue.severity === 'error')) {
+  await generateDomain.apply(connection, preview); // refuses to replace existing files unless { overwrite: 'overwrite' }
+}
+```
+
+`generateService`, `generateSelectorMethod`, `generateFieldSetInclusion`, `generateAction`, and
+`generateCriteria` don't need an org: pass `undefined` as the connection.

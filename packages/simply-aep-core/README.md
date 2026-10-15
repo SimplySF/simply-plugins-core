@@ -216,6 +216,35 @@ await createPlatformEventSubscription(
 // writes force-app/main/default/customMetadata/PlatformEvents_Subscription.Order_Shipped_Notify.md-meta.xml
 ```
 
+### Code generation
+
+Scaffolds fflib and AT4DX layers — selector, domain (with its trigger), service, unit of work — and the AT4DX criteria/action classes, selector methods, and field set inclusions, each with its unit test and, for AT4DX, its Custom Metadata binding. The engine behind `sf simply aep generate ...`, ported from [`@syntax-syllogism/apx-core`](https://github.com/Syntax-Syllogism/apx-core) (whose dead-code analysis stays there). Binding records are written by the `build*Xml` functions above, so a generated record and one `create*` writes can't differ. See [design doc 0045](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0045-aep-core-generation-engine.md).
+
+Each generator is a use case with a `plan` (validate options, describe the SObject if needed, render every file — writes nothing) and an `apply` (write the plan).
+
+| Export                                                                                                                                                                                 | Description                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `generate`, `generateSelector`, `generateDomain`, `generateService`, `generateUnitOfWork`, `generateSelectorMethod`, `generateFieldSetInclusion`, `generateAction`, `generateCriteria` | The use cases. `plan(connection, options, { projectRoot })` returns a `GenerationPreview`; `apply(connection, preview, { overwrite })` writes it, refusing (`file-exists`, every existing path in `data.absolutePaths`) unless `overwrite` is `'overwrite'` or `'skip'`. |
+| `generationUseCases`, `generationCommandDescriptors`                                                                                                                                   | The same, keyed by id, and their descriptors (`id`, `cliId`, `title`, `requiresOrg`, `optionsSchema`).                                                                                                                                                                   |
+| `planValidation(preview, sourceDirs)`                                                                                                                                                  | The validation issues a preview's CMDT records would introduce into `sourceDirs` — pre-existing problems aren't included. Each `GenerationIssue` is tagged `record: 'binding' \| 'domain-process-binding' \| 'field-set-inclusion'`.                                     |
+| `generate*OptionsSchema`, `uiHints(schema)`                                                                                                                                            | The zod option schemas, and the prompt hints (`label`, `kind`) a form or interactive CLI renders from.                                                                                                                                                                   |
+| `renderGenerationPlan(preview)`, `renderGenerationResult(outcome, { commandId })`, `describeGenerationError(error)`                                                                    | Human-readable lines for a preview, a result, and an error (including a zod validation error).                                                                                                                                                                           |
+| `AepGenerationError`, `isAepGenerationError`                                                                                                                                           | What the engine throws on purpose, with a stable `code` (`org-required`, `nothing-selected`, `file-exists`, `sobject-not-found`, ...).                                                                                                                                   |
+| `build*Names`, `PathResolver`, `DEFAULT_LAYOUT`, `build*Plan`, `combinePlans`, `GenerationEngine`, `planGeneration`, `applyGeneration`, `describeTarget`, `toDescribeView`, `resolve*` | The lower layers the use cases are built from: naming rules, the output layout, per-artifact plan builders, the write engine, and describe/API-version/output-path resolution.                                                                                           |
+
+```ts
+import { generateDomain, planValidation } from '@simplysf/simply-aep-core';
+
+const preview = await generateDomain.plan(connection, { sobject: 'Account', flavor: 'at4dx' }, { projectRoot });
+const issues = planValidation(preview, ['force-app', preview.baseDir]);
+if (!issues.some((issue) => issue.severity === 'error')) {
+  await generateDomain.apply(connection, preview);
+  // writes generated-files/main/classes/domains/Accounts.cls, its interface, test, trigger, and binding
+}
+```
+
+The generation code is ported from `apx-core` by its author and relicensed under Apache-2.0 here.
+
 ## Issues
 
 Please report any issues at https://github.com/SimplySF/simply-plugins-core/issues
