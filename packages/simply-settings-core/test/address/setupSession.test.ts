@@ -27,21 +27,16 @@ import { fixture } from './fixtures.js';
 
 const INSTANCE = 'https://acme.my.salesforce.com';
 const SETUP = 'https://acme.my.salesforce-setup.com';
-const ONE_TIME = 'otp-SECRET-123';
-const FRONTDOOR = `${INSTANCE}/secur/frontdoor.jsp?otp=${ONE_TIME}`;
+const TOKEN = '00D!SECRET-TOKEN';
 const PROBE = '/i18n/ConfigureNewState.apexp?countryIso=US';
 
-// eslint-disable-next-line camelcase -- the `singleaccess` endpoint's own response field
-function fakeConnection(singleAccess: () => Promise<unknown> = async () => ({ frontdoor_uri: FRONTDOOR })): {
+function fakeConnection(accessToken = TOKEN): {
   connection: Connection;
-  requestGet: ReturnType<typeof vi.fn>;
   refreshAuth: ReturnType<typeof vi.fn>;
 } {
-  const requestGet = vi.fn(singleAccess);
   const refreshAuth = vi.fn(async () => {});
   return {
-    connection: { instanceUrl: INSTANCE, requestGet, refreshAuth } as unknown as Connection,
-    requestGet,
+    connection: { instanceUrl: INSTANCE, accessToken, refreshAuth } as unknown as Connection,
     refreshAuth,
   };
 }
@@ -67,22 +62,25 @@ describe('SetupSession', () => {
     throw new Error('Expected SetupSession.open to fail.');
   }
 
-  it('opens through a single-access frontdoor URL and carries cookies across hosts', async () => {
-    const { connection, requestGet, refreshAuth } = fakeConnection();
+  it('opens with the access token as the sid cookie and carries cookies across hosts', async () => {
+    const { connection, refreshAuth } = fakeConnection();
     const instance = agent.get(INSTANCE);
     const setup = agent.get(SETUP);
+    let handoffCookie: string | undefined;
 
-    instance.intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' }).reply(302, '', {
-      headers: { location: PROBE, 'set-cookie': ['sid=SESSION; Domain=.salesforce.com; Path=/; Secure'] },
-    });
-    instance.intercept({ path: PROBE, method: 'GET', headers: { cookie: 'sid=SESSION' } }).reply(302, '', {
+    instance.intercept({ path: PROBE, method: 'GET', headers: { cookie: `sid=${TOKEN}` } }).reply(302, '', {
       headers: { location: `${SETUP}/handoff?retURL=${encodeURIComponent(PROBE)}`, 'set-cookie': ['oid=ORG; Path=/'] },
     });
-    // `.salesforce.com` cookies don't reach `*.salesforce-setup.com`; Salesforce hands the session
-    // over with a redirect that sets the setup domain's own cookie.
-    setup
-      .intercept({ path: `/handoff?retURL=${encodeURIComponent(PROBE)}`, method: 'GET' })
-      .reply(302, '', { headers: { location: PROBE, 'set-cookie': ['sid=SETUP_SESSION; Path=/; Secure'] } });
+    // The token stays on the instance host; Salesforce hands the session over with a redirect that
+    // sets the setup domain's own cookie.
+    setup.intercept({ path: `/handoff?retURL=${encodeURIComponent(PROBE)}`, method: 'GET' }).reply(
+      302,
+      (options) => {
+        handoffCookie = (options.headers as Record<string, string>).Cookie;
+        return '';
+      },
+      { headers: { location: PROBE, 'set-cookie': ['sid=SETUP_SESSION; Path=/; Secure'] } },
+    );
     setup
       .intercept({ path: PROBE, method: 'GET', headers: { cookie: 'sid=SETUP_SESSION' } })
       .reply(200, fixture('new-state-form.html'));
@@ -90,13 +88,14 @@ describe('SetupSession', () => {
     const session = await SetupSession.open({ connection, dispatcher: agent });
 
     expect(refreshAuth).toHaveBeenCalledOnce();
-    const singleAccessUrl = new URL(requestGet.mock.calls[0][0] as string);
-    expect(singleAccessUrl.pathname).toBe('/services/oauth2/singleaccess');
-    expect(singleAccessUrl.searchParams.get('redirect_uri')).toBe(PROBE);
+    expect(handoffCookie).toBeUndefined();
 
-    // The host-only `oid` cookie stays on the instance host; `sid` covers both.
     instance
-      .intercept({ path: '/i18n/ConfigureNewState.apexp', method: 'POST', headers: { cookie: 'sid=SESSION; oid=ORG' } })
+      .intercept({
+        path: '/i18n/ConfigureNewState.apexp',
+        method: 'POST',
+        headers: { cookie: `sid=${TOKEN}; oid=ORG` },
+      })
       .reply(200, 'ok');
     const response = await session.postForm('/i18n/ConfigureNewState.apexp', [['a', 'b c']]);
     expect(response.body).toBe('ok');
@@ -105,9 +104,7 @@ describe('SetupSession', () => {
   it('posts url-encoded fields without following the redirect', async () => {
     const { connection } = fakeConnection();
     const instance = agent.get(INSTANCE);
-    instance
-      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
-      .reply(200, fixture('new-state-form.html'));
+    instance.intercept({ path: PROBE, method: 'GET' }).reply(200, fixture('new-state-form.html'));
     const session = await SetupSession.open({ connection, dispatcher: agent });
 
     let sentBody = '';
@@ -133,10 +130,22 @@ describe('SetupSession', () => {
     expect(response.location).toBe('/i18n/ConfigureCountry.apexp?countryIso=US&success=true');
   });
 
-  it('fails with the scope hint when no frontdoor URL is issued, without the token', async () => {
-    const { connection } = fakeConnection(async () => {
-      throw new Error('403 Forbidden for token 00D!SECRET');
-    });
+  it('fails when the connection has no access token', async () => {
+    const { connection } = fakeConnection('');
+
+    expect((await openFailure(connection)).message).toMatch(/no instance URL or access token/);
+  });
+
+  it('fails with the scope hint, without the token, when Setup answers with the login page', async () => {
+    const { connection } = fakeConnection();
+    agent
+      .get(INSTANCE)
+      .intercept({ path: PROBE, method: 'GET' })
+      .reply(302, '', { headers: { location: 'https://login.salesforce.com/?ec=302' } });
+    agent
+      .get('https://login.salesforce.com')
+      .intercept({ path: '/?ec=302', method: 'GET' })
+      .reply(200, fixture('login.html'));
 
     const error = await openFailure(connection);
 
@@ -144,42 +153,21 @@ describe('SetupSession', () => {
     expect(JSON.stringify(error)).not.toMatch(/SECRET/);
   });
 
-  it('fails with the scope hint when frontdoor lands on the login page', async () => {
+  it('never puts the token in a transport error', async () => {
     const { connection } = fakeConnection();
-    agent
-      .get(INSTANCE)
-      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
-      .reply(302, '', { headers: { location: 'https://login.salesforce.com/?ec=302' } });
-    agent
-      .get('https://login.salesforce.com')
-      .intercept({ path: '/?ec=302', method: 'GET' })
-      .reply(200, fixture('login.html'));
-
-    await expect(SetupSession.open({ connection, dispatcher: agent })).rejects.toThrow(/OAuth scope/);
-  });
-
-  it('never puts the frontdoor URL in a transport error', async () => {
-    const { connection } = fakeConnection();
-    agent
-      .get(INSTANCE)
-      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
-      .reply(503, 'down');
+    agent.get(INSTANCE).intercept({ path: PROBE, method: 'GET' }).reply(503, 'down');
 
     const error = await openFailure(connection);
 
-    expect(error.message).toBe("Couldn't open a Setup session: HTTP 503 from /secur/frontdoor.jsp.");
-    expect(error.message).not.toContain(ONE_TIME);
+    expect(error.message).toBe("Couldn't open a Setup session: HTTP 503 from /i18n/ConfigureNewState.apexp.");
+    expect(JSON.stringify(error)).not.toMatch(/SECRET/);
   });
 
   it("follows Salesforce's redirectOnLoad() script interstitials like HTTP redirects", async () => {
     const { connection } = fakeConnection();
     const instance = agent.get(INSTANCE);
     const setup = agent.get(SETUP);
-    instance
-      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
-      .reply(200, scriptRedirect(`${SETUP}\\/handoff?retURL\\x3d1`), {
-        headers: { 'set-cookie': ['sid=SESSION; Path=/'] },
-      });
+    instance.intercept({ path: PROBE, method: 'GET' }).reply(200, scriptRedirect(`${SETUP}\\/handoff?retURL\\x3d1`));
     setup
       .intercept({ path: '/handoff?retURL=1', method: 'GET' })
       .reply(200, scriptRedirect(PROBE), { headers: { 'set-cookie': ['sid=SETUP_SESSION; Path=/'] } });
@@ -194,7 +182,7 @@ describe('SetupSession', () => {
     const { connection } = fakeConnection();
     const instance = agent.get(INSTANCE);
     instance
-      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
+      .intercept({ path: PROBE, method: 'GET' })
       .reply(200, scriptRedirect(`${INSTANCE}/identity/twofactor/addTwoFactorOnly.apexp`));
     instance
       .intercept({ path: '/identity/twofactor/addTwoFactorOnly.apexp', method: 'GET' })
@@ -203,15 +191,13 @@ describe('SetupSession', () => {
     const error = await openFailure(connection);
 
     expect(error.message).toMatch(/identity-verification step/);
-    expect(error.message).not.toContain(ONE_TIME);
+    expect(JSON.stringify(error)).not.toMatch(/SECRET/);
   });
 
   it('throws a retryable SetupTransportError for a 5xx', async () => {
     const { connection } = fakeConnection();
     const instance = agent.get(INSTANCE);
-    instance
-      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
-      .reply(200, fixture('new-state-form.html'));
+    instance.intercept({ path: PROBE, method: 'GET' }).reply(200, fixture('new-state-form.html'));
     const session = await SetupSession.open({ connection, dispatcher: agent });
     instance.intercept({ path: PROBE, method: 'GET' }).reply(502, 'bad gateway');
 

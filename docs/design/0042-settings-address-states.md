@@ -133,24 +133,31 @@ sf simply settings address state create --target-org myOrg --file states.json --
    row. Finish with a hint to run `state activate` when anything was created, since new states
    are created inactive. When nothing is pending, no Setup session is opened at all.
 
-**Opening a Setup session.** Ask `/services/oauth2/singleaccess?redirect_uri=/i18n/ConfigureNewState.apexp?countryIso=US`
-for a single-use `frontdoor_uri`, then GET it with a cookie jar (`undici` with manual
-redirect-following, collecting `Set-Cookie` per host, since `*.salesforce.com` cookies don't reach
-`*.salesforce-setup.com`). Redirects include Salesforce's `redirectOnLoad()` interstitial: a 200
+**Opening a Setup session.** Seed a cookie jar with the connection's access token as a host-only
+`sid` cookie on the instance host (the CLI's own cached session), then GET
+`/i18n/ConfigureNewState.apexp?countryIso=US` with it (`undici` with manual redirect-following,
+collecting `Set-Cookie` per host, since `*.salesforce.com` cookies don't reach
+`*.salesforce-setup.com`; the token itself never leaves the instance host). Redirects include Salesforce's `redirectOnLoad()` interstitial: a 200
 page whose script calls `window.location.replace('…')` in place of a 3xx. Every GET follows its
 `https:` target the way a browser would, within the same 10-hop limit. A real org answered the
 form's own URL with one, which the first release didn't follow, so every state failed with "Setup
 form layout not recognized". If the chain ends on an `/identity/` page (MFA registration, device
 verification), the command fails with "Salesforce wants this user to complete an
-identity-verification step…", since only a person in a browser can get past it. This is what `@salesforce/core`'s `Org.getFrontDoorUrl` (and so
-`sf org open`) does; the design originally passed the raw access token as
-`frontdoor.jsp?sid=`, which Salesforce now steers away from and which would put a long-lived token
-in a URL. `refreshAuth()` runs first, because `singleaccess` answers an expired token with a 403
-that jsforce won't refresh on. If no frontdoor URL is issued, or the redirect chain ends on a login
-page or a non-200, the command fails before submitting anything: "Couldn't open a Setup session
-with this org's credentials. The auth may lack the `web` or `full` OAuth scope." Neither the access
-token nor the one-time frontdoor URL ever appears in output or error messages; transport errors
-name only the path.
+identity-verification step…", since only a person in a browser can get past it.
+
+The first release opened the session the way `@salesforce/core`'s `Org.getFrontDoorUrl` (and so
+`sf org open`) does: a single-use `frontdoor_uri` from `/services/oauth2/singleaccess`. That starts
+a _new_ UI session, and a production org held it at passkey registration
+(`/_ui/identity/webauthn/AddPasskeyUi`, reached through `lhdoredir()` and `contentDoor` script
+pages the interstitial matcher doesn't recognize), even though the same user's browser session went
+straight to Setup. So every state failed with "Setup form layout not recognized" while the form was
+fine. The cached token as a `sid` cookie reaches the form directly on that org. It also avoids the
+problem that ruled out `frontdoor.jsp?sid=`: the token travels in a cookie header to the org's own
+host, never in a URL. `refreshAuth()` runs first, because Setup answers an expired token with the
+login page rather than a 401 jsforce would refresh on. If the redirect chain ends on a login page or
+a non-200, the command fails before submitting anything: "Couldn't open a Setup session with this
+org's credentials. The auth may lack the `web` or `full` OAuth scope." The access token never
+appears in output or error messages; transport errors name only the path.
 
 **Submitting one state** (`createState(session, definition)`):
 
@@ -252,7 +259,7 @@ type StateActivateResult = {
 | `deployAddressSettingsXml(options)`                                                       | org  | SDR deploy of that text; a failed deploy is returned, not thrown.                                           |
 | `parseAddressSettingsXml(xml)`                                                            | pure | → countries and states, with the "picklists not enabled" check.                                             |
 | `planStateCreation(defs, settings)`                                                       | pure | → `pending`, plus `settled` (`exists` / `country-missing`).                                                 |
-| `openSetupSession(options)` / `SetupSession`                                              | org  | `singleaccess` frontdoor + cookie jar + login-page check.                                                   |
+| `openSetupSession(options)` / `SetupSession`                                              | org  | Access token as `sid` cookie + cookie jar + login-page check.                                               |
 | `parseNewStateForm(html)` / `fillNewStateForm(form, def)`                                 | pure | → the form's action and default fields, or `undefined` if the layout isn't recognized; then the submission. |
 | `classifyNewStateResponse(response)`                                                      | pure | → `{ status, message? }` per the table above.                                                               |
 | `createState(session, def, options?)` / `createStates(options)`                           | org  | One state / many, with concurrency, retry, and an `onProgress` callback.                                    |
@@ -360,10 +367,10 @@ Per the cross-repo recipe ([0027](0027-core-extraction-round-1-post-split.md)), 
   `02` stays a string, a lone country or state is still a list, the picklists-not-enabled error,
   only listed states change, the rest of the document round-trips byte-for-byte, and missing
   flags are added in schema order.
-- `SetupSession`: the `singleaccess` request, cookies carried per host across the frontdoor and
-  setup-domain redirects, url-encoded POST without following the redirect, the scope error both
-  when no frontdoor URL is issued and when frontdoor lands on login, neither the token nor the
-  one-time URL in any error, and a 5xx as a retryable `SetupTransportError`.
+- `SetupSession`: the token sent as `sid` to the instance host only, cookies carried per host
+  across setup-domain redirects, url-encoded POST without following the redirect, the scope error
+  when Setup answers with login, a missing token, the token in no error, and a 5xx as a retryable
+  `SetupTransportError`.
 - `createState`/`createStates`: the form posted to its action, a rejection's message carried, no
   POST for an unrecognized form, expired-session wording, a 5xx retried and the retry landing as
   `exists`, no retry for other errors, giving up after the configured retries, concurrency bound,
@@ -394,7 +401,7 @@ automates this is follow-up work.
 
 ## Open questions
 
-1. **Auth types.** `singleaccess` needs a token with `web`/`full` scope. The default
+1. **Auth types.** Using the token as a UI session needs `web`/`full` scope. The default
    `sf org login web` app has it; JWT flows with a custom connected app may not. That case is
    handled by the fail-fast error, but it's worth confirming against a JWT-authed org before
    release.
