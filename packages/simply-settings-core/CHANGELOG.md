@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.2](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-settings-core%400.3.1...%40simplysf%2Fsimply-settings-core%400.3.2) (2026-10-16)
+
+### Bug Fixes
+
+- **simply-settings-core:** open Setup sessions with the cached access token ([#237](https://github.com/SimplySF/simply-plugins-core/issues/237)) ([a6b7f6a](https://github.com/SimplySF/simply-plugins-core/commit/a6b7f6a742b628c38fefbd1e87460db9d52a9c2a))
+
 ## [0.3.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-settings-core%400.3.0...%40simplysf%2Fsimply-settings-core%400.3.1) (2026-10-16)
 
 ### Bug Fixes
