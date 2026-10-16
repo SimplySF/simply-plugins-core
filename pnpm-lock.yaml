@@ -245,6 +245,25 @@ importers:
         specifier: ^4.1.10
         version: 4.1.11(@types/node@26.6.5)(@vitest/coverage-v8@4.1.11)(vite@8.3.1(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
 
+  packages/simply-flow-core:
+    dependencies:
+      '@salesforce/core':
+        specifier: ^8.30.0
+        version: 8.32.6
+      '@simplysf/simply-core':
+        specifier: workspace:^1.6.11
+        version: link:../simply-core
+      glob:
+        specifier: ^13.0.6
+        version: 13.0.6
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^4.1.10
+        version: 4.1.11(vitest@4.1.11)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@types/node@26.6.5)(@vitest/coverage-v8@4.1.11)(vite@8.3.1(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
+
   packages/simply-package-core:
     dependencies:
       '@salesforce/core':

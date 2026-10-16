@@ -1,0 +1,33 @@
+# -- CLEAN
+tmp/
+package-lock.json
+.npmrc
+npm-error.log
+yarn-error.log
+.history
+
+# compile source
+lib
+
+# test artifacts
+*xunit.xml
+*checkstyle.xml
+*unitcoverage
+coverage
+
+# ignore sfdx-trust files
+*.tgz
+*.sig
+package.json.bak.
+
+npm-shrinkwrap.json
+
+# -- CLEAN ALL
+*.tsbuildinfo
+.eslintcache
+.wireit
+node_modules
+
+# os specific files
+.DS_Store
+.idea
