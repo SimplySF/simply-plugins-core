@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-settings-core%400.3.0...%40simplysf%2Fsimply-settings-core%400.3.1) (2026-10-16)
+
+### Bug Fixes
+
+- **simply-settings-core:** follow Setup script redirects and collect view state outside the form ([#234](https://github.com/SimplySF/simply-plugins-core/issues/234)) ([ce1880b](https://github.com/SimplySF/simply-plugins-core/commit/ce1880b4012b4d5d49e9af42bc142d40f151435e))
+
 # [0.3.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-settings-core%400.2.0...%40simplysf%2Fsimply-settings-core%400.3.0) (2026-10-14)
 
 ### Features
