@@ -1,6 +1,6 @@
 # 0046 — Splitting `simply-flow-core` out of `simply-flow`
 
-**Status:** Draft
+**Status:** In progress (simply-flow-core implemented; simply-plugins companion PR pending its publish)
 **Package:** new `packages/simply-flow-core` (in `simply-plugins-core`); `packages/simply-flow` (CLI,
 slimmed, in `simply-plugins`)
 **Date:** 2026-10-16

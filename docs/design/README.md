@@ -85,7 +85,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0043](0043-settings-address-states-iso-codes.md)                    | `simply-settings-core`: fetch state definitions from an ISO 3166-2 source at run time | Planned     |
 | [0044](0044-community-publish-cancel-stalled-requests.md)            | Send the community publish POST, and cancel (not abandon) stalled requests            | In progress |
 | [0045](0045-aep-core-generation-engine.md)                           | `simply-aep-core`: the AEP generation engine, ported from `apx-core`                  | Implemented |
-| [0046](0046-simply-flow-core.md)                                     | Splitting `simply-flow-core` out of `simply-flow`                                     | Draft       |
+| [0046](0046-simply-flow-core.md)                                     | Splitting `simply-flow-core` out of `simply-flow`                                     | In progress |
 
 ## Template
 

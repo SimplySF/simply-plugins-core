@@ -30,6 +30,7 @@ npm install @simplysf/simply-schema-core
 npm install @simplysf/simply-project-setup-core
 npm install @simplysf/simply-cicd-core
 npm install @simplysf/simply-settings-core
+npm install @simplysf/simply-flow-core
 ```
 
 | Package                     | What it's for                                                                                                                                      |
@@ -48,6 +49,7 @@ npm install @simplysf/simply-settings-core
 | `simply-project-setup-core` | Salesforce DX project file/dependency standardization engine (template packs, `.gitignore` composition, `package.json` scripts/dependency merging) |
 | `simply-cicd-core`          | ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab)                                                                       |
 | `simply-settings-core`      | State and Country/Territory picklist automation: create states through Setup and activate them via AddressSettings                                 |
+| `simply-flow-core`          | Flow deactivation/deletion and obsolete Flow version pruning                                                                                       |
 
 ## Next steps
 
@@ -68,3 +70,4 @@ TypeScript source:
 - [simply-project-setup-core guide](/guides/simply-project-setup-core/) · [API](/api/simply-project-setup-core/readme/)
 - [simply-cicd-core guide](/guides/simply-cicd-core/) · [API](/api/simply-cicd-core/readme/)
 - [simply-settings-core guide](/guides/simply-settings-core/) · [API](/api/simply-settings-core/readme/)
+- [simply-flow-core guide](/guides/simply-flow-core/) · [API](/api/simply-flow-core/readme/)

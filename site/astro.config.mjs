@@ -22,6 +22,7 @@ const [simplySchemaCore, simplySchemaCoreSidebar] = createStarlightTypeDocPlugin
 const [simplyProjectSetupCore, simplyProjectSetupCoreSidebar] = createStarlightTypeDocPlugin();
 const [simplyCicdCore, simplyCicdCoreSidebar] = createStarlightTypeDocPlugin();
 const [simplySettingsCore, simplySettingsCoreSidebar] = createStarlightTypeDocPlugin();
+const [simplyFlowCore, simplyFlowCoreSidebar] = createStarlightTypeDocPlugin();
 
 function typeDocOptions(pkg) {
   return {
@@ -78,6 +79,7 @@ export default defineConfig({
         simplyProjectSetupCore(typeDocOptions('simply-project-setup-core')),
         simplyCicdCore(typeDocOptions('simply-cicd-core')),
         simplySettingsCore(typeDocOptions('simply-settings-core')),
+        simplyFlowCore(typeDocOptions('simply-flow-core')),
       ],
       sidebar: [
         { label: 'Get Started', slug: 'getting-started' },
@@ -98,6 +100,7 @@ export default defineConfig({
             { label: 'simply-project-setup-core', slug: 'guides/simply-project-setup-core' },
             { label: 'simply-cicd-core', slug: 'guides/simply-cicd-core' },
             { label: 'simply-settings-core', slug: 'guides/simply-settings-core' },
+            { label: 'simply-flow-core', slug: 'guides/simply-flow-core' },
           ],
         },
         {
@@ -117,6 +120,7 @@ export default defineConfig({
             simplyProjectSetupCoreSidebar,
             simplyCicdCoreSidebar,
             simplySettingsCoreSidebar,
+            simplyFlowCoreSidebar,
           ],
         },
       ],
