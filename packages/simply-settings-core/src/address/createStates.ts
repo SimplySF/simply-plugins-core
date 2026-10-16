@@ -18,7 +18,14 @@ import { Duration } from '@salesforce/kit';
 import { mapConcurrent, retryWithBackoff } from '@simplysf/simply-core';
 import type { AddressSettings } from './addressSettingsXml.js';
 import { classifyNewStateResponse, fillNewStateForm, parseNewStateForm } from './newStateForm.js';
-import { isLoginPage, NEW_STATE_FORM_PATH, SetupTransportError, type SetupSession } from './setupSession.js';
+import {
+  IDENTITY_VERIFICATION_MESSAGE,
+  isIdentityVerificationPage,
+  isLoginPage,
+  NEW_STATE_FORM_PATH,
+  SetupTransportError,
+  type SetupSession,
+} from './setupSession.js';
 import type { StateDefinition } from './stateDefinitions.js';
 
 export type StateCreationStatus =
@@ -135,9 +142,11 @@ export async function createState(
       return {
         ...definition,
         status: 'failed',
-        message: isLoginPage(page)
-          ? 'The Setup session expired or was rejected.'
-          : 'Setup form layout not recognized — Salesforce may have changed the Configure New State page.',
+        message: isIdentityVerificationPage(page)
+          ? IDENTITY_VERIFICATION_MESSAGE
+          : isLoginPage(page)
+            ? 'The Setup session expired or was rejected.'
+            : 'Setup form layout not recognized — Salesforce may have changed the Configure New State page.',
       };
     }
 

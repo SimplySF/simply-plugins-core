@@ -152,6 +152,28 @@ function* elements(html: string, startPattern: RegExp): Generator<Element> {
   }
 }
 
+const VIEW_STATE_PREFIX = 'com.salesforce.visualforce.';
+
+/**
+ * The Visualforce view-state inputs (`ViewState`, `ViewStateVersion`, `ViewStateMAC`,
+ * `ViewStateCSRF`) the form didn't already contain. Real pages render them after the `</form>`, in
+ * `<span id="ajax-view-state-page-container">`, and Visualforce's script copies them into the form
+ * on submit; without them the postback is rejected.
+ */
+function viewStateOutside(html: string, formFields: Array<[string, string]>): Array<[string, string]> {
+  const present = new Set(formFields.map(([name]) => name));
+  const viewState: Array<[string, string]> = [];
+  for (const control of elements(html, CONTROL_START_PATTERN)) {
+    if (control.tag !== 'input') continue;
+    const attributes = parseAttributes(control.attributes);
+    const name = attributes.get('name');
+    if (!name?.startsWith(VIEW_STATE_PREFIX) || present.has(name)) continue;
+    present.add(name);
+    viewState.push([name, attributes.get('value') ?? '']);
+  }
+  return viewState;
+}
+
 /**
  * Finds the "Configure New State" form in a `/i18n/ConfigureNewState.apexp` page.
  *
@@ -185,7 +207,7 @@ export function parseNewStateForm(html: string): NewStateForm | undefined {
     if (nameField && codeField && integrationValueField && addButton) {
       return {
         action: parseAttributes(form.attributes).get('action') ?? '',
-        fields,
+        fields: [...fields, ...viewStateOutside(html, fields)],
         nameField,
         codeField,
         integrationValueField,
