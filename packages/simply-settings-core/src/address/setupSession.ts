@@ -189,14 +189,17 @@ export class SetupSession {
   ) {}
 
   /**
-   * Opens a session through a single-use frontdoor URL from the `/services/oauth2/singleaccess`
-   * endpoint — the same mechanism `sf org open` uses (`Org.getFrontDoorUrl`) — then confirms the
-   * session actually reaches Setup.
+   * Opens a session by presenting the connection's access token as the `sid` cookie — the CLI's
+   * own cached session — then confirms the session actually reaches Setup.
+   *
+   * A frontdoor (`/services/oauth2/singleaccess`) login isn't used: it starts a new UI session,
+   * which Salesforce can hold at a passkey or MFA registration prompt even when the user's browser
+   * session gets straight through.
    *
    * @param options - The connection, plus an optional timeout and dispatcher.
    * @returns The opened session.
-   * @throws SfError (`SetupSessionError`) when no frontdoor URL is issued, or the org answers with a
-   * login page — typically an OAuth token without the `web` or `full` scope.
+   * @throws SfError (`SetupSessionError`) when the org answers with a login page — typically an
+   * OAuth token without the `web` or `full` scope — or holds the user at an identity check.
    */
   public static async open(options: OpenSetupSessionOptions): Promise<SetupSession> {
     const { connection } = options;
@@ -206,35 +209,24 @@ export class SetupSession {
       ['Re-authorize with `sf org login web`, which grants a token that can open Setup pages.'],
     );
 
-    // `singleaccess` answers an expired token with a 403, which jsforce doesn't treat as a cue to
-    // refresh — so refresh up front, as `Org.getFrontDoorUrl` does.
+    // A Setup page answers an expired token with the login page, not a 401 jsforce would refresh
+    // on — so refresh up front.
     await connection.refreshAuth();
 
-    if (!connection.instanceUrl) {
-      throw new SfError('The connection has no instance URL.', 'SetupSessionError');
-    }
-
-    const probe = `${NEW_STATE_FORM_PATH}?countryIso=US`;
-    const singleAccessUrl = new URL('/services/oauth2/singleaccess', connection.instanceUrl);
-    singleAccessUrl.searchParams.append('redirect_uri', probe);
-
-    let frontdoor: string | undefined;
-    try {
-      frontdoor = (await connection.requestGet<{ frontdoor_uri?: string }>(singleAccessUrl.toString())).frontdoor_uri;
-    } catch {
-      throw scopeError;
-    }
-    if (!frontdoor) {
-      throw scopeError;
+    if (!connection.instanceUrl || !connection.accessToken) {
+      throw new SfError('The connection has no instance URL or access token.', 'SetupSessionError');
     }
 
     const session = new SetupSession(connection.instanceUrl, options.requestTimeoutMs ?? 60_000, options.dispatcher);
+    // Host-only, so the token goes nowhere but the org's own instance; Salesforce hands the session
+    // to `*.salesforce-setup.com` itself, through a redirect that sets that host's cookie.
+    session.jar.store(new URL(connection.instanceUrl), [`sid=${connection.accessToken}`]);
 
     let response: SetupResponse;
     try {
-      response = await session.get(frontdoor);
+      response = await session.get(`${NEW_STATE_FORM_PATH}?countryIso=US`);
     } catch (error) {
-      // Never let the frontdoor URL (it carries a one-time token) leak into an error message.
+      // Transport errors name only the path, never the token.
       throw new SfError(
         `Couldn't open a Setup session: ${error instanceof SetupTransportError ? error.message : 'the request failed'}.`,
         'SetupSessionError',
