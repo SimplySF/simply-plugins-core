@@ -136,7 +136,13 @@ sf simply settings address state create --target-org myOrg --file states.json --
 **Opening a Setup session.** Ask `/services/oauth2/singleaccess?redirect_uri=/i18n/ConfigureNewState.apexp?countryIso=US`
 for a single-use `frontdoor_uri`, then GET it with a cookie jar (`undici` with manual
 redirect-following, collecting `Set-Cookie` per host, since `*.salesforce.com` cookies don't reach
-`*.salesforce-setup.com`). This is what `@salesforce/core`'s `Org.getFrontDoorUrl` (and so
+`*.salesforce-setup.com`). Redirects include Salesforce's `redirectOnLoad()` interstitial: a 200
+page whose script calls `window.location.replace('…')` in place of a 3xx. Every GET follows its
+`https:` target the way a browser would, within the same 10-hop limit. A real org answered the
+form's own URL with one, which the first release didn't follow, so every state failed with "Setup
+form layout not recognized". If the chain ends on an `/identity/` page (MFA registration, device
+verification), the command fails with "Salesforce wants this user to complete an
+identity-verification step…", since only a person in a browser can get past it. This is what `@salesforce/core`'s `Org.getFrontDoorUrl` (and so
 `sf org open`) does; the design originally passed the raw access token as
 `frontdoor.jsp?sid=`, which Salesforce now steers away from and which would put a long-lived token
 in a URL. `refreshAuth()` runs first, because `singleaccess` answers an expired token with a 403
@@ -153,9 +159,12 @@ name only the path.
    `:addButton`. Submit what a browser would: every hidden input (the four view-state fields plus
    the form's own marker input), text inputs at their default, checked checkboxes, selected
    options, and textareas, but no disabled controls and no submit button except Add. Set the
-   name, code, and integration-value inputs. If no form has all four suffixes, the state is
-   `failed` with "Setup form layout not recognized", or "The Setup session expired or was
-   rejected" if the page is a login page. This is the tripwire for Salesforce changing the page.
+   name, code, and integration-value inputs. A real page renders the `com.salesforce.visualforce.*`
+   view-state inputs _after_ `</form>`, in `<span id="ajax-view-state-page-container">`, and
+   Visualforce's script copies them in on submit, so they're collected from the whole page. If no
+   form has all four suffixes, the state is `failed` with "Setup form layout not recognized", with
+   the identity-verification message for an `/identity/` page, or with "The Setup session expired
+   or was rejected" for a login page. This is the tripwire for Salesforce changing the page.
 3. `POST` the form to its `action` URL without following the redirect, since a Visualforce
    postback signals success through where it redirects to, and classify the response:
 
@@ -370,7 +379,10 @@ nothing is missing, an unreadable file explained, a bad `--country` failing befo
 surfacing its errors.
 
 **Fixtures are synthetic.** The HTML fixtures are hand-built from Visualforce's standard markup,
-not captured from an org.
+not captured from an org. Two real pages have corrected them since. A browser-saved
+`ConfigureNewState.apexp` from a sandbox confirmed the field-name suffixes and showed the view state
+sitting outside the form. A production org answered the page with a `redirectOnLoad()`
+interstitial to MFA registration. The tests now cover both.
 
 **Live verification: not done yet.** No reachable scratch org was available when this was
 implemented. Before release, run `create` then `activate` against a scratch org with the
@@ -388,7 +400,8 @@ automates this is follow-up work.
    release.
 2. **Setup domain.** Whether `/i18n/ConfigureNewState.apexp` on the instance URL still serves the
    classic form, or redirects to `*.my.salesforce-setup.com`, gets confirmed in live verification.
-   The cookie jar follows redirects across both hosts either way.
+   The cookie jar follows redirects across both hosts either way, script interstitials included.
+   A sandbox serves the form itself from `*.sandbox.my.salesforce-setup.com`.
 3. **Default `--concurrency`.** 4 is a guess, chosen so a large file runs in tens of minutes
    instead of the hours a serial run takes. Measure against a sandbox and adjust.
 4. **Separate integration values** (for example, ISO code as the integration value). Not in v1.

@@ -105,6 +105,59 @@ class CookieJar {
   }
 }
 
+// Salesforce often redirects with a 200 page whose only job is to run `window.location.replace('…')`
+// (its `redirectOnLoad()` interstitial) instead of with a 3xx: on the hop from `*.my.salesforce.com`
+// to `*.my.salesforce-setup.com`, and to identity-verification pages, among others. The target
+// pattern stays inside one single-quoted JS string (`[^'<>\\]` or an escape), which keeps it linear.
+const SCRIPT_REDIRECT_MARKER = /\bfunction\s+redirectOnLoad\s*\(/;
+const SCRIPT_REDIRECT_TARGET = /\bwindow\.location\.replace\(\s*'((?:[^'<>\\]|\\.)*)'\s*\)/;
+
+function decodeJsString(value: string): string {
+  return value.replace(
+    /\\(?:x([0-9a-f]{2})|u([0-9a-f]{4})|(.))/gi,
+    (_, hex?: string, unicode?: string, char?: string) => {
+      const code = hex ?? unicode;
+      return code ? String.fromCharCode(parseInt(code, 16)) : (char ?? '');
+    },
+  );
+}
+
+/**
+ * Where a Salesforce `redirectOnLoad()` interstitial sends the browser, if the page is one.
+ *
+ * @param body - The page.
+ * @param base - The page's URL, to resolve a relative target against.
+ * @returns The absolute `https:` target, or `undefined` for any other page.
+ */
+export function scriptRedirectTarget(body: string, base: URL): URL | undefined {
+  if (!SCRIPT_REDIRECT_MARKER.test(body)) return undefined;
+  const match = SCRIPT_REDIRECT_TARGET.exec(body);
+  if (!match) return undefined;
+  try {
+    const target = new URL(decodeJsString(match[1]), base);
+    return target.protocol === 'https:' ? target : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether Salesforce sent the user to an identity-verification step (registering for multi-factor
+ * authentication, verifying a device) instead of the page that was asked for. Only a person in a
+ * browser can complete one, so there's no point retrying.
+ *
+ * @param response - The response to check.
+ * @returns `true` for an identity-verification page.
+ */
+export function isIdentityVerificationPage(response: Pick<SetupResponse, 'url'>): boolean {
+  const { pathname } = new URL(response.url);
+  return pathname.startsWith('/identity/') || pathname.startsWith('/_ui/identity/');
+}
+
+/** Why a Setup session can't be used while Salesforce is holding the user at an identity check. */
+export const IDENTITY_VERIFICATION_MESSAGE =
+  'Salesforce wants this user to complete an identity-verification step (such as registering for multi-factor authentication) before it opens Setup.';
+
 /**
  * Whether a page is Salesforce's login page rather than the Setup page that was asked for — what
  * comes back when the session cookie is missing, expired, or was never granted.
@@ -188,6 +241,11 @@ export class SetupSession {
       );
     }
 
+    if (isIdentityVerificationPage(response)) {
+      throw new SfError(IDENTITY_VERIFICATION_MESSAGE, 'SetupSessionError', [
+        'Log in to the org in a browser as this user, complete the step, then run the command again.',
+      ]);
+    }
     if (response.status !== 200 || isLoginPage(response)) {
       throw scopeError;
     }
@@ -196,7 +254,8 @@ export class SetupSession {
   }
 
   /**
-   * GETs a Setup page, following redirects.
+   * GETs a Setup page, following redirects: HTTP ones, and Salesforce's `redirectOnLoad()` script
+   * interstitials, which a browser follows too.
    *
    * @param pathOrUrl - A path relative to the org's instance URL, or an absolute URL.
    * @returns The final response.
@@ -207,10 +266,15 @@ export class SetupSession {
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
       // eslint-disable-next-line no-await-in-loop -- each hop depends on the previous one's Location
       const response = await this.send(url, { method: 'GET' });
-      if (response.location === undefined) {
+      if (response.location !== undefined) {
+        url = new URL(response.location, url);
+        continue;
+      }
+      const scriptTarget = response.status === 200 ? scriptRedirectTarget(response.body, url) : undefined;
+      if (scriptTarget === undefined) {
         return response;
       }
-      url = new URL(response.location, url);
+      url = scriptTarget;
     }
 
     throw new SetupTransportError(`Too many redirects loading ${new URL(pathOrUrl, this.baseUrl).pathname}`);

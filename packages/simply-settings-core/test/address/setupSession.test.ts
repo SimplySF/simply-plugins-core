@@ -17,7 +17,12 @@
 import type { Connection } from '@salesforce/core';
 import { MockAgent } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isLoginPage, SetupSession, SetupTransportError } from '../../src/address/setupSession.js';
+import {
+  isLoginPage,
+  scriptRedirectTarget,
+  SetupSession,
+  SetupTransportError,
+} from '../../src/address/setupSession.js';
 import { fixture } from './fixtures.js';
 
 const INSTANCE = 'https://acme.my.salesforce.com';
@@ -166,6 +171,41 @@ describe('SetupSession', () => {
     expect(error.message).not.toContain(ONE_TIME);
   });
 
+  it("follows Salesforce's redirectOnLoad() script interstitials like HTTP redirects", async () => {
+    const { connection } = fakeConnection();
+    const instance = agent.get(INSTANCE);
+    const setup = agent.get(SETUP);
+    instance
+      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
+      .reply(200, scriptRedirect(`${SETUP}\\/handoff?retURL\\x3d1`), {
+        headers: { 'set-cookie': ['sid=SESSION; Path=/'] },
+      });
+    setup
+      .intercept({ path: '/handoff?retURL=1', method: 'GET' })
+      .reply(200, scriptRedirect(PROBE), { headers: { 'set-cookie': ['sid=SETUP_SESSION; Path=/'] } });
+    setup
+      .intercept({ path: PROBE, method: 'GET', headers: { cookie: 'sid=SETUP_SESSION' } })
+      .reply(200, fixture('new-state-form.html'));
+
+    await expect(SetupSession.open({ connection, dispatcher: agent })).resolves.toBeInstanceOf(SetupSession);
+  });
+
+  it('fails with the identity-verification hint when Salesforce holds the user at MFA registration', async () => {
+    const { connection } = fakeConnection();
+    const instance = agent.get(INSTANCE);
+    instance
+      .intercept({ path: `/secur/frontdoor.jsp?otp=${ONE_TIME}`, method: 'GET' })
+      .reply(200, scriptRedirect(`${INSTANCE}/identity/twofactor/addTwoFactorOnly.apexp`));
+    instance
+      .intercept({ path: '/identity/twofactor/addTwoFactorOnly.apexp', method: 'GET' })
+      .reply(200, '<html><body>Register</body></html>');
+
+    const error = await openFailure(connection);
+
+    expect(error.message).toMatch(/identity-verification step/);
+    expect(error.message).not.toContain(ONE_TIME);
+  });
+
   it('throws a retryable SetupTransportError for a 5xx', async () => {
     const { connection } = fakeConnection();
     const instance = agent.get(INSTANCE);
@@ -176,6 +216,34 @@ describe('SetupSession', () => {
     instance.intercept({ path: PROBE, method: 'GET' }).reply(502, 'bad gateway');
 
     await expect(session.get(PROBE)).rejects.toBeInstanceOf(SetupTransportError);
+  });
+});
+
+/** The interstitial Salesforce answers with in place of a 3xx (scrubbed from a real org). */
+function scriptRedirect(target: string): string {
+  return `<html><head><script>
+function redirectOnLoad() {
+if (this.SfdcApp && this.SfdcApp.projectOneNavigator) { SfdcApp.projectOneNavigator.handleRedirect('${target}'); }
+else if (window.location.replace){ window.location.replace('${target}'); }
+else { window.location.href ='${target}'; }
+}
+redirectOnLoad();
+</script></head></html>`;
+}
+
+describe('scriptRedirectTarget', () => {
+  const base = new URL(`${INSTANCE}${PROBE}`);
+
+  it('resolves and unescapes the target', () => {
+    expect(scriptRedirectTarget(scriptRedirect('\\/home\\x3fa\\u003d1'), base)?.href).toBe(`${INSTANCE}/home?a=1`);
+  });
+
+  it.each([
+    ['an ordinary page', fixture('new-state-form.html')],
+    ['a non-https target', scriptRedirect('http://evil.example/')],
+    ['a replace() without the interstitial', "<script>window.location.replace('/x')</script>"],
+  ])('ignores %s', (_, body) => {
+    expect(scriptRedirectTarget(body, base)).toBeUndefined();
   });
 });
 

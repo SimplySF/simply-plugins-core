@@ -46,6 +46,18 @@ describe('parseNewStateForm', () => {
     ]);
   });
 
+  it('picks up the view state Salesforce renders after the form closes', () => {
+    // A real org's page puts `ajax-view-state-page-container` after `</form>`, and Visualforce's
+    // script copies it in on submit.
+    const html = fixture('new-state-form.html');
+    const viewStateStart = html.indexOf('<span id="ajax-view-state-page-container"');
+    const formEnd = html.indexOf('</form>');
+    const outside = `${html.slice(0, viewStateStart)}</form>${html.slice(viewStateStart, formEnd)}${html.slice(formEnd + '</form>'.length)}`;
+
+    const inside = parseNewStateForm(html)!.fields;
+    expect(parseNewStateForm(outside)!.fields).toStrictEqual(inside);
+  });
+
   it('finds fields by suffix whatever the generated ids are', () => {
     const renumbered = fixture('new-state-form.html').replaceAll('j_id9', 'j_id12').replaceAll('j_id43', 'j_id51');
 
