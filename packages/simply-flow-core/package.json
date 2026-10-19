@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-flow-core",
   "description": "Flow deactivation/deletion and obsolete Flow version pruning logic — the library layer behind @simplysf/simply-flow, published separately for direct consumption (e.g. an MCP server, CI scripts) without the CLI framework",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
