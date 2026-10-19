@@ -28,7 +28,7 @@ Everything below is exported from the package root. Removing or renaming an expo
 | `FlowDeleteResult`, `FlowDeleteFailure`, `FlowDeleteStage`, `DeleteFlowsOptions`                                     | Result, per-item failure, stage, and option types for `deleteFlows`.                                                                                      |
 | `FlowVersionPruneResult`, `FlowVersionPruneCandidate`, `FlowVersionPruneFailure`, `PruneObsoleteFlowVersionsOptions` | Result, candidate, per-version failure, and option types for the prune functions.                                                                         |
 
-**Errors.** Per-item failures from the Tooling API `update`/`destroy` calls — whether a `success: false` result or a thrown error — are collected into the result's `failures`, never thrown. A failed query rejects. None of these functions set `process.exitCode` or write to stdout or stderr.
+**Errors.** Per-item failures from the Tooling API `update`/`destroy` calls — whether a `success: false` result or a thrown error — are collected into the result's `failures`, never thrown. So is a name passed to `deleteFlows` that matches no Flow in the org: it becomes a `deactivate` failure. A failed query rejects. None of these functions set `process.exitCode` or write to stdout or stderr.
 
 ```ts
 import fs from 'node:fs/promises';

@@ -13,8 +13,8 @@ npm install @simplysf/simply-flow-core
 Every example below assumes you already have an authenticated `@salesforce/core` `Connection` — see
 [Get Started](/getting-started/).
 
-Per-item failures (a Flow that won't deactivate, a version that won't delete) are collected into the
-result's `failures` and never thrown, so one bad Flow doesn't stop the rest. A failed query rejects.
+Per-item failures (a Flow that won't deactivate, a version that won't delete, a name that matches no
+Flow in the org) are collected into the result's `failures` and never thrown, so one bad Flow doesn't stop the rest. A failed query rejects.
 
 ## Deleting Flows before a destructive deploy
 
