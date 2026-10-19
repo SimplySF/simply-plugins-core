@@ -18,7 +18,7 @@ import type { Connection } from '@salesforce/core';
 import { MockTestOrgData, TestContext } from '@salesforce/core/testSetup';
 import sinon from 'sinon';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { deleteFlows } from '../src/flowDelete.js';
+import { deleteFlows, FLOW_NOT_FOUND_MESSAGE } from '../src/flowDelete.js';
 import type { FlowDeleteStage } from '../src/flowTypes.js';
 import { queryResult, stubToolingSobject, type ToolingStubs } from './flowTestUtils.js';
 
@@ -174,6 +174,23 @@ describe('deleteFlows', () => {
         { developerName: 'Flow_A', stage: 'delete', message: 'In use, Locked' },
         { developerName: 'Flow_A', stage: 'delete', message: 'Network down' },
       ],
+    });
+  });
+
+  it('records a requested name with no Flow in the org as a deactivate failure, once', async () => {
+    stubQueries(
+      [{ Id: '300000000000001AAA', DeveloperName: 'Flow_A' }],
+      [{ Id: '301000000000001AAA', DeveloperName: 'Flow_A' }],
+    );
+    tooling.update.resolves({ id: '300000000000001AAA', success: true, errors: [] });
+    tooling.destroy.resolves({ id: '301000000000001AAA', success: true, errors: [] });
+
+    const result = await deleteFlows(connection, ['flow_a', 'Does_Not_Exist', 'does_not_exist']);
+
+    expect(result).toStrictEqual({
+      deactivated: ['Flow_A'],
+      deleted: ['Flow_A'],
+      failures: [{ developerName: 'Does_Not_Exist', stage: 'deactivate', message: FLOW_NOT_FOUND_MESSAGE }],
     });
   });
 

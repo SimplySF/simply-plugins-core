@@ -22,6 +22,9 @@ import type { FlowDeleteFailure, FlowDeleteResult, FlowDeleteStage } from './flo
 type FlowDefinitionRecord = { Definition: { Id: string; DeveloperName: string } };
 type FlowVersionRecord = { Id: string; Definition: { DeveloperName: string } };
 
+/** The `deactivate` failure message for a requested name with no Flow in the org. Exported for tests, not from the package index. */
+export const FLOW_NOT_FOUND_MESSAGE = 'No Flow with this DeveloperName exists in the org.';
+
 export type DeleteFlowsOptions = {
   /** Called once before each stage starts, e.g. to drive a spinner or send a progress notification. */
   onStage?: (stage: FlowDeleteStage) => void;
@@ -32,8 +35,9 @@ export type DeleteFlowsOptions = {
  * metadata deploy needs, since Salesforce won't remove a Flow that still has an active version.
  *
  * Each distinct `FlowDefinition` is deactivated once (`activeVersionNumber = 0`), then every `Flow`
- * version is destroyed, whether or not its deactivation succeeded. Per-item failures are collected
- * into `failures`, never thrown; a failed query rejects.
+ * version is destroyed, whether or not its deactivation succeeded. A requested name with no Flow in
+ * the org is a `deactivate` failure. Per-item failures are collected into `failures`, never thrown;
+ * a failed query rejects.
  *
  * @param connection - The org to delete the Flows from.
  * @param flowNames - Flow DeveloperNames. An empty list returns an empty result without touching the org.
@@ -63,6 +67,17 @@ export async function deleteFlows(
   const distinctDefinitions = new Map<string, string>();
   for (const record of definitionRecords) {
     distinctDefinitions.set(record.Definition.Id, record.Definition.DeveloperName);
+  }
+
+  // SOQL matches DeveloperName case-insensitively, so a name is missing only if no case variant came back.
+  const foundNames = new Set([...distinctDefinitions.values()].map((name) => name.toLowerCase()));
+  const reportedMissing = new Set<string>();
+  for (const developerName of flowNames) {
+    const key = developerName.toLowerCase();
+    if (!foundNames.has(key) && !reportedMissing.has(key)) {
+      reportedMissing.add(key);
+      failures.push({ developerName, stage: 'deactivate', message: FLOW_NOT_FOUND_MESSAGE });
+    }
   }
 
   const deactivated: string[] = [];
