@@ -40,6 +40,7 @@
     "@salesforce/source-deploy-retrieve": "^12.37.2",
     "@simplysf/simply-core": "workspace:^1.6.11",
     "@simplysf/simply-report": "workspace:^1.0.7",
+    "fast-xml-parser": "^5.11.1",
     "xmlbuilder2": "^4.0.3",
     "zod": "^4.5.4"
   },

@@ -33,6 +33,7 @@ it('exports the expected set of runtime values', () => {
     'PermissionSetsFileSchema',
     'buildPermissionSetXml',
     'buildPermissionsReportHtml',
+    'checkPermissionSets',
     'compilePermissionSet',
     'generatePermissionSets',
     'loadPermissionSetBuildConfig',

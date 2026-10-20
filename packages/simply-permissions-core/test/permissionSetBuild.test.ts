@@ -21,12 +21,14 @@ import path from 'node:path';
 import { ComponentSet } from '@salesforce/source-deploy-retrieve';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  checkPermissionSets,
   compilePermissionSet,
   generatePermissionSets,
   loadPermissionSetBuildConfig,
   loadPermissionSetsFile,
   PermissionSetBuildError,
   type PermissionSetSourceScan,
+  type PermissionSetSpec,
   scanPermissionSetSource,
 } from '../src/permissionSetBuild.js';
 import { writeFixtureProject } from './helpers/fixtureProject.js';
@@ -403,6 +405,110 @@ describe('permission sets files', () => {
       expect(admin).toContain('<recordType>Widget__c.Standard</recordType>');
       expect(admin).not.toContain('Widget__c.Widget__c');
       expect(fs.readFileSync(results[0].path, 'utf-8')).not.toContain('<recordTypeVisibilities>');
+    });
+  });
+
+  describe('checkPermissionSets', () => {
+    let output: string;
+    let filePath: string;
+    let generated: string;
+    const spec = (): PermissionSetSpec => ({
+      type: 'modify-all',
+      name: 'Admin',
+      includeRecordTypes: true,
+      directory: source,
+      output,
+    });
+    const check = async (): Promise<string> => (await checkPermissionSets([spec()]))[0].status;
+
+    beforeEach(async () => {
+      output = path.join(root, 'out');
+      [{ path: filePath }] = await generatePermissionSets([spec()]);
+      generated = fs.readFileSync(filePath, 'utf-8');
+    });
+
+    it('reports a freshly generated file as up-to-date, with the same path and counts generate returns', async () => {
+      expect(await checkPermissionSets([spec()])).toStrictEqual([
+        { name: 'Admin', path: filePath, objectPermissionCount: 1, fieldPermissionCount: 2, status: 'up-to-date' },
+      ]);
+    });
+
+    it.each([
+      ['reindented', (xml: string) => xml.replaceAll('    ', '  ')],
+      ['CRLF line endings', (xml: string) => xml.replaceAll('\n', '\r\n')],
+      ['no trailing newline', (xml: string) => xml.trimEnd()],
+      ['collapsed onto one line', (xml: string) => xml.replaceAll(/>\s+</g, '><')],
+      ['no XML declaration, with a comment', (xml: string) => xml.replace(/^<\?xml[^>]*\?>/, '<!-- generated -->')],
+    ])('treats a %s file as up-to-date', async (_, reformat) => {
+      fs.writeFileSync(filePath, reformat(generated));
+
+      expect(await check()).toBe('up-to-date');
+    });
+
+    it.each([
+      [
+        'a changed value',
+        (xml: string) => xml.replace('<allowDelete>true</allowDelete>', '<allowDelete>false</allowDelete>'),
+      ],
+      [
+        'a value differing only in case',
+        (xml: string) => xml.replace('<allowDelete>true</allowDelete>', '<allowDelete>True</allowDelete>'),
+      ],
+      ['a removed entry', (xml: string) => xml.replace(/<fieldPermissions>[\s\S]*?<\/fieldPermissions>\s*/, '')],
+      [
+        'an extra entry',
+        (xml: string) =>
+          xml.replace(
+            '</PermissionSet>',
+            '<userPermissions><enabled>true</enabled><name>ViewSetup</name></userPermissions></PermissionSet>',
+          ),
+      ],
+      [
+        'reordered entries',
+        (xml: string) => {
+          const [first = '', second = ''] = xml.match(/<fieldPermissions>[\s\S]*?<\/fieldPermissions>/g) ?? [];
+          return xml.replace(first, '@@').replace(second, first).replace('@@', second);
+        },
+      ],
+      ['a missing closing tag', (xml: string) => xml.replace('</PermissionSet>', '')],
+      ['non-XML content', () => 'not xml'],
+      ['empty content', () => ''],
+    ])('reports a file with %s as drifted', async (_, edit) => {
+      const edited = edit(generated);
+      expect(edited).not.toBe(generated);
+      fs.writeFileSync(filePath, edited);
+
+      expect(await check()).toBe('drifted');
+    });
+
+    it('reports drift when the source metadata gains a field', async () => {
+      const fieldsDir = path.join(source, 'main', 'default', 'objects', 'Widget__c', 'fields');
+      fs.writeFileSync(
+        path.join(fieldsDir, 'Size__c.field-meta.xml'),
+        fs.readFileSync(path.join(fieldsDir, 'Color__c.field-meta.xml'), 'utf-8').replaceAll('Color', 'Size'),
+      );
+
+      expect(await check()).toBe('drifted');
+    });
+
+    it('reports a missing file without writing anything, scanning each distinct directory once', async () => {
+      const fromSource = vi.spyOn(ComponentSet, 'fromSource');
+      const newOutput = path.join(root, 'not-created');
+      const seen: string[] = [];
+
+      const results = await checkPermissionSets(
+        [
+          { ...spec(), output: newOutput },
+          { ...spec(), name: 'Reader', type: 'read-only', directory: `${source}${path.sep}`, output: newOutput },
+        ],
+        (name) => seen.push(name),
+      );
+
+      expect(results.map((result) => result.status)).toStrictEqual(['missing', 'missing']);
+      expect(seen).toStrictEqual(['Admin', 'Reader']);
+      expect(fromSource).toHaveBeenCalledTimes(1);
+      expect(fs.existsSync(newOutput)).toBe(false);
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(generated);
     });
   });
 });

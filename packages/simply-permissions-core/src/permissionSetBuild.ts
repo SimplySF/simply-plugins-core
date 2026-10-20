@@ -20,6 +20,7 @@ import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ComponentSet, type SourceComponent } from '@salesforce/source-deploy-retrieve';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { type ConfigSchema, loadJsonConfig } from '@simplysf/simply-core';
 import {
   buildPermissionSetXml,
@@ -92,6 +93,18 @@ export type PermissionSetBuildResult = {
   path: string;
   objectPermissionCount: number;
   fieldPermissionCount: number;
+};
+
+/**
+ * How a permission set file on disk compares with what would be generated for it: `up-to-date` when
+ * semantically equal (formatting aside), `drifted` when it differs or isn't well-formed XML, and
+ * `missing` when there's no file.
+ */
+export type PermissionSetCheckStatus = 'up-to-date' | 'drifted' | 'missing';
+
+/** Where a permission set would be written, how many permissions it would grant, and whether the file there matches. */
+export type PermissionSetCheckResult = PermissionSetBuildResult & {
+  status: PermissionSetCheckStatus;
 };
 
 /** Whether a parsed `CustomField` can't carry field permissions (required or master-detail). */
@@ -352,16 +365,70 @@ export async function writePermissionSet(
   name: string,
   output: string,
 ): Promise<PermissionSetBuildResult> {
-  const filePath = path.join(output, `${name}.permissionset-meta.xml`);
+  const result = toBuildResult(templateData, name, output);
   await fs.mkdir(output, { recursive: true });
-  await fs.writeFile(filePath, buildPermissionSetXml(templateData));
+  await fs.writeFile(result.path, buildPermissionSetXml(templateData));
 
+  return result;
+}
+
+/** The output path and permission counts for `templateData`, without rendering or writing anything. */
+function toBuildResult(
+  templateData: PermissionSetTemplateData,
+  name: string,
+  output: string,
+): PermissionSetBuildResult {
   return {
     name,
-    path: filePath,
+    path: path.join(output, `${name}.permissionset-meta.xml`),
     objectPermissionCount: templateData.objectPermissions.length,
     fieldPermissionCount: templateData.fieldPermissions.length,
   };
+}
+
+/**
+ * Parses into an ordered tree that drops what formatters change (indentation, line endings, the XML
+ * declaration, comments) and keeps what Salesforce reads: element names and order, attributes, and
+ * text. Values stay strings so `true` and `True` aren't conflated.
+ */
+const comparisonParser = new XMLParser({
+  preserveOrder: true,
+  ignoreAttributes: false,
+  ignoreDeclaration: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
+});
+
+/** Whether two XML documents are semantically equal; an `actual` that isn't well-formed never is. */
+function isSameXml(expected: string, actual: string): boolean {
+  if (XMLValidator.validate(actual) !== true) {
+    return false;
+  }
+  return JSON.stringify(comparisonParser.parse(expected)) === JSON.stringify(comparisonParser.parse(actual));
+}
+
+/**
+ * Compares what `templateData` renders to with `<output>/<name>.permissionset-meta.xml`, writing
+ * nothing. See {@link PermissionSetCheckStatus} for what counts as drift.
+ */
+async function checkPermissionSet(
+  templateData: PermissionSetTemplateData,
+  name: string,
+  output: string,
+): Promise<PermissionSetCheckResult> {
+  const result = toBuildResult(templateData, name, output);
+
+  let existing: string;
+  try {
+    existing = await fs.readFile(result.path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { ...result, status: 'missing' };
+    }
+    throw error;
+  }
+
+  return { ...result, status: isSameXml(buildPermissionSetXml(templateData), existing) ? 'up-to-date' : 'drifted' };
 }
 
 /** Loads and validates a JSON config file, reporting malformed JSON and schema violations alike as `invalid-config`. */
@@ -434,18 +501,15 @@ export async function loadPermissionSetsFile(filePath: string): Promise<Permissi
 }
 
 /**
- * Scans, compiles, and writes each permission set in order. Each distinct source directory is
- * scanned once and the result reused for every permission set built from it.
- *
- * @param onPermissionSet - Called with each permission set's name just before it's built (for progress output).
- * @throws {PermissionSetBuildError} `scan-failed` — see {@link scanPermissionSetSource}.
+ * Scans and compiles each spec in order. Each distinct source directory is scanned once and the
+ * result reused for every permission set built from it. Shared by {@link generatePermissionSets} and
+ * {@link checkPermissionSets} so the two can't disagree about what a spec compiles to.
  */
-export async function generatePermissionSets(
+async function* compilePermissionSets(
   specs: PermissionSetSpec[],
   onPermissionSet?: (name: string) => void,
-): Promise<PermissionSetBuildResult[]> {
+): AsyncGenerator<{ spec: PermissionSetSpec; templateData: PermissionSetTemplateData }> {
   const scans = new Map<string, PermissionSetSourceScan>();
-  const results: PermissionSetBuildResult[] = [];
 
   for (const spec of specs) {
     onPermissionSet?.(spec.name);
@@ -457,8 +521,43 @@ export async function generatePermissionSets(
       scans.set(scanKey, scan);
     }
 
-    results.push(await writePermissionSet(compilePermissionSet(scan, spec), spec.name, spec.output));
+    yield { spec, templateData: compilePermissionSet(scan, spec) };
   }
+}
 
+/**
+ * Scans, compiles, and writes each permission set in order. Each distinct source directory is
+ * scanned once and the result reused for every permission set built from it.
+ *
+ * @param onPermissionSet - Called with each permission set's name just before it's built (for progress output).
+ * @throws {PermissionSetBuildError} `scan-failed` — see {@link scanPermissionSetSource}.
+ */
+export async function generatePermissionSets(
+  specs: PermissionSetSpec[],
+  onPermissionSet?: (name: string) => void,
+): Promise<PermissionSetBuildResult[]> {
+  const results: PermissionSetBuildResult[] = [];
+  for await (const { spec, templateData } of compilePermissionSets(specs, onPermissionSet)) {
+    results.push(await writePermissionSet(templateData, spec.name, spec.output));
+  }
+  return results;
+}
+
+/**
+ * Scans and compiles each permission set exactly as {@link generatePermissionSets} does, but compares
+ * the result with the file already at its output path instead of writing it — so CI can check that
+ * generated permission sets haven't drifted from their source metadata. Writes nothing.
+ *
+ * @param onPermissionSet - Called with each permission set's name just before it's checked (for progress output).
+ * @throws {PermissionSetBuildError} `scan-failed` — see {@link scanPermissionSetSource}.
+ */
+export async function checkPermissionSets(
+  specs: PermissionSetSpec[],
+  onPermissionSet?: (name: string) => void,
+): Promise<PermissionSetCheckResult[]> {
+  const results: PermissionSetCheckResult[] = [];
+  for await (const { spec, templateData } of compilePermissionSets(specs, onPermissionSet)) {
+    results.push(await checkPermissionSet(templateData, spec.name, spec.output));
+  }
   return results;
 }
