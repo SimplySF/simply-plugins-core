@@ -38,6 +38,7 @@ export {
   type GroupedPermissionsData,
 } from './permissionsReportTemplate.js';
 export {
+  checkPermissionSets,
   compilePermissionSet,
   generatePermissionSets,
   loadPermissionSetBuildConfig,
@@ -48,6 +49,8 @@ export {
   type PermissionSetBuildErrorCode,
   type PermissionSetBuildOptions,
   type PermissionSetBuildResult,
+  type PermissionSetCheckResult,
+  type PermissionSetCheckStatus,
   type PermissionSetSourceScan,
   type PermissionSetSpec,
   type PermissionSetType,

@@ -55,6 +55,20 @@ const results = await generatePermissionSets(specs);
 // [{ name, path, objectPermissionCount, fieldPermissionCount }, ...]
 ```
 
+To check in CI that the committed permission sets still match their source metadata, check the
+same specs instead of generating them. Nothing is written, and formatting differences (indentation,
+line endings, comments) don't count as drift:
+
+```ts
+import { checkPermissionSets, loadPermissionSetsFile } from '@simplysf/simply-permissions-core';
+
+const results = await checkPermissionSets(await loadPermissionSetsFile('config/permission-sets.json'));
+// [{ name, path, objectPermissionCount, fieldPermissionCount, status: 'up-to-date' | 'drifted' | 'missing' }, ...]
+if (results.some((result) => result.status !== 'up-to-date')) {
+  process.exitCode = 1;
+}
+```
+
 ```ts
 import { compilePermissionSet, scanPermissionSetSource, writePermissionSet } from '@simplysf/simply-permissions-core';
 

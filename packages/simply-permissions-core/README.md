@@ -79,6 +79,7 @@ Licensed under the [Apache-2.0](https://raw.githubusercontent.com/SimplySF/simpl
 | `loadPermissionSetBuildConfig(filePath)` | Loads and validates an overrides file (`PermissionSetBuildConfigSchema`). |
 | `loadPermissionSetsFile(filePath)` | Loads and validates a permission sets file (`PermissionSetsFileSchema`) into `PermissionSetSpec[]`: defaults applied, override files loaded, source directories checked. |
 | `generatePermissionSets(specs, onPermissionSet?)` | Builds and writes each spec, scanning each distinct source directory once. |
+| `checkPermissionSets(specs, onPermissionSet?)` | Builds each spec as `generatePermissionSets` does but writes nothing: compares it with the file at its output path and reports `up-to-date`, `drifted`, or `missing`. Formatting differences (indentation, line endings, comments) aren't drift. |
 | `PermissionSetBuildError` | Thrown by the above with a structural `code` (`scan-failed`, `invalid-config`, `config-not-found`, `directory-not-found`) and `args`. |
 | `PermissionSetBuildConfigSchema`, `PermissionSetsFileSchema` | zod schemas for the overrides file and the permission sets file. |
-| `PermissionSetType`, `PermissionSetSourceScan`, `PermissionSetBuildOptions`, `PermissionSetSpec`, `PermissionSetBuildResult`, `PermissionSetBuildErrorCode`, `PermissionSetBuildConfig`, `PermissionSetsFile` | Types for the permission set build functions. |
+| `PermissionSetType`, `PermissionSetSourceScan`, `PermissionSetBuildOptions`, `PermissionSetSpec`, `PermissionSetBuildResult`, `PermissionSetCheckResult`, `PermissionSetCheckStatus`, `PermissionSetBuildErrorCode`, `PermissionSetBuildConfig`, `PermissionSetsFile` | Types for the permission set build functions. |
