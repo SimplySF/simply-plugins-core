@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.3.2...%40simplysf%2Fsimply-permissions-core%400.4.0) (2026-10-20)
+
+### Features
+
+- **simply-permissions-core:** add checkPermissionSets for permission set drift detection ([#239](https://github.com/SimplySF/simply-plugins-core/issues/239)) ([fe6d343](https://github.com/SimplySF/simply-plugins-core/commit/fe6d34358ebe29b391041ae9521a9df26a60e6c1))
+
 ## [0.3.2](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.3.1...%40simplysf%2Fsimply-permissions-core%400.3.2) (2026-10-13)
 
 **Note:** Version bump only for package @simplysf/simply-permissions-core
