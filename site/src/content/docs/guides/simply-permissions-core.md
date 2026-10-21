@@ -42,36 +42,55 @@ const xml = buildPermissionSetXml(data);
 
 ## Generating permission sets from source
 
-Every permission set a project generates can be declared in one file (the format
-`simply permissions build --file` reads) and built in one call. By convention the file is named
-`*.psbuild.json`, which is how `findPermissionSetsFiles()` finds it (and so how
-`sf simply cicd build check-permission-sets` and a flagless `sf simply permissions build` do). The
-loading functions themselves accept any filename. The suffix is exported as
-`PERMISSION_SETS_FILE_SUFFIX`.
+Each permission set a project generates is defined by its own permission set build file: a JSON
+object with the same settings as one `sf simply permissions build` run with the single-permission-set
+flags. The file is named `*.psbuild.json`, which is how `findPermissionSetBuildFiles()` finds it (and
+so how `sf simply cicd build check-permission-sets` and a flagless `sf simply permissions build` do).
+`loadPermissionSetBuildFile` itself accepts any filename. The suffix is exported as
+`PERMISSION_SET_BUILD_FILE_SUFFIX`.
 
-```ts
-import { generatePermissionSets, loadPermissionSetsFile } from '@simplysf/simply-permissions-core';
-
-// Validate the whole file (and any override files it references) before writing anything...
-const specs = await loadPermissionSetsFile('config/app.psbuild.json');
-// ...then scan each source directory once and write every permission set.
-const results = await generatePermissionSets(specs);
-// [{ name, path, objectPermissionCount, fieldPermissionCount }, ...]
+```json
+{
+  "name": "App_Admin",
+  "type": "modify-all",
+  "label": "App Admin",
+  "directory": "force-app",
+  "output": "force-app/main/default/permissionsets",
+  "includeRecordTypes": true,
+  "config": "config/app-admin-overrides.json"
+}
 ```
 
-To build every permission sets file in the project, find them first. The search starts at the
-current directory and skips `node_modules`, `.git`, `.sf`, and `.sfdx`:
+`name`, `type`, `directory`, and `output` are required. `config` is a path to an overrides file or
+the same overrides inline. Relative paths resolve against the current directory.
+
+```ts
+import { generatePermissionSets, loadPermissionSetBuildFile } from '@simplysf/simply-permissions-core';
+
+// Validate the file (and any overrides file it references) before writing anything...
+const spec = await loadPermissionSetBuildFile('config/app-admin.psbuild.json');
+// ...then scan the source directory and write the permission set.
+const [result] = await generatePermissionSets([spec]);
+// { name, path, objectPermissionCount, fieldPermissionCount }
+```
+
+To build every permission set in the project, find the files first. The search starts at the
+current directory and skips `node_modules`, `.git`, `.sf`, and `.sfdx`. Load every file before
+building any, and check that no two declare the same name; otherwise the later one would silently
+overwrite the earlier one's output:
 
 ```ts
 import {
-  findPermissionSetsFiles,
+  assertUniquePermissionSetNames,
+  findPermissionSetBuildFiles,
   generatePermissionSets,
-  loadPermissionSetsFile,
+  loadPermissionSetBuildFile,
 } from '@simplysf/simply-permissions-core';
 
-const files = await findPermissionSetsFiles(); // ['apps/sales/sales.psbuild.json', 'config/app.psbuild.json']
-const specs = (await Promise.all(files.map((file) => loadPermissionSetsFile(file)))).flat();
-await generatePermissionSets(specs);
+const files = await findPermissionSetBuildFiles(); // ['apps/sales/sales-admin.psbuild.json', 'config/app-admin.psbuild.json']
+const entries = await Promise.all(files.map(async (file) => ({ file, spec: await loadPermissionSetBuildFile(file) })));
+assertUniquePermissionSetNames(entries);
+await generatePermissionSets(entries.map(({ spec }) => spec));
 ```
 
 To check in CI that the committed permission sets still match their source metadata, check the
@@ -79,9 +98,9 @@ same specs instead of generating them. Nothing is written, and formatting differ
 line endings, comments) don't count as drift:
 
 ```ts
-import { checkPermissionSets, loadPermissionSetsFile } from '@simplysf/simply-permissions-core';
+import { checkPermissionSets, loadPermissionSetBuildFile } from '@simplysf/simply-permissions-core';
 
-const results = await checkPermissionSets(await loadPermissionSetsFile('config/app.psbuild.json'));
+const results = await checkPermissionSets([await loadPermissionSetBuildFile('config/app-admin.psbuild.json')]);
 // [{ name, path, objectPermissionCount, fieldPermissionCount, status: 'up-to-date' | 'drifted' | 'missing' }, ...]
 if (results.some((result) => result.status !== 'up-to-date')) {
   process.exitCode = 1;

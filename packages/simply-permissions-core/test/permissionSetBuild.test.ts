@@ -22,12 +22,13 @@ import path from 'node:path';
 import { ComponentSet } from '@salesforce/source-deploy-retrieve';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  assertUniquePermissionSetNames,
   checkPermissionSets,
   compilePermissionSet,
-  findPermissionSetsFiles,
+  findPermissionSetBuildFiles,
   generatePermissionSets,
   loadPermissionSetBuildConfig,
-  loadPermissionSetsFile,
+  loadPermissionSetBuildFile,
   PermissionSetBuildError,
   type PermissionSetSourceScan,
   type PermissionSetSpec,
@@ -196,7 +197,7 @@ describe('compilePermissionSet', () => {
   });
 });
 
-describe('permission sets files', () => {
+describe('permission set build files', () => {
   let root: string;
   let source: string;
 
@@ -207,7 +208,7 @@ describe('permission sets files', () => {
   };
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'permission-sets-file-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'permission-set-build-file-'));
     source = path.join(root, 'force-app');
     writeFixtureProject(source);
   });
@@ -217,146 +218,150 @@ describe('permission sets files', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  describe('loadPermissionSetsFile', () => {
-    it('applies defaults, lets entries override them, and loads inline and file-referenced overrides', async () => {
-      const overrides = writeJson('admin.json', { userPermissions: { ViewSetup: true } });
-      const file = writeJson('permission-sets.json', {
-        defaults: { directory: source, output: path.join(root, 'out'), includeRecordTypes: true },
-        permissionSets: [
-          { name: 'Reader', type: 'read-only' },
-          {
-            name: 'Admin',
-            type: 'modify-all',
-            label: 'Admin Label',
-            description: 'Admin Description',
-            output: path.join(root, 'admin-out'),
-            includeRecordTypes: false,
-            config: overrides,
-          },
-          { name: 'Support', type: 'view-all', config: { tabs: { Widget__c: { visible: false } } } },
-        ],
+  describe('loadPermissionSetBuildFile', () => {
+    /** A valid file's contents for permission set `A`, with `overrides` replacing or adding keys. */
+    const fileContents = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+      name: 'A',
+      type: 'read-only',
+      directory: source,
+      output: root,
+      ...overrides,
+    });
+
+    it('loads one permission set, defaulting includeRecordTypes', async () => {
+      const file = writeJson('a.psbuild.json', fileContents());
+
+      expect(await loadPermissionSetBuildFile(file)).toStrictEqual({
+        type: 'read-only',
+        name: 'A',
+        label: undefined,
+        description: undefined,
+        directory: source,
+        output: root,
+        includeRecordTypes: false,
+        config: undefined,
       });
+    });
 
-      const specs = await loadPermissionSetsFile(file);
-
-      expect(specs).toStrictEqual([
-        {
-          type: 'read-only',
-          name: 'Reader',
-          label: undefined,
-          description: undefined,
-          directory: source,
-          output: path.join(root, 'out'),
-          includeRecordTypes: true,
-          config: undefined,
-        },
-        {
-          type: 'modify-all',
+    it('loads every setting, with file-referenced overrides', async () => {
+      const overrides = writeJson('admin.json', { userPermissions: { ViewSetup: true } });
+      const file = writeJson(
+        'admin.psbuild.json',
+        fileContents({
           name: 'Admin',
+          type: 'modify-all',
           label: 'Admin Label',
           description: 'Admin Description',
-          directory: source,
-          output: path.join(root, 'admin-out'),
-          includeRecordTypes: false,
-          config: { userPermissions: { ViewSetup: true }, hasActivationRequired: false },
-        },
-        {
-          type: 'view-all',
-          name: 'Support',
-          label: undefined,
-          description: undefined,
-          directory: source,
-          output: path.join(root, 'out'),
           includeRecordTypes: true,
-          config: { tabs: { Widget__c: { visible: false } }, hasActivationRequired: false },
-        },
-      ]);
+          config: overrides,
+        }),
+      );
+
+      expect(await loadPermissionSetBuildFile(file)).toStrictEqual({
+        type: 'modify-all',
+        name: 'Admin',
+        label: 'Admin Label',
+        description: 'Admin Description',
+        directory: source,
+        output: root,
+        includeRecordTypes: true,
+        config: { userPermissions: { ViewSetup: true }, hasActivationRequired: false },
+      });
+    });
+
+    it('loads inline overrides', async () => {
+      const file = writeJson('a.psbuild.json', fileContents({ config: { tabs: { Widget__c: { visible: false } } } }));
+
+      expect((await loadPermissionSetBuildFile(file)).config).toStrictEqual({
+        tabs: { Widget__c: { visible: false } },
+        hasActivationRequired: false,
+      });
     });
 
     it('rejects a missing file with config-not-found', async () => {
-      const error = await expectBuildError(loadPermissionSetsFile(path.join(root, 'nope.json')), 'config-not-found');
+      const error = await expectBuildError(
+        loadPermissionSetBuildFile(path.join(root, 'nope.json')),
+        'config-not-found',
+      );
       expect(error.args).toStrictEqual([path.join(root, 'nope.json')]);
     });
 
     it('rejects malformed JSON with invalid-config', async () => {
-      const file = writeJson('bad.json', '{ "permissionSets": [');
-      const error = await expectBuildError(loadPermissionSetsFile(file), 'invalid-config');
+      const file = writeJson('bad.json', '{ "name": ');
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
       expect(error.args[0]).toBe(file);
     });
 
     it.each([
-      ['no permission sets', { permissionSets: [] }],
-      ['an unknown type', { permissionSets: [{ name: 'A', type: 'admin', directory: 'd', output: 'o' }] }],
-      [
-        'a duplicate name',
-        {
-          permissionSets: [
-            { name: 'A', type: 'read-only' },
-            { name: 'A', type: 'view-all' },
-          ],
-        },
-      ],
-      ['no directory anywhere', { defaults: { output: 'o' }, permissionSets: [{ name: 'A', type: 'read-only' }] }],
-      ['no output anywhere', { defaults: { directory: 'd' }, permissionSets: [{ name: 'A', type: 'read-only' }] }],
-      [
-        'an invalid inline override',
-        {
-          permissionSets: [
-            { name: 'A', type: 'read-only', directory: 'd', output: 'o', config: { tabs: { T: { visible: 'yes' } } } },
-          ],
-        },
-      ],
-    ])('rejects %s with invalid-config', async (_label, contents) => {
-      const withDefaults =
-        'defaults' in contents || contents.permissionSets.length === 0
-          ? contents
-          : { defaults: { directory: source, output: root }, ...contents };
-      await expectBuildError(loadPermissionSetsFile(writeJson('file.json', withDefaults)), 'invalid-config');
+      ['no name', { name: undefined }],
+      ['an unknown type', { type: 'admin' }],
+      ['no directory', { directory: undefined }],
+      ['no output', { output: undefined }],
+      ['an invalid inline override', { config: { tabs: { T: { visible: 'yes' } } } }],
+    ])('rejects %s with invalid-config', async (_label, overrides) => {
+      const file = writeJson('a.psbuild.json', fileContents(overrides));
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
+      expect(error.args[0]).toBe(file);
     });
 
-    it('names the duplicate and the missing key in the validation message', async () => {
-      const file = writeJson('file.json', {
-        defaults: { directory: source },
-        permissionSets: [
-          { name: 'A', type: 'read-only', output: root },
-          { name: 'A', type: 'view-all' },
-        ],
+    it('rejects a file in the old permissionSets list format with legacy-format', async () => {
+      const file = writeJson('app.psbuild.json', {
+        defaults: { directory: source, output: root },
+        permissionSets: [{ name: 'A', type: 'read-only' }],
       });
 
-      const error = await expectBuildError(loadPermissionSetsFile(file), 'invalid-config');
-      expect(error.args[1]).toContain("Duplicate permission set name 'A'");
-      expect(error.args[1]).toContain("'output' must be set on the permission set or in 'defaults'");
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'legacy-format');
+      expect(error.args).toStrictEqual([file]);
     });
 
     it('rejects a referenced overrides file that does not exist with config-not-found', async () => {
-      const file = writeJson('file.json', {
-        defaults: { directory: source, output: root },
-        permissionSets: [{ name: 'A', type: 'read-only', config: path.join(root, 'missing.json') }],
-      });
+      const file = writeJson('a.psbuild.json', fileContents({ config: path.join(root, 'missing.json') }));
 
-      const error = await expectBuildError(loadPermissionSetsFile(file), 'config-not-found');
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'config-not-found');
       expect(error.args).toStrictEqual([path.join(root, 'missing.json')]);
     });
 
     it('rejects an invalid referenced overrides file with invalid-config naming that file', async () => {
-      const overrides = writeJson('overrides.json', { objects: { Widget__c: { read: 'yes' } } });
-      const file = writeJson('file.json', {
-        defaults: { directory: source, output: root },
-        permissionSets: [{ name: 'A', type: 'read-only', config: overrides }],
-      });
+      // A `permissionSets` key in an overrides file is just invalid, not the old build file format.
+      const overrides = writeJson('overrides.json', { permissionSets: [], objects: { Widget__c: { read: 'yes' } } });
+      const file = writeJson('a.psbuild.json', fileContents({ config: overrides }));
 
-      const error = await expectBuildError(loadPermissionSetsFile(file), 'invalid-config');
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
       expect(error.args[0]).toBe(overrides);
     });
 
     it('rejects a source directory that does not exist with directory-not-found', async () => {
-      const file = writeJson('file.json', {
-        defaults: { output: root },
-        permissionSets: [{ name: 'A', type: 'read-only', directory: path.join(root, 'nowhere') }],
-      });
+      const file = writeJson('a.psbuild.json', fileContents({ directory: path.join(root, 'nowhere') }));
 
-      const error = await expectBuildError(loadPermissionSetsFile(file), 'directory-not-found');
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'directory-not-found');
       expect(error.args).toStrictEqual([path.join(root, 'nowhere'), 'A']);
+    });
+  });
+
+  describe('assertUniquePermissionSetNames', () => {
+    const entry = (file: string, name: string): { file: string; spec: PermissionSetSpec } => ({
+      file,
+      spec: { type: 'read-only', name, includeRecordTypes: false, directory: source, output: root },
+    });
+
+    it('accepts distinct names', () => {
+      expect(() =>
+        assertUniquePermissionSetNames([entry('a.psbuild.json', 'A'), entry('b.psbuild.json', 'B')]),
+      ).not.toThrow();
+    });
+
+    it('rejects a name declared by two files with duplicate-name, naming both', async () => {
+      const error = await expectBuildError(
+        Promise.resolve().then(() =>
+          assertUniquePermissionSetNames([
+            entry('a.psbuild.json', 'A'),
+            entry('b.psbuild.json', 'B'),
+            entry('c.psbuild.json', 'A'),
+          ]),
+        ),
+        'duplicate-name',
+      );
+      expect(error.args).toStrictEqual(['A', 'a.psbuild.json', 'c.psbuild.json']);
     });
   });
 
@@ -515,7 +520,7 @@ describe('permission sets files', () => {
   });
 });
 
-describe('findPermissionSetsFiles', () => {
+describe('findPermissionSetBuildFiles', () => {
   let originalCwd: string;
   let root: string;
 
@@ -526,7 +531,7 @@ describe('findPermissionSetsFiles', () => {
 
   beforeEach(() => {
     originalCwd = process.cwd();
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'find-permission-sets-files-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'find-permission-set-build-files-'));
     process.chdir(root);
   });
 
@@ -539,11 +544,11 @@ describe('findPermissionSetsFiles', () => {
     write('config/app.psbuild.json');
     write('apps/sales/sales.psbuild.json');
     write('root.psbuild.json');
-    // Correctly shaped, but without the suffix: not a permission sets file.
+    // Correctly shaped, but without the suffix: not a permission set build file.
     write('config/permission-sets.json', JSON.stringify({ permissionSets: [] }));
     write('config/notes.psbuild.json.bak');
 
-    expect(await findPermissionSetsFiles()).toStrictEqual([
+    expect(await findPermissionSetBuildFiles()).toStrictEqual([
       'apps/sales/sales.psbuild.json',
       'config/app.psbuild.json',
       'root.psbuild.json',
@@ -557,7 +562,7 @@ describe('findPermissionSetsFiles', () => {
     }
     write('.config/team.psbuild.json');
 
-    expect(await findPermissionSetsFiles()).toStrictEqual(['.config/team.psbuild.json', 'app.psbuild.json']);
+    expect(await findPermissionSetBuildFiles()).toStrictEqual(['.config/team.psbuild.json', 'app.psbuild.json']);
   });
 
   it('finds files regardless of git: tracked, untracked, and gitignored alike', async () => {
@@ -568,7 +573,7 @@ describe('findPermissionSetsFiles', () => {
     write('ignored/x.psbuild.json');
     write('.gitignore', 'ignored/\n');
 
-    expect(await findPermissionSetsFiles()).toStrictEqual([
+    expect(await findPermissionSetBuildFiles()).toStrictEqual([
       'ignored/x.psbuild.json',
       'tracked.psbuild.json',
       'untracked.psbuild.json',
@@ -576,6 +581,6 @@ describe('findPermissionSetsFiles', () => {
   });
 
   it('returns an empty list when there are none', async () => {
-    expect(await findPermissionSetsFiles()).toStrictEqual([]);
+    expect(await findPermissionSetBuildFiles()).toStrictEqual([]);
   });
 });

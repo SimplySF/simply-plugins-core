@@ -38,12 +38,13 @@ export {
   type GroupedPermissionsData,
 } from './permissionsReportTemplate.js';
 export {
+  assertUniquePermissionSetNames,
   checkPermissionSets,
   compilePermissionSet,
-  findPermissionSetsFiles,
+  findPermissionSetBuildFiles,
   generatePermissionSets,
   loadPermissionSetBuildConfig,
-  loadPermissionSetsFile,
+  loadPermissionSetBuildFile,
   PermissionSetBuildError,
   scanPermissionSetSource,
   writePermissionSet,
@@ -58,7 +59,7 @@ export {
 } from './permissionSetBuild.js';
 export { PermissionSetBuildConfigSchema, type PermissionSetBuildConfig } from './schemas/permissionSetBuildConfig.js';
 export {
-  PERMISSION_SETS_FILE_SUFFIX,
-  PermissionSetsFileSchema,
-  type PermissionSetsFile,
-} from './schemas/permissionSetsFile.js';
+  PERMISSION_SET_BUILD_FILE_SUFFIX,
+  PermissionSetBuildFileSchema,
+  type PermissionSetBuildFile,
+} from './schemas/permissionSetBuildFile.js';
