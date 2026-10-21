@@ -31,17 +31,18 @@ import {
   type TabSetting,
 } from './permissionSetXmlTemplate.js';
 import { type PermissionSetBuildConfig, PermissionSetBuildConfigSchema } from './schemas/permissionSetBuildConfig.js';
-import { PERMISSION_SETS_FILE_SUFFIX, PermissionSetsFileSchema } from './schemas/permissionSetsFile.js';
+import { PERMISSION_SET_BUILD_FILE_SUFFIX, PermissionSetBuildFileSchema } from './schemas/permissionSetBuildFile.js';
 
 /** Baseline permission profile applied before config overrides. */
 export type PermissionSetType = 'read-only' | 'view-all' | 'modify-all';
 
 /** The error conditions this module signals structurally (via `code`) rather than by message text, so a `Messages`-based caller (the CLI) can map each one to its own error key without string-matching. */
-export type PermissionSetBuildErrorCode = 'scan-failed' | 'invalid-config' | 'config-not-found' | 'directory-not-found';
+export type PermissionSetBuildErrorCode =
+  'scan-failed' | 'invalid-config' | 'config-not-found' | 'directory-not-found' | 'legacy-format' | 'duplicate-name';
 
 export class PermissionSetBuildError extends Error {
   public readonly code: PermissionSetBuildErrorCode;
-  /** The raw values a `Messages`-based caller needs to reproduce its own error text: `[detail]` for `scan-failed`, `[filePath, detail]` for `invalid-config`, `[filePath]` for `config-not-found`, `[directory, permissionSetName]` for `directory-not-found`. */
+  /** The raw values a `Messages`-based caller needs to reproduce its own error text: `[detail]` for `scan-failed`, `[filePath, detail]` for `invalid-config`, `[filePath]` for `config-not-found` and `legacy-format`, `[directory, permissionSetName]` for `directory-not-found`, `[permissionSetName, firstFile, secondFile]` for `duplicate-name`. */
   public readonly args: string[];
 
   public constructor(code: PermissionSetBuildErrorCode, message: string, args: string[] = [message]) {
@@ -458,60 +459,101 @@ export async function loadPermissionSetBuildConfig(filePath: string): Promise<Pe
   return loadValidatedJson(filePath, PermissionSetBuildConfigSchema);
 }
 
-/**
- * Loads a permission sets file and resolves each entry into a {@link PermissionSetSpec}: applies
- * `defaults`, loads file-referenced overrides, and checks that every source directory exists — so a
- * caller that validates with this before calling {@link generatePermissionSets} writes nothing when
- * any entry is invalid. Relative paths are returned as written (resolved against the current
- * directory by whatever uses them), not against the file's location.
- *
- * @throws {PermissionSetBuildError} `config-not-found` or `invalid-config` (the file itself or a
- * referenced overrides file), or `directory-not-found`.
- */
-export async function loadPermissionSetsFile(filePath: string): Promise<PermissionSetSpec[]> {
-  const file = await loadValidatedJson(filePath, PermissionSetsFileSchema);
-  const specs: PermissionSetSpec[] = [];
-
-  for (const entry of file.permissionSets) {
-    // The schema guarantees each is set on the entry or in `defaults`.
-    const directory = (entry.directory ?? file.defaults?.directory) as string;
-    const output = (entry.output ?? file.defaults?.output) as string;
-
-    if (!existsSync(directory)) {
-      throw new PermissionSetBuildError(
-        'directory-not-found',
-        `Source directory ${directory} for permission set ${entry.name} does not exist.`,
-        [directory, entry.name],
-      );
-    }
-
-    specs.push({
-      type: entry.type,
-      name: entry.name,
-      label: entry.label,
-      description: entry.description,
-      directory,
-      output,
-      includeRecordTypes: entry.includeRecordTypes ?? file.defaults?.includeRecordTypes ?? false,
-      config: typeof entry.config === 'string' ? await loadPermissionSetBuildConfig(entry.config) : entry.config,
-    });
+/** Whether `filePath` holds a JSON object in the pre-0.7 format: a `permissionSets` list rather than one permission set. */
+async function isLegacyPermissionSetsFile(filePath: string): Promise<boolean> {
+  try {
+    const value: unknown = JSON.parse(await fs.readFile(filePath, 'utf8'));
+    return typeof value === 'object' && value !== null && 'permissionSets' in value;
+  } catch {
+    return false;
   }
-
-  return specs;
 }
 
-/** Directories {@link findPermissionSetsFiles} never searches: dependencies, VCS data, and Salesforce CLI state. */
+/**
+ * Loads a permission set build file into a {@link PermissionSetSpec}: loads a file-referenced
+ * overrides `config` and checks that the source directory exists, so a caller that validates with
+ * this before calling {@link generatePermissionSets} writes nothing when the file is invalid.
+ * Relative paths are returned as written (resolved against the current directory by whatever uses
+ * them), not against the file's location.
+ *
+ * @throws {PermissionSetBuildError} `config-not-found` or `invalid-config` (the file itself or a
+ * referenced overrides file), `legacy-format` for a file in the old `permissionSets` list format, or
+ * `directory-not-found`.
+ */
+export async function loadPermissionSetBuildFile(filePath: string): Promise<PermissionSetSpec> {
+  let file;
+  try {
+    file = await loadValidatedJson(filePath, PermissionSetBuildFileSchema);
+  } catch (error) {
+    // Only re-read on failure, to tell an old-format file apart from an ordinary invalid one.
+    if (
+      error instanceof PermissionSetBuildError &&
+      error.code === 'invalid-config' &&
+      (await isLegacyPermissionSetsFile(filePath))
+    ) {
+      throw new PermissionSetBuildError(
+        'legacy-format',
+        `${filePath} uses the old format, a "permissionSets" list, which is no longer supported.`,
+        [filePath],
+      );
+    }
+    throw error;
+  }
+
+  if (!existsSync(file.directory)) {
+    throw new PermissionSetBuildError(
+      'directory-not-found',
+      `Source directory ${file.directory} for permission set ${file.name} does not exist.`,
+      [file.directory, file.name],
+    );
+  }
+
+  return {
+    type: file.type,
+    name: file.name,
+    label: file.label,
+    description: file.description,
+    directory: file.directory,
+    output: file.output,
+    includeRecordTypes: file.includeRecordTypes ?? false,
+    config: typeof file.config === 'string' ? await loadPermissionSetBuildConfig(file.config) : file.config,
+  };
+}
+
+/**
+ * Checks that no two permission set build files declare the same permission set name. Without this,
+ * the later file silently overwrites the earlier one's output.
+ *
+ * @param entries - Each loaded spec with the file that declared it, in the order they'll be built.
+ * @throws {PermissionSetBuildError} `duplicate-name`, naming the first duplicate and both files.
+ */
+export function assertUniquePermissionSetNames(entries: Array<{ file: string; spec: PermissionSetSpec }>): void {
+  const declaredBy = new Map<string, string>();
+  for (const { file, spec } of entries) {
+    const first = declaredBy.get(spec.name);
+    if (first !== undefined) {
+      throw new PermissionSetBuildError(
+        'duplicate-name',
+        `Permission set ${spec.name} is defined by both ${first} and ${file}.`,
+        [spec.name, first, file],
+      );
+    }
+    declaredBy.set(spec.name, file);
+  }
+}
+
+/** Directories {@link findPermissionSetBuildFiles} never searches: dependencies, VCS data, and Salesforce CLI state. */
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', '.sf', '.sfdx']);
 
 /**
- * Every permission sets file under the current directory: each file whose name ends in
- * {@link PERMISSION_SETS_FILE_SUFFIX}, found by walking the tree. Skipped directories are pruned
+ * Every permission set build file under the current directory: each file whose name ends in
+ * {@link PERMISSION_SET_BUILD_FILE_SUFFIX}, found by walking the tree. Skipped directories are pruned
  * rather than filtered afterwards, so `node_modules` is never read, and symbolic links aren't followed.
  * Doesn't consult git: tracked, untracked, and ignored files are all found.
  *
  * @returns Paths relative to the current directory with `/` separators, sorted.
  */
-export async function findPermissionSetsFiles(): Promise<string[]> {
+export async function findPermissionSetBuildFiles(): Promise<string[]> {
   const matches: string[] = [];
 
   const walk = async (dir: string): Promise<void> => {
@@ -523,7 +565,7 @@ export async function findPermissionSetsFiles(): Promise<string[]> {
           // eslint-disable-next-line no-await-in-loop -- depth-first keeps the open directory handles to one
           await walk(relativePath);
         }
-      } else if (entry.isFile() && entry.name.endsWith(PERMISSION_SETS_FILE_SUFFIX)) {
+      } else if (entry.isFile() && entry.name.endsWith(PERMISSION_SET_BUILD_FILE_SUFFIX)) {
         matches.push(relativePath);
       }
     }

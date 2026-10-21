@@ -88,6 +88,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0046](0046-simply-flow-core.md)                                     | Splitting `simply-flow-core` out of `simply-flow`                                     | In progress |
 | [0047](0047-permissions-build-check.md)                              | `simply permissions build --check`                                                    | Implemented |
 | [0048](0048-permissions-build-discover.md)                           | `simply permissions build` with no flags builds every `.psbuild.json` file            | Implemented |
+| [0049](0049-psbuild-single-permission-set.md)                        | One permission set per `.psbuild.json` file; `--file` removed                         | Draft       |
 
 ## Template
 

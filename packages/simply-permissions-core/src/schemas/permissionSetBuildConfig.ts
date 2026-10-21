@@ -45,7 +45,7 @@ const RecordTypeVisibilityConfigSchema = z.object({
 
 /**
  * Schema for a permission set's overrides: the file passed to `simply permissions build --config`,
- * or a {@link PermissionSetsFileSchema} entry's `config`. `objects`, `fields`, `tabs`, and
+ * or a {@link PermissionSetBuildFileSchema}'s `config`. `objects`, `fields`, `tabs`, and
  * `recordTypeVisibilities` are keyed by `Object` / `Object.Field` / `Tab` / `Object.RecordType` API
  * names; `hasActivationRequired` applies to the permission set as a whole.
  */
