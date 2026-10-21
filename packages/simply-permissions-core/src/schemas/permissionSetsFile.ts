@@ -18,6 +18,14 @@ import { z } from 'zod';
 import { PermissionSetBuildConfigSchema } from './permissionSetBuildConfig.js';
 
 /**
+ * The conventional filename suffix for a permission sets file, e.g. `config/app.psbuild.json`. It's
+ * how `sf simply cicd build check-permission-sets` finds permission sets files, and
+ * `sf simply permissions build --file` warns about a file without it. `loadPermissionSetsFile` itself
+ * accepts any filename.
+ */
+export const PERMISSION_SETS_FILE_SUFFIX = '.psbuild.json';
+
+/**
  * Settings shared by every permission set in the file. Each can be overridden per permission set;
  * `directory` and `output` must end up set one way or the other.
  */
