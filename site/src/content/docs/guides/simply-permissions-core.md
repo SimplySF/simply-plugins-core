@@ -44,8 +44,10 @@ const xml = buildPermissionSetXml(data);
 
 Every permission set a project generates can be declared in one file (the format
 `simply permissions build --file` reads) and built in one call. By convention the file is named
-`*.psbuild.json`, which is how `sf simply cicd build check-permission-sets` finds it. The library
-itself accepts any filename. The suffix is exported as `PERMISSION_SETS_FILE_SUFFIX`.
+`*.psbuild.json`, which is how `findPermissionSetsFiles()` finds it (and so how
+`sf simply cicd build check-permission-sets` and a flagless `sf simply permissions build` do). The
+loading functions themselves accept any filename. The suffix is exported as
+`PERMISSION_SETS_FILE_SUFFIX`.
 
 ```ts
 import { generatePermissionSets, loadPermissionSetsFile } from '@simplysf/simply-permissions-core';
@@ -55,6 +57,21 @@ const specs = await loadPermissionSetsFile('config/app.psbuild.json');
 // ...then scan each source directory once and write every permission set.
 const results = await generatePermissionSets(specs);
 // [{ name, path, objectPermissionCount, fieldPermissionCount }, ...]
+```
+
+To build every permission sets file in the project, find them first. The search starts at the
+current directory and skips `node_modules`, `.git`, `.sf`, and `.sfdx`:
+
+```ts
+import {
+  findPermissionSetsFiles,
+  generatePermissionSets,
+  loadPermissionSetsFile,
+} from '@simplysf/simply-permissions-core';
+
+const files = await findPermissionSetsFiles(); // ['apps/sales/sales.psbuild.json', 'config/app.psbuild.json']
+const specs = (await Promise.all(files.map((file) => loadPermissionSetsFile(file)))).flat();
+await generatePermissionSets(specs);
 ```
 
 To check in CI that the committed permission sets still match their source metadata, check the

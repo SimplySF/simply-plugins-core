@@ -78,9 +78,10 @@ Licensed under the [Apache-2.0](https://raw.githubusercontent.com/SimplySF/simpl
 | `writePermissionSet(data, name, output)` | Renders and writes `<output>/<name>.permissionset-meta.xml`. |
 | `loadPermissionSetBuildConfig(filePath)` | Loads and validates an overrides file (`PermissionSetBuildConfigSchema`). |
 | `loadPermissionSetsFile(filePath)` | Loads and validates a permission sets file (`PermissionSetsFileSchema`) into `PermissionSetSpec[]`: defaults applied, override files loaded, source directories checked. |
+| `findPermissionSetsFiles()` | Every `*.psbuild.json` file under the current directory, as sorted `/`-separated relative paths. Doesn't descend into `node_modules`, `.git`, `.sf`, or `.sfdx`, or follow symbolic links. |
 | `generatePermissionSets(specs, onPermissionSet?)` | Builds and writes each spec, scanning each distinct source directory once. |
 | `checkPermissionSets(specs, onPermissionSet?)` | Builds each spec as `generatePermissionSets` does but writes nothing: compares it with the file at its output path and reports `up-to-date`, `drifted`, or `missing`. Formatting differences (indentation, line endings, comments) aren't drift. |
 | `PermissionSetBuildError` | Thrown by the above with a structural `code` (`scan-failed`, `invalid-config`, `config-not-found`, `directory-not-found`) and `args`. |
 | `PermissionSetBuildConfigSchema`, `PermissionSetsFileSchema` | zod schemas for the overrides file and the permission sets file. |
-| `PERMISSION_SETS_FILE_SUFFIX` | `'.psbuild.json'`, the conventional suffix for a permission sets file, which `sf simply cicd build check-permission-sets` discovers files by. `loadPermissionSetsFile` accepts any name. |
+| `PERMISSION_SETS_FILE_SUFFIX` | `'.psbuild.json'`, the conventional suffix for a permission sets file, which `findPermissionSetsFiles` (and so `sf simply cicd build check-permission-sets` and a flagless `sf simply permissions build`) discovers files by. `loadPermissionSetsFile` accepts any name. |
 | `PermissionSetType`, `PermissionSetSourceScan`, `PermissionSetBuildOptions`, `PermissionSetSpec`, `PermissionSetBuildResult`, `PermissionSetCheckResult`, `PermissionSetCheckStatus`, `PermissionSetBuildErrorCode`, `PermissionSetBuildConfig`, `PermissionSetsFile` | Types for the permission set build functions. |
