@@ -1,6 +1,7 @@
 # 0047 — `simply permissions build --check`
 
-**Status:** In progress (core implemented; plugin PR pending its publish)
+**Status:** Implemented (core SimplySF/simply-plugins-core#239, `simply-permissions-core@0.4.0`; CLI
+SimplySF/simply-plugins#92)
 **Package:** `packages/simply-permissions-core` (library); `packages/simply-permissions` (CLI, in
 `simply-plugins`, where this doc is duplicated as its 0050)
 **Date:** 2026-10-20
@@ -34,7 +35,7 @@ directly should get drift checking from the same library without shelling out.
 ## Behavior
 
 ```
-sf simply permissions build --file config/permission-sets.json --check
+sf simply permissions build --file config/app.psbuild.json --check
 sf simply permissions build --type read-only --name App_Read_Only --directory force-app \
   --output force-app/main/default/permissionsets --check
 ```
@@ -183,3 +184,12 @@ touched.
 2. **Orphaned files.** A permission set removed from the `--file` declaration leaves its old XML in
    the output directory. That is a different question ("is this file still generated?") from drift,
    so it is left out of scope here.
+
+## Follow-up
+
+`simply-plugins`' design doc
+[0051](https://github.com/SimplySF/simply-plugins/blob/main/docs/design/0051-cicd-check-permission-sets.md)
+standardized permission sets file names on the `.psbuild.json` suffix, so
+`sf simply cicd build check-permission-sets` can find them. This doc's example was updated to match.
+This library still accepts any filename. 0051's open question 3 proposes exporting the suffix from
+here as `PERMISSION_SETS_FILE_SUFFIX` at the next release.

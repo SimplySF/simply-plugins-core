@@ -86,7 +86,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0044](0044-community-publish-cancel-stalled-requests.md)            | Send the community publish POST, and cancel (not abandon) stalled requests            | In progress |
 | [0045](0045-aep-core-generation-engine.md)                           | `simply-aep-core`: the AEP generation engine, ported from `apx-core`                  | Implemented |
 | [0046](0046-simply-flow-core.md)                                     | Splitting `simply-flow-core` out of `simply-flow`                                     | In progress |
-| [0047](0047-permissions-build-check.md)                              | `simply permissions build --check`                                                    | In progress |
+| [0047](0047-permissions-build-check.md)                              | `simply permissions build --check`                                                    | Implemented |
 
 ## Template
 
