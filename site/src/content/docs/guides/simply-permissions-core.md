@@ -45,7 +45,7 @@ const xml = buildPermissionSetXml(data);
 Every permission set a project generates can be declared in one file (the format
 `simply permissions build --file` reads) and built in one call. By convention the file is named
 `*.psbuild.json`, which is how `sf simply cicd build check-permission-sets` finds it. The library
-itself accepts any filename.
+itself accepts any filename. The suffix is exported as `PERMISSION_SETS_FILE_SUFFIX`.
 
 ```ts
 import { generatePermissionSets, loadPermissionSetsFile } from '@simplysf/simply-permissions-core';

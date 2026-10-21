@@ -191,5 +191,5 @@ touched.
 [0051](https://github.com/SimplySF/simply-plugins/blob/main/docs/design/0051-cicd-check-permission-sets.md)
 standardized permission sets file names on the `.psbuild.json` suffix, so
 `sf simply cicd build check-permission-sets` can find them. This doc's example was updated to match.
-This library still accepts any filename. 0051's open question 3 proposes exporting the suffix from
-here as `PERMISSION_SETS_FILE_SUFFIX` at the next release.
+This library still accepts any filename. Resolving 0051's open question 3, the suffix is exported from
+here as `PERMISSION_SETS_FILE_SUFFIX` (`0.5.0`), and both plugins import it instead of defining it.

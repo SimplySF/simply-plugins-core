@@ -28,6 +28,7 @@ import * as api from '../src/index.js';
  */
 it('exports the expected set of runtime values', () => {
   expect(Object.keys(api).sort()).toStrictEqual([
+    'PERMISSION_SETS_FILE_SUFFIX',
     'PermissionSetBuildConfigSchema',
     'PermissionSetBuildError',
     'PermissionSetsFileSchema',
@@ -41,4 +42,9 @@ it('exports the expected set of runtime values', () => {
     'scanPermissionSetSource',
     'writePermissionSet',
   ]);
+});
+
+it('pins the permission sets file suffix', () => {
+  // Repos name their files with this suffix and simply-cicd discovers them by it, so changing it is breaking.
+  expect(api.PERMISSION_SETS_FILE_SUFFIX).toBe('.psbuild.json');
 });

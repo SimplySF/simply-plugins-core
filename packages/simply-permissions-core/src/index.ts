@@ -56,4 +56,8 @@ export {
   type PermissionSetType,
 } from './permissionSetBuild.js';
 export { PermissionSetBuildConfigSchema, type PermissionSetBuildConfig } from './schemas/permissionSetBuildConfig.js';
-export { PermissionSetsFileSchema, type PermissionSetsFile } from './schemas/permissionSetsFile.js';
+export {
+  PERMISSION_SETS_FILE_SUFFIX,
+  PermissionSetsFileSchema,
+  type PermissionSetsFile,
+} from './schemas/permissionSetsFile.js';
