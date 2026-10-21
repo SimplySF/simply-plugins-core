@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.5.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.4.0...%40simplysf%2Fsimply-permissions-core%400.5.0) (2026-10-21)
+
+### Features
+
+- **simply-permissions-core:** export PERMISSION_SETS_FILE_SUFFIX ([#241](https://github.com/SimplySF/simply-plugins-core/issues/241)) ([cadc325](https://github.com/SimplySF/simply-plugins-core/commit/cadc325a4bed7c27ef63d5e917637c373aa94c76))
+
 # [0.4.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.3.2...%40simplysf%2Fsimply-permissions-core%400.4.0) (2026-10-20)
 
 ### Features
