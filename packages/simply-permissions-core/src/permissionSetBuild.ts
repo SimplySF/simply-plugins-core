@@ -268,8 +268,8 @@ export function compilePermissionSet(
         permission.allowCreate = objectPerms.create ?? permission.allowCreate;
         permission.allowEdit = objectPerms.edit ?? permission.allowEdit;
         permission.allowDelete = objectPerms.delete ?? permission.allowDelete;
-        permission.modifyAllRecords = objectPerms.modifyAll ?? permission.modifyAllRecords;
-        permission.viewAllRecords = objectPerms.viewAll ?? permission.viewAllRecords;
+        permission.modifyAllRecords = objectPerms.modifyAllRecords ?? permission.modifyAllRecords;
+        permission.viewAllRecords = objectPerms.viewAllRecords ?? permission.viewAllRecords;
         permission.viewAllFields = objectPerms.viewAllFields ?? permission.viewAllFields;
       }
     }

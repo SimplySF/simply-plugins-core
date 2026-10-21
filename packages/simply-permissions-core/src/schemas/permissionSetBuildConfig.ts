@@ -16,16 +16,37 @@
 
 import { z } from 'zod';
 
-/** Object-level CRUD/access permissions, as granted for a single sObject in `objects`. */
-const ObjectPermissionConfigSchema = z.object({
-  read: z.boolean().optional(),
-  create: z.boolean().optional(),
-  edit: z.boolean().optional(),
-  delete: z.boolean().optional(),
-  modifyAll: z.boolean().optional(),
-  viewAll: z.boolean().optional(),
-  viewAllFields: z.boolean().optional(),
-});
+/** Object permission keys that were renamed to match the `ObjectPermissions` metadata, mapped to their new names. */
+const RENAMED_OBJECT_PERMISSIONS: Record<string, string> = {
+  modifyAll: 'modifyAllRecords',
+  viewAll: 'viewAllRecords',
+};
+
+/**
+ * Object-level CRUD/access permissions, as granted for a single sObject in `objects`. A renamed key is
+ * rejected rather than stripped, so an old config fails loudly instead of silently granting less.
+ */
+const ObjectPermissionConfigSchema = z.preprocess(
+  (value, ctx) => {
+    if (value && typeof value === 'object') {
+      for (const [oldKey, newKey] of Object.entries(RENAMED_OBJECT_PERMISSIONS)) {
+        if (oldKey in value) {
+          ctx.addIssue({ code: 'custom', message: `${oldKey} was renamed to ${newKey}.`, path: [oldKey] });
+        }
+      }
+    }
+    return value;
+  },
+  z.object({
+    read: z.boolean().optional(),
+    create: z.boolean().optional(),
+    edit: z.boolean().optional(),
+    delete: z.boolean().optional(),
+    modifyAllRecords: z.boolean().optional(),
+    viewAllRecords: z.boolean().optional(),
+    viewAllFields: z.boolean().optional(),
+  }),
+);
 
 /** Field-level read/edit permissions, as granted for a single field in `fields`. */
 const FieldPermissionConfigSchema = z.object({
