@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.7.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.6.0...%40simplysf%2Fsimply-permissions-core%400.7.0) (2026-10-21)
+
+- feat(simply-permissions-core)!: one permission set per .psbuild.json file (#244) ([6c3cfa0](https://github.com/SimplySF/simply-plugins-core/commit/6c3cfa0fd9756bd9ebf559dbdee3f624822565ef)), closes [#244](https://github.com/SimplySF/simply-plugins-core/issues/244)
+
+### BREAKING CHANGES
+
+- the permission sets file format and the exports above are
+  replaced. simply-permissions and simply-cicd in simply-plugins move to the new
+  API in a coordinated follow-up that depends on ^0.7.0.
+
 # [0.6.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.5.0...%40simplysf%2Fsimply-permissions-core%400.6.0) (2026-10-21)
 
 ### Features
