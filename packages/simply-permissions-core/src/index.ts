@@ -40,6 +40,7 @@ export {
 export {
   checkPermissionSets,
   compilePermissionSet,
+  findPermissionSetsFiles,
   generatePermissionSets,
   loadPermissionSetBuildConfig,
   loadPermissionSetsFile,

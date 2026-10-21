@@ -87,6 +87,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0045](0045-aep-core-generation-engine.md)                           | `simply-aep-core`: the AEP generation engine, ported from `apx-core`                  | Implemented |
 | [0046](0046-simply-flow-core.md)                                     | Splitting `simply-flow-core` out of `simply-flow`                                     | In progress |
 | [0047](0047-permissions-build-check.md)                              | `simply permissions build --check`                                                    | Implemented |
+| [0048](0048-permissions-build-discover.md)                           | `simply permissions build` with no flags builds every `.psbuild.json` file            | In progress |
 
 ## Template
 

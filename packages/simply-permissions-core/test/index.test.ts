@@ -36,6 +36,7 @@ it('exports the expected set of runtime values', () => {
     'buildPermissionsReportHtml',
     'checkPermissionSets',
     'compilePermissionSet',
+    'findPermissionSetsFiles',
     'generatePermissionSets',
     'loadPermissionSetBuildConfig',
     'loadPermissionSetsFile',
@@ -45,6 +46,6 @@ it('exports the expected set of runtime values', () => {
 });
 
 it('pins the permission sets file suffix', () => {
-  // Repos name their files with this suffix and simply-cicd discovers them by it, so changing it is breaking.
+  // Repos name their files with this suffix and simply-cicd and simply-permissions discover them by it, so changing it is breaking.
   expect(api.PERMISSION_SETS_FILE_SUFFIX).toBe('.psbuild.json');
 });

@@ -15,6 +15,7 @@
  */
 
 /* eslint-disable camelcase -- Salesforce API names (Widget__c, etc.) as override keys */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,6 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkPermissionSets,
   compilePermissionSet,
+  findPermissionSetsFiles,
   generatePermissionSets,
   loadPermissionSetBuildConfig,
   loadPermissionSetsFile,
@@ -510,5 +512,70 @@ describe('permission sets files', () => {
       expect(fs.existsSync(newOutput)).toBe(false);
       expect(fs.readFileSync(filePath, 'utf-8')).toBe(generated);
     });
+  });
+});
+
+describe('findPermissionSetsFiles', () => {
+  let originalCwd: string;
+  let root: string;
+
+  const write = (file: string, content = '{}'): void => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+  };
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'find-permission-sets-files-'));
+    process.chdir(root);
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('finds .psbuild.json files at any depth, sorted, with / separators, and ignores every other file', async () => {
+    write('config/app.psbuild.json');
+    write('apps/sales/sales.psbuild.json');
+    write('root.psbuild.json');
+    // Correctly shaped, but without the suffix: not a permission sets file.
+    write('config/permission-sets.json', JSON.stringify({ permissionSets: [] }));
+    write('config/notes.psbuild.json.bak');
+
+    expect(await findPermissionSetsFiles()).toStrictEqual([
+      'apps/sales/sales.psbuild.json',
+      'config/app.psbuild.json',
+      'root.psbuild.json',
+    ]);
+  });
+
+  it('does not descend into node_modules, .git, .sf, or .sfdx', async () => {
+    write('app.psbuild.json');
+    for (const dir of ['node_modules/pkg', '.git', '.sf/orgs', '.sfdx']) {
+      write(`${dir}/x.psbuild.json`);
+    }
+    write('.config/team.psbuild.json');
+
+    expect(await findPermissionSetsFiles()).toStrictEqual(['.config/team.psbuild.json', 'app.psbuild.json']);
+  });
+
+  it('finds files regardless of git: tracked, untracked, and gitignored alike', async () => {
+    execFileSync('git', ['init', '-q']);
+    write('tracked.psbuild.json');
+    execFileSync('git', ['add', 'tracked.psbuild.json']);
+    write('untracked.psbuild.json');
+    write('ignored/x.psbuild.json');
+    write('.gitignore', 'ignored/\n');
+
+    expect(await findPermissionSetsFiles()).toStrictEqual([
+      'ignored/x.psbuild.json',
+      'tracked.psbuild.json',
+      'untracked.psbuild.json',
+    ]);
+  });
+
+  it('returns an empty list when there are none', async () => {
+    expect(await findPermissionSetsFiles()).toStrictEqual([]);
   });
 });

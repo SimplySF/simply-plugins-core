@@ -31,7 +31,7 @@ import {
   type TabSetting,
 } from './permissionSetXmlTemplate.js';
 import { type PermissionSetBuildConfig, PermissionSetBuildConfigSchema } from './schemas/permissionSetBuildConfig.js';
-import { PermissionSetsFileSchema } from './schemas/permissionSetsFile.js';
+import { PERMISSION_SETS_FILE_SUFFIX, PermissionSetsFileSchema } from './schemas/permissionSetsFile.js';
 
 /** Baseline permission profile applied before config overrides. */
 export type PermissionSetType = 'read-only' | 'view-all' | 'modify-all';
@@ -498,6 +498,39 @@ export async function loadPermissionSetsFile(filePath: string): Promise<Permissi
   }
 
   return specs;
+}
+
+/** Directories {@link findPermissionSetsFiles} never searches: dependencies, VCS data, and Salesforce CLI state. */
+const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', '.sf', '.sfdx']);
+
+/**
+ * Every permission sets file under the current directory: each file whose name ends in
+ * {@link PERMISSION_SETS_FILE_SUFFIX}, found by walking the tree. Skipped directories are pruned
+ * rather than filtered afterwards, so `node_modules` is never read, and symbolic links aren't followed.
+ * Doesn't consult git: tracked, untracked, and ignored files are all found.
+ *
+ * @returns Paths relative to the current directory with `/` separators, sorted.
+ */
+export async function findPermissionSetsFiles(): Promise<string[]> {
+  const matches: string[] = [];
+
+  const walk = async (dir: string): Promise<void> => {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const relativePath = dir === '.' ? entry.name : `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (!SKIPPED_DIRECTORIES.has(entry.name)) {
+          // eslint-disable-next-line no-await-in-loop -- depth-first keeps the open directory handles to one
+          await walk(relativePath);
+        }
+      } else if (entry.isFile() && entry.name.endsWith(PERMISSION_SETS_FILE_SUFFIX)) {
+        matches.push(relativePath);
+      }
+    }
+  };
+
+  await walk('.');
+  return matches.sort();
 }
 
 /**
