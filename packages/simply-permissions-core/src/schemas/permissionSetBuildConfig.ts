@@ -15,33 +15,43 @@
  */
 
 import { z } from 'zod';
-
-/** Object permission keys that were renamed to match the `ObjectPermissions` metadata, mapped to their new names. */
-const RENAMED_OBJECT_PERMISSIONS: Record<string, string> = {
-  modifyAll: 'modifyAllRecords',
-  viewAll: 'viewAllRecords',
-};
+import { TAB_VISIBILITIES } from '../permissionSetXmlTemplate.js';
 
 /**
- * Object-level CRUD/access permissions, as granted for a single sObject in `objects`. A renamed key is
- * rejected rather than stripped, so an old config fails loudly instead of silently granting less.
+ * Wraps `schema` so each key in `renamed` (an old key, mapped to the key that replaced it) is rejected
+ * rather than stripped, so an old config fails loudly instead of silently granting less.
  */
-const ObjectPermissionConfigSchema = z.preprocess(
-  (value, ctx) => {
+function rejectingRenamedKeys<T extends z.ZodType>(renamed: Record<string, string>, schema: T): z.ZodPreprocess<T> {
+  return z.preprocess((value, ctx) => {
     if (value && typeof value === 'object') {
-      for (const [oldKey, newKey] of Object.entries(RENAMED_OBJECT_PERMISSIONS)) {
+      for (const [oldKey, newKey] of Object.entries(renamed)) {
         if (oldKey in value) {
           ctx.addIssue({ code: 'custom', message: `${oldKey} was renamed to ${newKey}.`, path: [oldKey] });
         }
       }
     }
     return value;
+  }, schema);
+}
+
+/**
+ * Object-level CRUD/access permissions, as granted for a single sObject in `objects`. Keys are the
+ * `<objectPermissions>` element names.
+ */
+const ObjectPermissionConfigSchema = rejectingRenamedKeys(
+  {
+    read: 'allowRead',
+    create: 'allowCreate',
+    edit: 'allowEdit',
+    delete: 'allowDelete',
+    modifyAll: 'modifyAllRecords',
+    viewAll: 'viewAllRecords',
   },
   z.object({
-    read: z.boolean().optional(),
-    create: z.boolean().optional(),
-    edit: z.boolean().optional(),
-    delete: z.boolean().optional(),
+    allowRead: z.boolean().optional(),
+    allowCreate: z.boolean().optional(),
+    allowEdit: z.boolean().optional(),
+    allowDelete: z.boolean().optional(),
     modifyAllRecords: z.boolean().optional(),
     viewAllRecords: z.boolean().optional(),
     viewAllFields: z.boolean().optional(),
@@ -54,10 +64,13 @@ const FieldPermissionConfigSchema = z.object({
   editable: z.boolean().optional(),
 });
 
-/** Tab visibility, as granted for a single tab in `tabs`. */
-const TabPermissionConfigSchema = z.object({
-  visible: z.boolean().optional(),
-});
+/** Tab visibility, as granted for a single tab in `tabs`: the `<tabSettings>` `<visibility>` value. */
+const TabPermissionConfigSchema = rejectingRenamedKeys(
+  { visible: 'visibility (Visible, Available, or None)' },
+  z.object({
+    visibility: z.enum(TAB_VISIBILITIES).optional(),
+  }),
+);
 
 /** Record type visibility, as granted for a single record type in `recordTypeVisibilities`. */
 const RecordTypeVisibilityConfigSchema = z.object({

@@ -25,6 +25,7 @@ export {
   type ObjectPermission,
   type FieldPermission,
   type TabSetting,
+  type TabVisibility,
   type RecordTypeVisibility,
   type UserPermission,
   type PermissionSetTemplateData,

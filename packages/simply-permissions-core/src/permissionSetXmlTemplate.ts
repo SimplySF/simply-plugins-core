@@ -35,10 +35,14 @@ export type FieldPermission = {
   editable: boolean;
 };
 
+/** The values a PermissionSet's `<tabSettings>` `<visibility>` accepts. */
+export const TAB_VISIBILITIES = ['Visible', 'Available', 'None'] as const;
+export type TabVisibility = (typeof TAB_VISIBILITIES)[number];
+
 /** One `<tabSettings>` entry in a PermissionSet metadata file. */
 export type TabSetting = {
   tab: string;
-  visible: boolean;
+  visibility: TabVisibility;
 };
 
 /** One `<recordTypeVisibilities>` entry in a PermissionSet metadata file. */
@@ -135,15 +139,7 @@ export function buildPermissionSetXml(data: PermissionSetTemplateData): string {
   }
 
   for (const setting of data.tabSettings) {
-    root
-      .ele('tabSettings')
-      .ele('tab')
-      .txt(setting.tab)
-      .up()
-      .ele('visibility')
-      .txt(setting.visible ? 'Visible' : 'Hidden')
-      .up()
-      .up();
+    root.ele('tabSettings').ele('tab').txt(setting.tab).up().ele('visibility').txt(setting.visibility).up().up();
   }
 
   for (const visibility of data.recordTypeVisibilities) {
