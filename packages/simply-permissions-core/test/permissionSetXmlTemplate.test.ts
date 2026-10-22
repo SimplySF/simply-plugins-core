@@ -116,6 +116,58 @@ describe('buildPermissionSetXml', () => {
     expect(xml).toContain('<enabled>true</enabled>');
   });
 
+  it('writes elements in the order Salesforce retrieves them', () => {
+    const xml = buildPermissionSetXml({
+      ...baseData,
+      description: 'A description',
+      objectPermissions: [
+        {
+          object: 'Account',
+          allowCreate: true,
+          allowDelete: true,
+          allowEdit: true,
+          allowRead: true,
+          modifyAllRecords: true,
+          viewAllRecords: true,
+          viewAllFields: true,
+        },
+      ],
+      fieldPermissions: [{ field: 'Account.CustomField__c', readable: true, editable: true }],
+      tabSettings: [{ tab: 'Account', visibility: 'Visible' }],
+      recordTypeVisibilities: [{ recordType: 'Account.Business', visible: true }],
+      userPermissions: [{ name: 'ApiEnabled', enabled: true }],
+    });
+
+    const elements = [...xml.matchAll(/<(\w+)>/g)].map(([, name]) => name);
+    expect(elements).toStrictEqual([
+      'description',
+      'fieldPermissions',
+      'editable',
+      'field',
+      'readable',
+      'hasActivationRequired',
+      'label',
+      'objectPermissions',
+      'allowCreate',
+      'allowDelete',
+      'allowEdit',
+      'allowRead',
+      'modifyAllRecords',
+      'object',
+      'viewAllFields',
+      'viewAllRecords',
+      'recordTypeVisibilities',
+      'recordType',
+      'visible',
+      'tabSettings',
+      'tab',
+      'visibility',
+      'userPermissions',
+      'enabled',
+      'name',
+    ]);
+  });
+
   it('escapes unsafe XML text content', () => {
     const xml = buildPermissionSetXml({ ...baseData, label: 'A & B < C' });
 
