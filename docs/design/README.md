@@ -90,7 +90,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0048](0048-permissions-build-discover.md)                           | `simply permissions build` with no flags builds every `.psbuild.json` file            | Implemented |
 | [0049](0049-psbuild-single-permission-set.md)                        | One permission set per `.psbuild.json` file; `--file` removed                         | Implemented |
 | [0050](0050-permissions-config-record-access-names.md)               | Overrides use `viewAllRecords` / `modifyAllRecords`                                   | Draft       |
-| [0051](0051-permissions-config-metadata-names.md)                    | Override keys match the PermissionSet metadata                                        | Draft       |
+| [0051](0051-permissions-config-metadata-names.md)                    | Override sections and keys match the PermissionSet metadata                           | Draft       |
 
 ## Template
 
