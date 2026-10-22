@@ -1,6 +1,7 @@
 # 0051 — Override sections and keys match the PermissionSet metadata
 
-**Status:** Draft
+**Status:** Implemented (core SimplySF/simply-plugins-core#247 and #248,
+`simply-permissions-core@0.9.0` and `0.10.0`; CLI SimplySF/simply-plugins#100)
 **Package:** `packages/simply-permissions-core` (library); `packages/simply-permissions` (CLI, in
 `simply-plugins`, where this doc is duplicated as its 0055)
 **Date:** 2026-10-22
@@ -64,8 +65,8 @@ The exported `TabSetting` type changes from `{ tab, visible: boolean }` to
 `{ tab, visibility: TabVisibility }`, with `TabVisibility` exported alongside it.
 
 This landed in two core releases: the key renames and `visibility` in `0.9.0` (#247), and the
-section renames in `0.10.0`. `0.8.0` shipped with 0050 alone. The plugins skip `0.8.0` and `0.9.0`
-and move to `0.10.0` directly, so plugin users migrate once.
+section renames in `0.10.0` (#248). `0.8.0` shipped with 0050 alone. The plugins skip `0.8.0` and
+`0.9.0` and move to `0.10.0` directly, so plugin users migrate once.
 
 ## Alternatives considered
 
@@ -84,7 +85,7 @@ setting forever, and a precedence rule for files that set both.
 1. **Core `0.9.0`** (#247): rename the object keys; replace `visible` with a `visibility` enum;
    generalize 0050's renamed-name rejection to the object and tab schemas; `TabSetting.visibility`
    in the template, which writes it unchanged; tests.
-2. **Core `0.10.0`:** rename the sections, rejecting the old names at the top level; tests.
+2. **Core `0.10.0`** (#248): rename the sections, rejecting the old names at the top level; tests.
 3. **`simply-permissions`** (bump straight to `^0.10.0`): the README's `--config` example and table.
 
 ## Testing
