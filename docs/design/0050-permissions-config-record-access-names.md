@@ -1,6 +1,7 @@
 # 0050 — Overrides use `viewAllRecords` / `modifyAllRecords`
 
-**Status:** Draft
+**Status:** Implemented (core SimplySF/simply-plugins-core#246, `simply-permissions-core@0.8.0`; CLI
+SimplySF/simply-plugins#100)
 **Package:** `packages/simply-permissions-core` (library); `packages/simply-permissions` (CLI, in
 `simply-plugins`, where this doc is duplicated as its 0054)
 **Date:** 2026-10-21
@@ -53,11 +54,11 @@ permission set that grants less than its file says, which is the worst failure f
 
 ## Implementation plan
 
-1. **Core** (breaking, `0.8.0`): rename the keys in `ObjectPermissionConfigSchema`, reject the old
-   ones, apply the new ones in `compilePermissionSet`; tests. The API reference regenerates from
-   the schema at site build time; the README and guide don't list these keys.
-2. **`simply-permissions`**: bump to `^0.8.0`; update the README's config section and example, and
-   the command's messages if they mention the keys.
+1. **Core** (breaking, `0.8.0`, #246): rename the keys in `ObjectPermissionConfigSchema`, reject
+   the old ones, apply the new ones in `compilePermissionSet`; tests. The API reference regenerates
+   from the schema at site build time; the README and guide don't list these keys.
+2. **`simply-permissions`**: skip `0.8.0` and move straight to `^0.10.0` with 0051; update the
+   README's config section and example, and the command's messages if they mention the keys.
 
 ## Testing
 
