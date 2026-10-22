@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.9.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.8.0...%40simplysf%2Fsimply-permissions-core%400.9.0) (2026-10-22)
+
+- feat(simply-permissions-core)!: match override keys to permission set metadata (#247), closes [#247](https://github.com/SimplySF/simply-plugins-core/issues/247)
+
+### BREAKING CHANGES
+
+- `objects` entries use `allowRead`, `allowCreate`, `allowEdit`,
+  and `allowDelete`; `tabs` entries use `visibility` instead of `visible`. The
+  exported `TabSetting` type is now `{ tab, visibility }`.
+
 # [0.8.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.7.0...%40simplysf%2Fsimply-permissions-core%400.8.0) (2026-10-22)
 
 - feat(simply-permissions-core)!: rename viewAll/modifyAll to viewAllRecords/modifyAllRecords (#246), closes [#246](https://github.com/SimplySF/simply-plugins-core/issues/246)
