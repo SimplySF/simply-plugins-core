@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.10.0...%40simplysf%2Fsimply-permissions-core%400.10.1) (2026-10-22)
+
+### Bug Fixes
+
+- **simply-permissions-core:** write permission set elements in Salesforce order ([#250](https://github.com/SimplySF/simply-plugins-core/issues/250)) ([55c121b](https://github.com/SimplySF/simply-plugins-core/commit/55c121b7bcc908b10f08c59b775c572fe69feccf))
+
 # [0.10.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.9.0...%40simplysf%2Fsimply-permissions-core%400.10.0) (2026-10-22)
 
 - feat(simply-permissions-core)!: name override sections after permission set metadata (#248), closes [#248](https://github.com/SimplySF/simply-plugins-core/issues/248)
