@@ -248,8 +248,8 @@ export function compilePermissionSet(
     }
   }
 
-  if (config?.objects) {
-    for (const [objectName, objectPerms] of Object.entries(config.objects)) {
+  if (config?.objectPermissions) {
+    for (const [objectName, objectPerms] of Object.entries(config.objectPermissions)) {
       if (!objectPermissions.has(objectName)) {
         objectPermissions.set(objectName, {
           object: objectName,
@@ -275,8 +275,8 @@ export function compilePermissionSet(
     }
   }
 
-  if (config?.fields) {
-    for (const [fullFieldName, fieldPerms] of Object.entries(config.fields)) {
+  if (config?.fieldPermissions) {
+    for (const [fullFieldName, fieldPerms] of Object.entries(config.fieldPermissions)) {
       const [objectName, fieldName] = fullFieldName.split('.');
       if (!fieldPermissions.has(objectName)) {
         fieldPermissions.set(objectName, new Map());
@@ -292,8 +292,8 @@ export function compilePermissionSet(
     }
   }
 
-  if (config?.tabs) {
-    for (const [tabName, tabPerms] of Object.entries(config.tabs)) {
+  if (config?.tabSettings) {
+    for (const [tabName, tabPerms] of Object.entries(config.tabSettings)) {
       if (!tabSettings.has(tabName)) {
         tabSettings.set(tabName, { tab: tabName, visibility: 'None' });
       }

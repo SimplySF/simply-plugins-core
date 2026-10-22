@@ -35,7 +35,7 @@ function rejectingRenamedKeys<T extends z.ZodType>(renamed: Record<string, strin
 }
 
 /**
- * Object-level CRUD/access permissions, as granted for a single sObject in `objects`. Keys are the
+ * Object-level CRUD/access permissions, as granted for a single sObject in `objectPermissions`. Keys are the
  * `<objectPermissions>` element names.
  */
 const ObjectPermissionConfigSchema = rejectingRenamedKeys(
@@ -58,13 +58,13 @@ const ObjectPermissionConfigSchema = rejectingRenamedKeys(
   }),
 );
 
-/** Field-level read/edit permissions, as granted for a single field in `fields`. */
+/** Field-level read/edit permissions, as granted for a single field in `fieldPermissions`. */
 const FieldPermissionConfigSchema = z.object({
   readable: z.boolean().optional(),
   editable: z.boolean().optional(),
 });
 
-/** Tab visibility, as granted for a single tab in `tabs`: the `<tabSettings>` `<visibility>` value. */
+/** Tab visibility, as granted for a single tab in `tabSettings`: the `<tabSettings>` `<visibility>` value. */
 const TabPermissionConfigSchema = rejectingRenamedKeys(
   { visible: 'visibility (Visible, Available, or None)' },
   z.object({
@@ -79,19 +79,23 @@ const RecordTypeVisibilityConfigSchema = z.object({
 
 /**
  * Schema for a permission set's overrides: the file passed to `simply permissions build --config`,
- * or a {@link PermissionSetBuildFileSchema}'s `config`. `objects`, `fields`, `tabs`, and
- * `recordTypeVisibilities` are keyed by `Object` / `Object.Field` / `Tab` / `Object.RecordType` API
- * names; `hasActivationRequired` applies to the permission set as a whole.
+ * or a {@link PermissionSetBuildFileSchema}'s `config`. Each section is named for the PermissionSet
+ * element it sets. `objectPermissions`, `fieldPermissions`, `tabSettings`, and `recordTypeVisibilities`
+ * are keyed by `Object` / `Object.Field` / `Tab` / `Object.RecordType` API names;
+ * `hasActivationRequired` applies to the permission set as a whole.
  */
-export const PermissionSetBuildConfigSchema = z.object({
-  objects: z.record(z.string(), ObjectPermissionConfigSchema).optional(),
-  fields: z.record(z.string(), FieldPermissionConfigSchema).optional(),
-  tabs: z.record(z.string(), TabPermissionConfigSchema).optional(),
-  recordTypeVisibilities: z.record(z.string(), RecordTypeVisibilityConfigSchema).optional(),
-  userPermissions: z.record(z.string(), z.boolean()).optional(),
-  /** Whether the permission set requires activation before it grants access. Defaults to `false`. */
-  hasActivationRequired: z.boolean().optional().default(false),
-});
+export const PermissionSetBuildConfigSchema = rejectingRenamedKeys(
+  { objects: 'objectPermissions', fields: 'fieldPermissions', tabs: 'tabSettings' },
+  z.object({
+    objectPermissions: z.record(z.string(), ObjectPermissionConfigSchema).optional(),
+    fieldPermissions: z.record(z.string(), FieldPermissionConfigSchema).optional(),
+    tabSettings: z.record(z.string(), TabPermissionConfigSchema).optional(),
+    recordTypeVisibilities: z.record(z.string(), RecordTypeVisibilityConfigSchema).optional(),
+    userPermissions: z.record(z.string(), z.boolean()).optional(),
+    /** Whether the permission set requires activation before it grants access. Defaults to `false`. */
+    hasActivationRequired: z.boolean().optional().default(false),
+  }),
+);
 
 /** A parsed, validated permission set build config. */
 export type PermissionSetBuildConfig = z.infer<typeof PermissionSetBuildConfigSchema>;
