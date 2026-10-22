@@ -80,19 +80,20 @@ describe('buildPermissionSetXml', () => {
     expect(xml).toContain('<editable>false</editable>');
   });
 
-  it('maps tab visibility to Visible/Hidden', () => {
+  it('writes each tab setting visibility as given', () => {
     const xml = buildPermissionSetXml({
       ...baseData,
       tabSettings: [
-        { tab: 'Account', visible: true },
-        { tab: 'Contact', visible: false },
+        { tab: 'Account', visibility: 'Visible' },
+        { tab: 'Contact', visibility: 'Available' },
+        { tab: 'Lead', visibility: 'None' },
       ],
     });
 
-    expect(xml).toContain('<tab>Account</tab>');
-    expect(xml).toContain('<visibility>Visible</visibility>');
-    expect(xml).toContain('<tab>Contact</tab>');
-    expect(xml).toContain('<visibility>Hidden</visibility>');
+    expect(xml).toMatch(/<tab>Account<\/tab>\s*<visibility>Visible<\/visibility>/);
+    expect(xml).toMatch(/<tab>Contact<\/tab>\s*<visibility>Available<\/visibility>/);
+    expect(xml).toMatch(/<tab>Lead<\/tab>\s*<visibility>None<\/visibility>/);
+    expect(xml).not.toContain('Hidden');
   });
 
   it('renders record type visibilities', () => {

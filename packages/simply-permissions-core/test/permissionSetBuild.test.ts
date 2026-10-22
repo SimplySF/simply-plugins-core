@@ -110,7 +110,7 @@ describe('compilePermissionSet', () => {
     ]);
     // Account has no object permission here, so its field still needs an explicit one.
     expect(data.fieldPermissions).toStrictEqual([{ field: 'Account.Rating__c', readable: true, editable: false }]);
-    expect(data.tabSettings).toStrictEqual([{ tab: 'Widget__c', visible: true }]);
+    expect(data.tabSettings).toStrictEqual([{ tab: 'Widget__c', visibility: 'Visible' }]);
     expect(data.recordTypeVisibilities).toStrictEqual([]);
     expect(data.label).toBe('PS');
     expect(data.hasActivationRequired).toBe(false);
@@ -154,9 +154,9 @@ describe('compilePermissionSet', () => {
       description: 'Description',
       includeRecordTypes: true,
       config: {
-        objects: { Widget__c: { delete: false }, Contact: { read: true } },
+        objects: { Widget__c: { allowDelete: false }, Contact: { allowRead: true } },
         fields: { 'Widget__c.Color__c': { editable: false }, 'Contact.Email': { readable: true } },
-        tabs: { Widget__c: { visible: false }, 'standard-Contact': { visible: true } },
+        tabs: { Widget__c: { visibility: 'None' }, 'standard-Contact': { visibility: 'Available' }, Lead: {} },
         recordTypeVisibilities: { 'Widget__c.Standard': { visible: false } },
         userPermissions: { ViewSetup: true, ApiEnabled: false },
         hasActivationRequired: true,
@@ -175,8 +175,10 @@ describe('compilePermissionSet', () => {
       { field: 'Widget__c.Color__c', readable: true, editable: false },
     ]);
     expect(data.tabSettings).toStrictEqual([
-      { tab: 'standard-Contact', visible: true },
-      { tab: 'Widget__c', visible: false },
+      // A tab only an override names, with no visibility of its own, defaults to None.
+      { tab: 'Lead', visibility: 'None' },
+      { tab: 'standard-Contact', visibility: 'Available' },
+      { tab: 'Widget__c', visibility: 'None' },
     ]);
     expect(data.recordTypeVisibilities).toStrictEqual([{ recordType: 'Widget__c.Standard', visible: false }]);
     expect(data.userPermissions).toStrictEqual([
@@ -293,10 +295,13 @@ describe('permission set build files', () => {
     });
 
     it('loads inline overrides', async () => {
-      const file = writeJson('a.psbuild.json', fileContents({ config: { tabs: { Widget__c: { visible: false } } } }));
+      const file = writeJson(
+        'a.psbuild.json',
+        fileContents({ config: { tabs: { Widget__c: { visibility: 'Available' } } } }),
+      );
 
       expect((await loadPermissionSetBuildFile(file)).config).toStrictEqual({
-        tabs: { Widget__c: { visible: false } },
+        tabs: { Widget__c: { visibility: 'Available' } },
         hasActivationRequired: false,
       });
     });
@@ -320,7 +325,7 @@ describe('permission set build files', () => {
       ['an unknown type', { type: 'admin' }],
       ['no directory', { directory: undefined }],
       ['no output', { output: undefined }],
-      ['an invalid inline override', { config: { tabs: { T: { visible: 'yes' } } } }],
+      ['an invalid inline override', { config: { tabs: { T: { visibility: 'Hidden' } } } }],
     ])('rejects %s with invalid-config', async (_label, overrides) => {
       const file = writeJson('a.psbuild.json', fileContents(overrides));
       const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
@@ -328,18 +333,26 @@ describe('permission set build files', () => {
     });
 
     it.each([
-      ['viewAll', 'viewAllRecords'],
-      ['modifyAll', 'modifyAllRecords'],
-    ])('rejects the renamed %s key in an inline override with invalid-config naming %s', async (oldKey, newKey) => {
-      const file = writeJson(
-        'a.psbuild.json',
-        fileContents({ config: { objects: { Widget__c: { [oldKey]: true } } } }),
-      );
+      ['objects', 'read', 'allowRead'],
+      ['objects', 'create', 'allowCreate'],
+      ['objects', 'edit', 'allowEdit'],
+      ['objects', 'delete', 'allowDelete'],
+      ['objects', 'viewAll', 'viewAllRecords'],
+      ['objects', 'modifyAll', 'modifyAllRecords'],
+      ['tabs', 'visible', 'visibility (Visible, Available, or None)'],
+    ])(
+      'rejects the renamed %s key %s in an inline override with invalid-config naming %s',
+      async (section, oldKey, newKey) => {
+        const file = writeJson(
+          'a.psbuild.json',
+          fileContents({ config: { [section]: { Widget__c: { [oldKey]: true } } } }),
+        );
 
-      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
-      expect(error.args[0]).toBe(file);
-      expect(error.args[1]).toContain(`${oldKey} was renamed to ${newKey}.`);
-    });
+        const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
+        expect(error.args[0]).toBe(file);
+        expect(error.args[1]).toContain(`${oldKey} was renamed to ${newKey}.`);
+      },
+    );
 
     it('rejects a file in the old permissionSets list format with legacy-format', async () => {
       const file = writeJson('app.psbuild.json', {
@@ -360,7 +373,10 @@ describe('permission set build files', () => {
 
     it('rejects an invalid referenced overrides file with invalid-config naming that file', async () => {
       // A `permissionSets` key in an overrides file is just invalid, not the old build file format.
-      const overrides = writeJson('overrides.json', { permissionSets: [], objects: { Widget__c: { read: 'yes' } } });
+      const overrides = writeJson('overrides.json', {
+        permissionSets: [],
+        objects: { Widget__c: { allowRead: 'yes' } },
+      });
       const file = writeJson('a.psbuild.json', fileContents({ config: overrides }));
 
       const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
@@ -403,20 +419,25 @@ describe('permission set build files', () => {
   });
 
   describe('loadPermissionSetBuildConfig', () => {
-    it('rejects the renamed viewAll and modifyAll keys with invalid-config naming the new keys', async () => {
-      const file = writeJson('overrides.json', { objects: { Widget__c: { viewAll: true, modifyAll: false } } });
+    it('rejects every renamed key at once, naming each new key', async () => {
+      const file = writeJson('overrides.json', {
+        objects: { Widget__c: { read: true, viewAll: true, modifyAll: false } },
+        tabs: { Widget__c: { visible: true } },
+      });
 
       const error = await expectBuildError(loadPermissionSetBuildConfig(file), 'invalid-config');
       expect(error.args[0]).toBe(file);
+      expect(error.args[1]).toContain('read was renamed to allowRead.');
       expect(error.args[1]).toContain('viewAll was renamed to viewAllRecords.');
       expect(error.args[1]).toContain('modifyAll was renamed to modifyAllRecords.');
+      expect(error.args[1]).toContain('visible was renamed to visibility (Visible, Available, or None).');
     });
 
     it('loads an overrides file, defaulting hasActivationRequired', async () => {
-      const file = writeJson('overrides.json', { objects: { Widget__c: { edit: true } } });
+      const file = writeJson('overrides.json', { objects: { Widget__c: { allowEdit: true } } });
 
       expect(await loadPermissionSetBuildConfig(file)).toStrictEqual({
-        objects: { Widget__c: { edit: true } },
+        objects: { Widget__c: { allowEdit: true } },
         hasActivationRequired: false,
       });
     });

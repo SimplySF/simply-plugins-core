@@ -213,7 +213,7 @@ export function compilePermissionSet(
   }
 
   for (const tab of scan.tabs) {
-    tabSettings.set(tab, { tab, visible: true });
+    tabSettings.set(tab, { tab, visibility: 'Visible' });
   }
 
   if (options.includeRecordTypes) {
@@ -264,10 +264,10 @@ export function compilePermissionSet(
       }
       const permission = objectPermissions.get(objectName);
       if (permission) {
-        permission.allowRead = objectPerms.read ?? permission.allowRead;
-        permission.allowCreate = objectPerms.create ?? permission.allowCreate;
-        permission.allowEdit = objectPerms.edit ?? permission.allowEdit;
-        permission.allowDelete = objectPerms.delete ?? permission.allowDelete;
+        permission.allowRead = objectPerms.allowRead ?? permission.allowRead;
+        permission.allowCreate = objectPerms.allowCreate ?? permission.allowCreate;
+        permission.allowEdit = objectPerms.allowEdit ?? permission.allowEdit;
+        permission.allowDelete = objectPerms.allowDelete ?? permission.allowDelete;
         permission.modifyAllRecords = objectPerms.modifyAllRecords ?? permission.modifyAllRecords;
         permission.viewAllRecords = objectPerms.viewAllRecords ?? permission.viewAllRecords;
         permission.viewAllFields = objectPerms.viewAllFields ?? permission.viewAllFields;
@@ -295,11 +295,11 @@ export function compilePermissionSet(
   if (config?.tabs) {
     for (const [tabName, tabPerms] of Object.entries(config.tabs)) {
       if (!tabSettings.has(tabName)) {
-        tabSettings.set(tabName, { tab: tabName, visible: false });
+        tabSettings.set(tabName, { tab: tabName, visibility: 'None' });
       }
       const setting = tabSettings.get(tabName);
       if (setting) {
-        setting.visible = tabPerms.visible ?? setting.visible;
+        setting.visibility = tabPerms.visibility ?? setting.visibility;
       }
     }
   }
