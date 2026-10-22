@@ -185,6 +185,29 @@ describe('compilePermissionSet', () => {
     ]);
   });
 
+  it('overrides View All Records and Modify All Records in both directions', () => {
+    const config = (viewAllRecords: boolean, modifyAllRecords: boolean): PermissionSetSpec['config'] => ({
+      objects: { Widget__c: { viewAllRecords, modifyAllRecords } },
+      hasActivationRequired: false,
+    });
+
+    const granted = compilePermissionSet(scan, {
+      type: 'read-only',
+      name: 'PS',
+      includeRecordTypes: false,
+      config: config(true, true),
+    });
+    const revoked = compilePermissionSet(scan, {
+      type: 'modify-all',
+      name: 'PS',
+      includeRecordTypes: false,
+      config: config(false, false),
+    });
+
+    expect(granted.objectPermissions[0]).toMatchObject({ viewAllRecords: true, modifyAllRecords: true });
+    expect(revoked.objectPermissions[0]).toMatchObject({ viewAllRecords: false, modifyAllRecords: false });
+  });
+
   it('drops field permissions for an object an override grants View All Fields', () => {
     const data = compilePermissionSet(scan, {
       type: 'modify-all',
@@ -304,6 +327,20 @@ describe('permission set build files', () => {
       expect(error.args[0]).toBe(file);
     });
 
+    it.each([
+      ['viewAll', 'viewAllRecords'],
+      ['modifyAll', 'modifyAllRecords'],
+    ])('rejects the renamed %s key in an inline override with invalid-config naming %s', async (oldKey, newKey) => {
+      const file = writeJson(
+        'a.psbuild.json',
+        fileContents({ config: { objects: { Widget__c: { [oldKey]: true } } } }),
+      );
+
+      const error = await expectBuildError(loadPermissionSetBuildFile(file), 'invalid-config');
+      expect(error.args[0]).toBe(file);
+      expect(error.args[1]).toContain(`${oldKey} was renamed to ${newKey}.`);
+    });
+
     it('rejects a file in the old permissionSets list format with legacy-format', async () => {
       const file = writeJson('app.psbuild.json', {
         defaults: { directory: source, output: root },
@@ -366,6 +403,15 @@ describe('permission set build files', () => {
   });
 
   describe('loadPermissionSetBuildConfig', () => {
+    it('rejects the renamed viewAll and modifyAll keys with invalid-config naming the new keys', async () => {
+      const file = writeJson('overrides.json', { objects: { Widget__c: { viewAll: true, modifyAll: false } } });
+
+      const error = await expectBuildError(loadPermissionSetBuildConfig(file), 'invalid-config');
+      expect(error.args[0]).toBe(file);
+      expect(error.args[1]).toContain('viewAll was renamed to viewAllRecords.');
+      expect(error.args[1]).toContain('modifyAll was renamed to modifyAllRecords.');
+    });
+
     it('loads an overrides file, defaulting hasActivationRequired', async () => {
       const file = writeJson('overrides.json', { objects: { Widget__c: { edit: true } } });
 
