@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.10.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.9.0...%40simplysf%2Fsimply-permissions-core%400.10.0) (2026-10-22)
+
+- feat(simply-permissions-core)!: name override sections after permission set metadata (#248), closes [#248](https://github.com/SimplySF/simply-plugins-core/issues/248)
+
+### BREAKING CHANGES
+
+- a permission set build config's `objects`, `fields`, and
+  `tabs` sections are now `objectPermissions`, `fieldPermissions`, and
+  `tabSettings`.
+
 # [0.9.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.8.0...%40simplysf%2Fsimply-permissions-core%400.9.0) (2026-10-22)
 
 - feat(simply-permissions-core)!: match override keys to permission set metadata (#247), closes [#247](https://github.com/SimplySF/simply-plugins-core/issues/247)
