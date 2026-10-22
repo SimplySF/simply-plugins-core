@@ -76,6 +76,10 @@ export type PermissionSetTemplateData = {
  * hand-rolled escaping (and no risk of it drifting out of sync with what's actually unsafe in
  * XML text content).
  *
+ * Elements are written in the order Salesforce writes them on retrieve (alphabetical, at the top level
+ * and within each entry), so a file retrieved from an org is identical to a generated one and
+ * `checkPermissionSets` doesn't report it as drifted.
+ *
  * @param data - The permission set's label, description, activation requirement, and permission
  * entries.
  * @returns The rendered `<PermissionSet>` XML document, ready to write to a `.permissionset-meta.xml` file.
@@ -129,17 +133,13 @@ export function buildPermissionSetXml(data: PermissionSetTemplateData): string {
       .ele('object')
       .txt(permission.object)
       .up()
-      .ele('viewAllRecords')
-      .txt(String(permission.viewAllRecords))
-      .up()
       .ele('viewAllFields')
       .txt(String(permission.viewAllFields))
       .up()
+      .ele('viewAllRecords')
+      .txt(String(permission.viewAllRecords))
+      .up()
       .up();
-  }
-
-  for (const setting of data.tabSettings) {
-    root.ele('tabSettings').ele('tab').txt(setting.tab).up().ele('visibility').txt(setting.visibility).up().up();
   }
 
   for (const visibility of data.recordTypeVisibilities) {
@@ -154,14 +154,18 @@ export function buildPermissionSetXml(data: PermissionSetTemplateData): string {
       .up();
   }
 
+  for (const setting of data.tabSettings) {
+    root.ele('tabSettings').ele('tab').txt(setting.tab).up().ele('visibility').txt(setting.visibility).up().up();
+  }
+
   for (const permission of data.userPermissions) {
     root
       .ele('userPermissions')
-      .ele('name')
-      .txt(permission.name)
-      .up()
       .ele('enabled')
       .txt(String(permission.enabled))
+      .up()
+      .ele('name')
+      .txt(permission.name)
       .up()
       .up();
   }

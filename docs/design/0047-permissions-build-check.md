@@ -71,6 +71,11 @@ fixes it. This includes a file with a missing closing tag, which a bad merge can
 
 Element order is significant. `build` sorts every permission list by API name, so a hand-reordered
 file is drift, and so is a hand-edited one. A generated file is meant to be owned by the generator.
+The generator writes elements in the order Salesforce writes them on retrieve (alphabetical, at the
+top level and within each entry), so retrieving an unchanged permission set from an org doesn't make
+it drift. Earlier versions wrote `viewAllRecords` before `viewAllFields`, `name` before `enabled`,
+and `tabSettings` before `recordTypeVisibilities`, so a retrieved file was reported as drifted even
+though it granted the same permissions.
 
 ### Output
 
