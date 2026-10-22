@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.8.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.7.0...%40simplysf%2Fsimply-permissions-core%400.8.0) (2026-10-22)
+
+- feat(simply-permissions-core)!: rename viewAll/modifyAll to viewAllRecords/modifyAllRecords (#246), closes [#246](https://github.com/SimplySF/simply-plugins-core/issues/246)
+
+### BREAKING CHANGES
+
+- `objects` entries in a permission set build config must use
+  `viewAllRecords` and `modifyAllRecords`; `viewAll` and `modifyAll` are rejected.
+
 # [0.7.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.6.0...%40simplysf%2Fsimply-permissions-core%400.7.0) (2026-10-21)
 
 - feat(simply-permissions-core)!: one permission set per .psbuild.json file (#244) ([6c3cfa0](https://github.com/SimplySF/simply-plugins-core/commit/6c3cfa0fd9756bd9ebf559dbdee3f624822565ef)), closes [#244](https://github.com/SimplySF/simply-plugins-core/issues/244)
