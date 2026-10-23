@@ -91,6 +91,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0049](0049-psbuild-single-permission-set.md)                        | One permission set per `.psbuild.json` file; `--file` removed                         | Implemented |
 | [0050](0050-permissions-config-record-access-names.md)               | Overrides use `viewAllRecords` / `modifyAllRecords`                                   | Implemented |
 | [0051](0051-permissions-config-metadata-names.md)                    | Override sections and keys match the PermissionSet metadata                           | Implemented |
+| [0052](0052-package-dependencies-clone.md)                           | `simply package dependencies clone`                                                   | In progress |
 
 ## Template
 
