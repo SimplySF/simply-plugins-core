@@ -1,4 +1,4 @@
-# 0047 — `simply package dependencies clone`
+# 0052 — `simply package dependencies clone`
 
 **Status:** In progress (implemented on `feat/package-dependencies-clone` in both repos; unreleased)
 **Package:** `packages/simply-package-core` (library); `packages/simply-package` (CLI, in
@@ -24,9 +24,8 @@ package versions into an org. This feature never touches an org, so it gets a di
 ## Decision
 
 1. **Record each dependency's repository in `sfdx-project.json`** under
-   `plugins.simply.dependencies.repositories`, a map from package alias to repository. This sits
-   next to the existing `plugins.simply.dependencies.ignore`. The entry gives a git URL and,
-   optionally, a ref and a subdirectory. Any git host works (GitHub, GitLab.com, self-managed
+   `plugins.simply.packages`, a map from package alias to that package's settings. A `repository`
+   in an entry gives a git URL and, optionally, a ref and a subdirectory. Any git host works (GitHub, GitLab.com, self-managed
    GitLab, GitHub Enterprise, Bitbucket, Azure DevOps), because the value is only a URL passed to
    `git clone`.
 2. **Add `clonePackageDependencies(options)` to `@simplysf/simply-package-core`.** It resolves each
@@ -59,13 +58,15 @@ packaging library forwards unknown dependency keys to the server.
   ],
   "plugins": {
     "simply": {
-      "dependencies": {
-        "repositories": {
-          "fflib-apex-common": {
+      "packages": {
+        "fflib-apex-common": {
+          "repository": {
             "url": "https://github.com/apex-enterprise-patterns/fflib-apex-common.git",
             "ref": "v3.0.0",
           },
-          "my-core": {
+        },
+        "my-core": {
+          "repository": {
             "url": "git@gitlab.example.internal:salesforce/my-core.git",
             "ref": "main",
             "path": "sfdx-source",
@@ -77,11 +78,16 @@ packaging library forwards unknown dependency keys to the server.
 }
 ```
 
-| Field  | Type     | Required | Meaning                                                                                                                                                                                                                                                                   |
-| ------ | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`  | `string` | yes      | Anything `git clone` accepts: `https://…`, `ssh://…`, `git@host:group/repo.git`, or a local path. The host doesn't matter.                                                                                                                                                |
-| `ref`  | `string` | no       | Branch, tag, or commit SHA to check out. If it's omitted, the clone uses the remote's default branch.                                                                                                                                                                     |
-| `path` | `string` | no       | Subdirectory of the repository where its `sfdx-project.json` lives, for monorepos that hold several packages. The default is the repository root. The clone still contains the whole repository. `path` only tells `--recursive` where to look for the next project file. |
+| `repository` field | Type     | Required | Meaning                                                                                                                                                                                                                                                                   |
+| ------------------ | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`              | `string` | yes      | Anything `git clone` accepts: `https://…`, `ssh://…`, `git@host:group/repo.git`, or a local path. The host doesn't matter.                                                                                                                                                |
+| `ref`              | `string` | no       | Branch, tag, or commit SHA to check out. If it's omitted, the clone uses the remote's default branch.                                                                                                                                                                     |
+| `path`             | `string` | no       | Subdirectory of the repository where its `sfdx-project.json` lives, for monorepos that hold several packages. The default is the repository root. The clone still contains the whole repository. `path` only tells `--recursive` where to look for the next project file. |
+
+An entry is keyed by package, not by feature, so settings for one package stay together. Only
+`repository` exists today. Other keys in an entry are kept and ignored, so later settings can sit
+beside it without older versions rejecting the file. An entry without a `repository` is treated as
+no mapping.
 
 **Credentials never go in this file.** The command runs the user's own `git`, so it uses whatever
 that `git` already has: SSH keys, a credential helper, `gh auth`/`glab auth`, or a corporate
@@ -141,7 +147,7 @@ By default only direct dependencies are cloned. The deduplication and conflict r
 apply then, because two package directories in one project can depend on the same repository.
 
 - With `--recursive`, the command walks breadth-first from the root project. Each clone's
-  `<clone>/<path>/sfdx-project.json` is read for its own `dependencies` and `repositories` map.
+  `<clone>/<path>/sfdx-project.json` is read for its own `dependencies` and `plugins.simply.packages` map.
   When a clone has no project file, it's a leaf, and an unreadable or invalid one is a warning,
   not an error. A dependency's own map comes first, then the root project's map, so the root can
   supply URLs for transitive dependencies whose projects don't map them.
@@ -175,13 +181,13 @@ The possible statuses are `Cloned`, `Updated`, `Already cloned`, `Dirty, skipped
 
 ### Errors
 
-| Condition                                                      | Result                                                                                        |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `git` isn't on `PATH`                                          | Error before any work is done: `GitNotFoundError`.                                            |
-| A repository entry is missing `url`, or has a non-string field | Error before any work is done, naming the key: `InvalidRepositoryConfigError`.                |
-| A `url` contains credentials                                   | Error before any work is done, naming the key: `CredentialsInUrlError`.                       |
-| A clone or checkout fails (auth, network, unknown ref)         | That row is `Failed`, the run continues, and the exit code is non-zero.                       |
-| `<output-dir>/<repo>` exists but isn't a clone of that URL     | That row is `Failed` with "directory exists and is not a clone of …". Nothing is overwritten. |
+| Condition                                                  | Result                                                                                        |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `git` isn't on `PATH`                                      | Error before any work is done: `GitNotFoundError`.                                            |
+| A `repository` is missing `url`, or has a non-string field | Error before any work is done, naming the key: `InvalidRepositoryConfigError`.                |
+| A `url` contains credentials                               | Error before any work is done, naming the key: `CredentialsInUrlError`.                       |
+| A clone or checkout fails (auth, network, unknown ref)     | That row is `Failed`, the run continues, and the exit code is non-zero.                       |
+| `<output-dir>/<repo>` exists but isn't a clone of that URL | That row is `Failed` with "directory exists and is not a clone of …". Nothing is overwritten. |
 
 ## Alternatives considered
 
@@ -208,6 +214,14 @@ keeps `plugins.simply.dependencies.ignore` there.
 If a scratch-org test shows the server ignores unknown dependency keys, inline entries could be
 accepted as well, ahead of the map in the lookup order. That would be a backward-compatible
 addition.
+
+**A feature-keyed map, `plugins.simply.dependencies.repositories`.** This was the first version
+of this design: a map from package alias straight to repository, next to the existing
+`plugins.simply.dependencies.ignore`. In review it was changed to `plugins.simply.packages`,
+keyed by package with `repository` as one setting. A package-keyed map gives each package one
+place for everything simply knows about it, so a later per-package setting adds a key to an
+existing entry instead of a second map keyed by the same aliases. `ignore` stays where it is,
+because `dependencies manage` already reads it and it's a list, not per-package settings.
 
 **Discovering the repository with no configuration.** Package2 records carry no source URL, and
 neither do AppExchange listings in any reliable form. Guessing from naming conventions
@@ -248,7 +262,8 @@ for one mode of the same command.
 In `simply-plugins-core`:
 
 1. `packages/simply-package-core/src/schemas/sfdx-project/dependencyRepositories.ts`: a zod
-   `DependencyRepositorySchema` (`url`, optional `ref` and `path`), a map schema, and the URL
+   `DependencyRepositorySchema` (`url`, optional `ref` and `path`), `PackageConfigSchema` (an
+   entry, with an optional `repository`), `PackagesConfigSchema` (the map), and the URL
    credential check.
 2. `packages/simply-package-core/src/dependencyRepositoryResolver.ts`: the lookup order above, as a
    pure function over the parsed project. It reads the map with `simply-core`'s `getPluginConfig`.
@@ -264,7 +279,7 @@ In `simply-plugins`, after that is published:
 
 5. `packages/simply-package/src/commands/simply/package/dependencies/clone.ts` and
    `messages/simply.package.dependencies.clone.md`.
-6. Document `plugins.simply.dependencies.repositories` in the README's `plugins.simply` table, then
+6. Document `plugins.simply.packages` in the README's `plugins.simply` table, then
    run `pnpm run readme` and `pnpm run build` (for the command snapshot), and regenerate
    `packages/simply`'s README.
 7. Bump `@simplysf/simply-package-core` in `packages/simply-package/package.json` to the release
@@ -295,5 +310,5 @@ In `simply-plugins`, after that is published:
   can only supply it by parsing the `@x.y.z-b` alias text. This is deferred to a follow-up, and
   the literal `ref` stays the v1 contract.
 
-- **A `plugins.simply.dependencies.repositories` JSON Schema fragment** for editor completion. It
+- **A `plugins.simply.packages` JSON Schema fragment** for editor completion. It
   depends on whether we publish schemas at all.

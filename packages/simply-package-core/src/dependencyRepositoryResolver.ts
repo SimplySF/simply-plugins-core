@@ -16,7 +16,7 @@
 
 import type { DependencyRepositories, DependencyRepository } from './schemas/sfdx-project/dependencyRepositories.js';
 
-/** A dependency matched to its `plugins.simply.dependencies.repositories` entry. */
+/** A dependency matched to its `plugins.simply.packages` entry. */
 export type ResolvedDependencyRepository = {
   /** The map key that matched. */
   key: string;

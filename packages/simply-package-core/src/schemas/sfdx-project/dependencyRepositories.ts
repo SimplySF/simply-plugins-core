@@ -18,11 +18,11 @@ import { SfError } from '@salesforce/core';
 import { getPluginConfig, type SfdxProject } from '@simplysf/simply-core';
 import { z } from 'zod';
 
-/** Where `sfdx-project.json` keeps the dependency-to-repository map. */
-export const DEPENDENCY_REPOSITORIES_CONFIG_PATH = 'plugins.simply.dependencies.repositories';
+/** Where `sfdx-project.json` keeps per-package settings, keyed by package alias (or ID). */
+export const PACKAGES_CONFIG_PATH = 'plugins.simply.packages';
 
 /**
- * One entry in `plugins.simply.dependencies.repositories`: where a dependency's source lives.
+ * The `repository` of a `plugins.simply.packages` entry: where that package's source lives.
  * Unknown keys are kept, so a later version can add fields without older ones rejecting the file.
  */
 export const DependencyRepositorySchema = z
@@ -37,13 +37,25 @@ export const DependencyRepositorySchema = z
   })
   .catchall(z.unknown());
 
-/** `plugins.simply.dependencies.repositories`, keyed by package alias (or ID). */
-export const DependencyRepositoriesSchema = z.record(z.string(), DependencyRepositorySchema);
+/**
+ * One entry in `plugins.simply.packages`: settings for one package. `repository` is the only
+ * setting so far. Unknown keys are kept, so later settings can sit beside it.
+ */
+export const PackageConfigSchema = z
+  .object({ repository: DependencyRepositorySchema.optional() })
+  .catchall(z.unknown());
 
-/** One entry in `plugins.simply.dependencies.repositories`. */
+/** `plugins.simply.packages`, keyed by package alias (or ID). */
+export const PackagesConfigSchema = z.record(z.string(), PackageConfigSchema);
+
+/** The `repository` of a `plugins.simply.packages` entry. */
 export type DependencyRepository = z.infer<typeof DependencyRepositorySchema>;
-/** `plugins.simply.dependencies.repositories`, keyed by package alias (or ID). */
-export type DependencyRepositories = z.infer<typeof DependencyRepositoriesSchema>;
+/** One entry in `plugins.simply.packages`. */
+export type PackageConfig = z.infer<typeof PackageConfigSchema>;
+/** `plugins.simply.packages`, keyed by package alias (or ID). */
+export type PackagesConfig = z.infer<typeof PackagesConfigSchema>;
+/** The `repository` of every `plugins.simply.packages` entry that has one, keyed the same way. */
+export type DependencyRepositories = Record<string, DependencyRepository>;
 
 /**
  * Whether a git URL carries credentials that shouldn't be committed to `sfdx-project.json`.
@@ -69,34 +81,38 @@ export function hasCredentialsInUrl(url: string): boolean {
 }
 
 /**
- * Read and validate a project's `plugins.simply.dependencies.repositories` map.
+ * Read and validate a project's `plugins.simply.packages` map, and return the `repository` of
+ * each entry that has one.
  *
  * @param project - The parsed project manifest.
  * @param source - What to call the project in error messages, e.g. its file path.
- * @returns The map, or an empty object if the project doesn't have one.
+ * @returns The repositories by package key, or an empty object if the project maps none.
  * @throws {SfError} `InvalidRepositoryConfigError` if the map or an entry has the wrong shape, or
- * `CredentialsInUrlError` if an entry's `url` contains credentials. Both name the offending key.
+ * `CredentialsInUrlError` if a repository's `url` contains credentials. Both name the offending key.
  */
 export function readDependencyRepositories(project: SfdxProject, source = 'sfdx-project.json'): DependencyRepositories {
-  const raw = getPluginConfig<unknown>(project, DEPENDENCY_REPOSITORIES_CONFIG_PATH);
+  const raw = getPluginConfig<unknown>(project, PACKAGES_CONFIG_PATH);
   if (raw === undefined) return {};
 
-  const result = DependencyRepositoriesSchema.safeParse(raw);
+  const result = PackagesConfigSchema.safeParse(raw);
   if (!result.success) {
     const issues = result.error.issues
-      .map((issue) => `${[DEPENDENCY_REPOSITORIES_CONFIG_PATH, ...issue.path].join('.')}: ${issue.message}`)
+      .map((issue) => `${[PACKAGES_CONFIG_PATH, ...issue.path].join('.')}: ${issue.message}`)
       .join('\n');
     throw new SfError(`Invalid repository configuration in ${source}:\n${issues}`, 'InvalidRepositoryConfigError');
   }
 
-  for (const [key, repository] of Object.entries(result.data)) {
+  const repositories: DependencyRepositories = {};
+  for (const [key, { repository }] of Object.entries(result.data)) {
+    if (!repository) continue;
     if (hasCredentialsInUrl(repository.url)) {
       throw new SfError(
-        `The url for "${key}" in ${source} contains credentials. Remove them and let git supply them instead (an SSH key or a credential helper).`,
+        `The repository url for "${key}" in ${source} contains credentials. Remove them and let git supply them instead (an SSH key or a credential helper).`,
         'CredentialsInUrlError',
       );
     }
+    repositories[key] = repository;
   }
 
-  return result.data;
+  return repositories;
 }

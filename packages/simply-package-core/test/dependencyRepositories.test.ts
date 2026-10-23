@@ -19,11 +19,11 @@ import { describe, expect, it } from 'vitest';
 import { isIgnoredDependency, resolveDependencyRepository } from '../src/dependencyRepositoryResolver.js';
 import { hasCredentialsInUrl, readDependencyRepositories } from '../src/schemas/sfdx-project/dependencyRepositories.js';
 
-/** @returns A minimal project whose `plugins.simply.dependencies.repositories` is `repositories`. */
-function projectWith(repositories: unknown): SfdxProject {
+/** @returns A minimal project whose `plugins.simply.packages` is `packages`. */
+function projectWith(packages: unknown): SfdxProject {
   return {
     packageDirectories: [{ path: 'force-app', default: true }],
-    plugins: { simply: { dependencies: { repositories } } },
+    plugins: { simply: { packages } },
   };
 }
 
@@ -46,31 +46,40 @@ describe('readDependencyRepositories', () => {
     expect(readDependencyRepositories({ packageDirectories: [] })).toStrictEqual({});
   });
 
-  it('keeps unknown keys inside an entry, for forward compatibility', () => {
+  it('returns the repository of each entry that has one, keyed like the entry', () => {
     const repositories = readDependencyRepositories(
-      projectWith({ fflib: { url: 'https://github.com/org/fflib.git', ref: 'v3.0.0', future: true } }),
+      projectWith({ fflib: { repository: { url: 'https://github.com/org/fflib.git' } }, other: { future: true } }),
+    );
+    expect(repositories).toStrictEqual({ fflib: { url: 'https://github.com/org/fflib.git' } });
+  });
+
+  it('keeps unknown keys inside a repository, for forward compatibility', () => {
+    const repositories = readDependencyRepositories(
+      projectWith({ fflib: { repository: { url: 'https://github.com/org/fflib.git', ref: 'v3.0.0', future: true } } }),
     );
     expect(repositories.fflib).toStrictEqual({ url: 'https://github.com/org/fflib.git', ref: 'v3.0.0', future: true });
   });
 
-  it('rejects an entry without a url, naming the key', () => {
-    expect(() => readDependencyRepositories(projectWith({ fflib: { ref: 'main' } }))).toThrow(
+  it('rejects a repository without a url, naming the key', () => {
+    expect(() => readDependencyRepositories(projectWith({ fflib: { repository: { ref: 'main' } } }))).toThrow(
       expect.objectContaining({
         name: 'InvalidRepositoryConfigError',
-        message: expect.stringContaining('plugins.simply.dependencies.repositories.fflib.url') as string,
+        message: expect.stringContaining('plugins.simply.packages.fflib.repository.url') as string,
       }),
     );
   });
 
   it('rejects a non-string ref', () => {
-    expect(() => readDependencyRepositories(projectWith({ fflib: { url: 'x', ref: 3 } }))).toThrow(
+    expect(() => readDependencyRepositories(projectWith({ fflib: { repository: { url: 'x', ref: 3 } } }))).toThrow(
       expect.objectContaining({ name: 'InvalidRepositoryConfigError' }),
     );
   });
 
   it('rejects a url with credentials, naming the key', () => {
     expect(() =>
-      readDependencyRepositories(projectWith({ core: { url: 'https://oauth2:abc@gitlab.example.internal/core.git' } })),
+      readDependencyRepositories(
+        projectWith({ core: { repository: { url: 'https://oauth2:abc@gitlab.example.internal/core.git' } } }),
+      ),
     ).toThrow(
       expect.objectContaining({ name: 'CredentialsInUrlError', message: expect.stringContaining('"core"') as string }),
     );

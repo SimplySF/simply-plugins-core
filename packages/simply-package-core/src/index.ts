@@ -81,11 +81,14 @@ export {
   type ResolvedDependencyRepository,
 } from './dependencyRepositoryResolver.js';
 export {
-  DEPENDENCY_REPOSITORIES_CONFIG_PATH,
-  DependencyRepositoriesSchema,
   DependencyRepositorySchema,
+  PACKAGES_CONFIG_PATH,
+  PackageConfigSchema,
+  PackagesConfigSchema,
   hasCredentialsInUrl,
   readDependencyRepositories,
   type DependencyRepositories,
   type DependencyRepository,
+  type PackageConfig,
+  type PackagesConfig,
 } from './schemas/sfdx-project/dependencyRepositories.js';

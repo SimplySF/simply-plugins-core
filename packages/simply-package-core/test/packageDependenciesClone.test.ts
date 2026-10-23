@@ -46,6 +46,11 @@ function git(cwd: string, ...args: string[]): string {
 type Dependency = { package: string };
 type Repositories = Record<string, { url: string; ref?: string; path?: string }>;
 
+/** @returns `plugins.simply.packages` with each of `repositories` as an entry's `repository`. */
+function packagesFrom(repositories: Repositories): Record<string, { repository: Repositories[string] }> {
+  return Object.fromEntries(Object.entries(repositories).map(([key, repository]) => [key, { repository }]));
+}
+
 /** @returns An `sfdx-project.json` body for package `name` with these dependencies and map. */
 function projectJson(name: string, dependencies: Dependency[] = [], repositories?: Repositories): string {
   return JSON.stringify(
@@ -53,7 +58,7 @@ function projectJson(name: string, dependencies: Dependency[] = [], repositories
       packageDirectories: [
         { path: 'force-app', default: true, package: name, versionNumber: '1.0.0.NEXT', dependencies },
       ],
-      ...(repositories ? { plugins: { simply: { dependencies: { repositories } } } } : {}),
+      ...(repositories ? { plugins: { simply: { packages: packagesFrom(repositories) } } } : {}),
     },
     undefined,
     2,
@@ -194,7 +199,7 @@ describe('clonePackageDependencies', () => {
     const projectDir = rootProject(
       [{ package: 'SomeAppExchangePackage@5.2' }, { package: 'skip-me@1.0.0-1' }],
       {},
-      { plugins: { simply: { dependencies: { ignore: ['skip-me'], repositories: {} } } } },
+      { plugins: { simply: { dependencies: { ignore: ['skip-me'] } } } },
     );
 
     expect(statuses(await clone({ projectDir }))).toStrictEqual([
@@ -306,6 +311,13 @@ describe('normalizeRepositoryUrl', () => {
     expect(new Set(forms.map((url) => normalizeRepositoryUrl(url, '/')))).toStrictEqual(
       new Set(['github.com/org/repo']),
     );
+  });
+
+  it('trims many trailing slashes, and stays fast on slashes that are not trailing', () => {
+    expect(normalizeRepositoryUrl(`https://github.com/org/repo${'/'.repeat(50)}`, '/')).toBe('github.com/org/repo');
+    const started = performance.now();
+    normalizeRepositoryUrl(`https://github.com/org/${'/'.repeat(100_000)}x`, '/');
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   it('resolves a relative local path against the given directory', () => {

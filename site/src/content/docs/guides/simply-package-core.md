@@ -71,21 +71,23 @@ for (const result of results) {
 
 ## Cloning the source of a project's package dependencies
 
-The engine behind `sf simply package dependencies clone`. It needs no org: it reads
-`plugins.simply.dependencies.repositories` from `sfdx-project.json` and runs your own `git`, so
+The engine behind `sf simply package dependencies clone`. It needs no org: it reads each
+package's `repository` from `plugins.simply.packages` in `sfdx-project.json` and runs your own `git`, so
 any host works and your existing SSH keys or credential helper supply access.
 
 ```json
 {
   "plugins": {
     "simply": {
-      "dependencies": {
-        "repositories": {
-          "fflib-apex-common": {
+      "packages": {
+        "fflib-apex-common": {
+          "repository": {
             "url": "https://github.com/apex-enterprise-patterns/fflib-apex-common.git",
             "ref": "v3.0.0"
-          },
-          "my-core": { "url": "git@gitlab.example.internal:salesforce/my-core.git", "ref": "main" }
+          }
+        },
+        "my-core": {
+          "repository": { "url": "git@gitlab.example.internal:salesforce/my-core.git", "ref": "main" }
         }
       }
     }

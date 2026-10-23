@@ -29,13 +29,14 @@ import * as api from '../src/index.js';
 it('exports the expected set of runtime values', () => {
   expect(Object.keys(api).sort()).toStrictEqual([
     'BasePackageDirWithDependenciesSchema',
-    'DEPENDENCY_REPOSITORIES_CONFIG_PATH',
-    'DependencyRepositoriesSchema',
     'DependencyRepositorySchema',
+    'PACKAGES_CONFIG_PATH',
     'PACKAGE_PREFIX_PACKAGE2',
     'PACKAGE_PREFIX_PACKAGE2_VERSION',
     'PACKAGE_PREFIX_SUBSCRIBER_PACKAGE',
     'PACKAGE_PREFIX_SUBSCRIBER_PACKAGE_VERSION',
+    'PackageConfigSchema',
+    'PackagesConfigSchema',
     'buildProjectService',
     'buildVersionService',
     'clonePackageDependencies',

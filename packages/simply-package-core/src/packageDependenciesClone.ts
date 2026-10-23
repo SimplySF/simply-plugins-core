@@ -47,7 +47,7 @@ export type DependencyCloneStatus =
 export type DependencyCloneResult = {
   /** The dependency's `package` value as written in the declaring project. */
   package: string;
-  /** The `plugins.simply.dependencies.repositories` key that matched, if any. */
+  /** The `plugins.simply.packages` key that matched, if any. */
   key?: string;
   url?: string;
   ref?: string;
@@ -144,7 +144,13 @@ export const defaultGitRunner: GitRunner = (args, options) =>
  * @returns The comparison key.
  */
 export function normalizeRepositoryUrl(url: string, baseDir: string): string {
-  const trimSuffix = (value: string): string => value.replace(/\/+$/, '').replace(/\.git$/i, '');
+  // Trailing slashes are trimmed with a loop, not /\/+$/, which backtracks quadratically on a long
+  // run of slashes that isn't at the end (CodeQL js/polynomial-redos).
+  const trimSuffix = (value: string): string => {
+    let end = value.length;
+    while (end > 0 && value[end - 1] === '/') end--;
+    return value.slice(0, end).replace(/\.git$/i, '');
+  };
 
   const scp = /^(?:[^@/]+@)?([^/:]+):(?!\/\/)(.+)$/.exec(url);
   if (scp && !/^[a-z]:[\\/]/i.test(url)) {
@@ -209,8 +215,8 @@ type CloneRun = {
 };
 
 /**
- * Clone the source repositories of a project's package dependencies, as mapped in
- * `plugins.simply.dependencies.repositories`. See docs/design/0047-package-dependencies-clone.md.
+ * Clone the source repositories of a project's package dependencies, as given by each package's
+ * `repository` in `plugins.simply.packages`. See docs/design/0052-package-dependencies-clone.md.
  *
  * Repositories are deduplicated by URL. A repository reached at two refs is cloned once, at the
  * ref found first (nearest the root), with a warning. Two different repositories with the same
