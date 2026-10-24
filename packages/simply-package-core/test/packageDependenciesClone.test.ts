@@ -21,6 +21,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clonePackageDependencies,
+  defaultGitRunner,
   normalizeRepositoryUrl,
   type ClonePackageDependenciesOptions,
   type DependencyCloneResult,
@@ -34,6 +35,7 @@ let tmp: string;
 let sources: string;
 let workspace: string;
 let warnings: string[];
+let infos: string[];
 
 /** Run git synchronously for fixture setup, with an identity so commits work on any machine. */
 function git(cwd: string, ...args: string[]): string {
@@ -92,9 +94,30 @@ function rootProject(dependencies: Dependency[], repositories?: Repositories, ex
   return dir;
 }
 
-/** Clone with a warning collector attached. */
+/** Clone with warning and info collectors attached. */
 async function clone(options: Omit<ClonePackageDependenciesOptions, 'progress'>): Promise<DependencyCloneResult[]> {
-  return clonePackageDependencies({ ...options, progress: { warn: (message) => warnings.push(message) } });
+  return clonePackageDependencies({
+    ...options,
+    progress: { warn: (message) => warnings.push(message), info: (message) => infos.push(message) },
+  });
+}
+
+/**
+ * A runner that serves `https` URLs from local repositories, so a URL from a dependency's project
+ * file, which must be https or ssh, can be cloned without a network. It records each command as
+ * the engine sent it, then drops the protocol settings that would refuse the local path.
+ */
+function servingGit(served: Record<string, string>, calls: string[][]): GitRunner {
+  return (args, options) => {
+    calls.push(args);
+    const local = args.filter(
+      (arg, i) => !arg.startsWith('protocol.') && !(arg === '-c' && args[i + 1]?.startsWith('protocol.')),
+    );
+    return defaultGitRunner(
+      local.map((arg) => served[arg] ?? arg),
+      options,
+    );
+  };
 }
 
 /** @returns `[package, status]` pairs, the shape most assertions care about. */
@@ -108,6 +131,7 @@ beforeEach(() => {
   workspace = path.join(tmp, 'workspace');
   fs.mkdirSync(workspace, { recursive: true });
   warnings = [];
+  infos = [];
 });
 
 afterEach(() => {
@@ -128,32 +152,84 @@ describe('clonePackageDependencies', () => {
     expect(fs.existsSync(path.join(workspace, 'leaf'))).toBe(false);
   });
 
-  it('follows dependencies of dependencies with recursive', async () => {
+  it("follows dependencies of dependencies with recursive, allowing only https and ssh for a dependency's URLs", async () => {
+    const leafUrl = 'https://git.example.com/org/leaf.git';
     const leaf = sourceRepo('org/leaf');
-    const core = sourceRepo('org/core', projectJson('core', [{ package: 'leaf' }], { leaf: { url: leaf } }));
+    const core = sourceRepo('org/core', projectJson('core', [{ package: 'leaf' }], { leaf: { url: leafUrl } }));
     const projectDir = rootProject([{ package: 'core' }], { core: { url: core } });
+    const calls: string[][] = [];
 
-    const results = await clone({ projectDir, recursive: true });
+    const results = await clone({ projectDir, recursive: true, git: servingGit({ [leafUrl]: leaf }, calls) });
 
     expect(results.map((row) => [row.package, row.status, row.via])).toStrictEqual([
       ['core', 'Cloned', 'my-app'],
       ['leaf', 'Cloned', 'core'],
     ]);
     expect(fs.existsSync(path.join(workspace, 'leaf', 'README.md'))).toBe(true);
+    expect(calls.find((args) => args.includes(leafUrl))?.slice(0, 7)).toStrictEqual([
+      '-c',
+      'protocol.allow=never',
+      '-c',
+      'protocol.https.allow=always',
+      '-c',
+      'protocol.ssh.allow=always',
+      'clone',
+    ]);
+    expect(calls.find((args) => args.includes(core))).not.toContain('protocol.allow=never');
+    expect(infos).toContainEqual(expect.stringMatching(/^leaf's repository comes from core's sfdx-project\.json/));
   });
 
-  it("uses the root's map for a dependency's dependencies that it doesn't map itself", async () => {
+  it("uses the root's map for a dependency's dependencies, ahead of the dependency's own", async () => {
     const leaf = sourceRepo('org/leaf');
-    const core = sourceRepo('org/core', projectJson('core', [{ package: 'leaf' }]));
+    const core = sourceRepo(
+      'org/core',
+      projectJson('core', [{ package: 'leaf' }], { leaf: { url: 'https://git.example.com/other/leaf.git' } }),
+    );
     const projectDir = rootProject([{ package: 'core' }], { core: { url: core }, leaf: { url: leaf } });
 
-    expect(statuses(await clone({ projectDir, recursive: true }))).toStrictEqual([
+    const results = await clone({ projectDir, recursive: true });
+
+    expect(statuses(results)).toStrictEqual([
       ['core', 'Cloned'],
       ['leaf', 'Cloned'],
     ]);
+    expect(results[1].url).toBe(leaf);
+    expect(infos.some((message) => message.includes('comes from'))).toBe(false);
   });
 
-  it('checks out a tag, and keeps the ref nearest the root when two refs conflict', async () => {
+  it("fails a dependency's URL that isn't https or ssh, naming where it came from", async () => {
+    const leaf = sourceRepo('org/leaf');
+    const core = sourceRepo('org/core', projectJson('core', [{ package: 'leaf' }], { leaf: { url: leaf } }));
+    const projectDir = rootProject([{ package: 'core' }], { core: { url: core } });
+
+    const results = await clone({ projectDir, recursive: true });
+
+    expect(statuses(results)).toStrictEqual([
+      ['core', 'Cloned'],
+      ['leaf', 'Failed'],
+    ]);
+    expect(results[1].message).toMatch(/^core's sfdx-project\.json gives a URL that isn't https or ssh/);
+    expect(fs.existsSync(path.join(workspace, 'leaf'))).toBe(false);
+  });
+
+  it('notes the clones left on a branch, but not those at a tag', async () => {
+    const core = sourceRepo('org/core');
+    const fflib = sourceRepo('org/fflib', undefined, ['v3.0.0']);
+    const projectDir = rootProject([{ package: 'core' }, { package: 'fflib' }], {
+      core: { url: core },
+      fflib: { url: fflib, ref: 'v3.0.0' },
+    });
+
+    await clone({ projectDir });
+
+    expect(infos).toStrictEqual([
+      'core (main) is on a branch, so a later --update brings in newer commits. To stay on one version, set "ref" to a tag.',
+    ]);
+    expect(warnings).toStrictEqual([]);
+  });
+
+  it('checks out a tag, and keeps the ref found first when two refs conflict', async () => {
+    const sharedUrl = 'https://git.example.com/org/shared.git';
     const shared = sourceRepo('org/shared', undefined, ['v1']);
     fs.writeFileSync(path.join(shared, 'v2.txt'), 'v2');
     git(shared, 'add', '.');
@@ -161,21 +237,26 @@ describe('clonePackageDependencies', () => {
     git(shared, 'tag', 'v2');
     const core = sourceRepo(
       'org/core',
-      projectJson('core', [{ package: 'shared' }], { shared: { url: `${shared}/`, ref: 'v2' } }),
+      projectJson('core', [{ package: 'shared' }], { shared: { url: sharedUrl, ref: 'v1' } }),
     );
-    const projectDir = rootProject([{ package: 'core' }, { package: 'shared' }], {
+    const other = sourceRepo(
+      'org/other',
+      projectJson('other', [{ package: 'shared' }], { shared: { url: `${sharedUrl}/`, ref: 'v2' } }),
+    );
+    const projectDir = rootProject([{ package: 'core' }, { package: 'other' }], {
       core: { url: core },
-      shared: { url: shared, ref: 'v1' },
+      other: { url: other },
     });
 
-    const results = await clone({ projectDir, recursive: true });
+    const results = await clone({ projectDir, recursive: true, git: servingGit({ [sharedUrl]: shared }, []) });
 
     expect(statuses(results)).toStrictEqual([
       ['core', 'Cloned'],
+      ['other', 'Cloned'],
       ['shared', 'Cloned'],
     ]);
     expect(fs.existsSync(path.join(workspace, 'shared', 'v2.txt'))).toBe(false);
-    expect(warnings).toStrictEqual([expect.stringMatching(/shared is wanted at v2 by core.*Keeping v1/)]);
+    expect(warnings).toStrictEqual([expect.stringMatching(/shared is wanted at v2 by other.*Keeping v1/)]);
   });
 
   it('puts a second repository with the same name in a group-prefixed folder', async () => {
@@ -296,6 +377,33 @@ describe('clonePackageDependencies', () => {
       ['gone', 'Failed'],
       ['good', 'Cloned'],
     ]);
+  });
+});
+
+describe('defaultGitRunner', () => {
+  let originalGlobalConfig: string | undefined;
+
+  beforeEach(() => {
+    originalGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
+  });
+
+  afterEach(() => {
+    if (originalGlobalConfig === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = originalGlobalConfig;
+  });
+
+  it("keeps submodules and the ext transport off, whatever the user's git config says", async () => {
+    const globalConfig = path.join(tmp, 'gitconfig');
+    fs.writeFileSync(
+      globalConfig,
+      '[submodule]\n\trecurse = true\n[fetch]\n\trecurseSubmodules = true\n[protocol "ext"]\n\tallow = always\n',
+    );
+    process.env.GIT_CONFIG_GLOBAL = globalConfig;
+
+    const read = (name: string): Promise<string> => defaultGitRunner(['config', '--get', name], { cwd: tmp });
+    expect(await read('submodule.recurse')).toBe('false');
+    expect(await read('fetch.recurseSubmodules')).toBe('false');
+    expect(await read('protocol.ext.allow')).toBe('never');
   });
 });
 

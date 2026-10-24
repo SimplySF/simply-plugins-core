@@ -78,11 +78,11 @@ packaging library forwards unknown dependency keys to the server.
 }
 ```
 
-| `repository` field | Type     | Required | Meaning                                                                                                                                                                                                                                                                   |
-| ------------------ | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`              | `string` | yes      | Anything `git clone` accepts: `https://…`, `ssh://…`, `git@host:group/repo.git`, or a local path. The host doesn't matter.                                                                                                                                                |
-| `ref`              | `string` | no       | Branch, tag, or commit SHA to check out. If it's omitted, the clone uses the remote's default branch.                                                                                                                                                                     |
-| `path`             | `string` | no       | Subdirectory of the repository where its `sfdx-project.json` lives, for monorepos that hold several packages. The default is the repository root. The clone still contains the whole repository. `path` only tells `--recursive` where to look for the next project file. |
+| `repository` field | Type     | Required | Meaning                                                                                                                                                                                                                                                                                                      |
+| ------------------ | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `url`              | `string` | yes      | Anything `git clone` accepts: `https://…`, `ssh://…`, `git@host:group/repo.git`, or a local path. The host doesn't matter.                                                                                                                                                                                   |
+| `ref`              | `string` | no       | Branch, tag, or commit SHA to check out. If it's omitted, the clone uses the remote's default branch. It must be a valid git ref name, and can't start with `-`.                                                                                                                                             |
+| `path`             | `string` | no       | Subdirectory of the repository where its `sfdx-project.json` lives, for monorepos that hold several packages. The default is the repository root. The clone still contains the whole repository. `path` only tells `--recursive` where to look for the next project file. It must be relative, with no `..`. |
 
 An entry is keyed by package, not by feature, so settings for one package stay together. Only
 `repository` exists today. Other keys in an entry are kept and ignored, so later settings can sit
@@ -94,11 +94,48 @@ that `git` already has: SSH keys, a credential helper, `gh auth`/`glab auth`, or
 proxy. A `url` that contains userinfo (`https://user:token@…`) is rejected with an error, so that
 nobody commits a token to the file by mistake.
 
-With `--recursive`, URLs come from other people's project files, so every git command is run the
-same guarded way: without a shell, with `--` before the URL so it can't be read as an option,
-with git's `ext::` transport (which runs arbitrary commands) disabled, and with
-`GIT_TERMINAL_PROMPT=0` so a missing credential fails that row at once instead of waiting for
-input nobody can see. Folder names taken from URLs are reduced to safe characters.
+### Security
+
+Cloning is for review, not installation. Unlike `npm install`, which runs each package's install
+scripts, this command runs nothing from a dependency's repository. git doesn't clone a
+repository's hooks or config, submodules aren't fetched, and the cloned `sfdx-project.json` is
+only parsed as JSON. The risk starts when someone acts on a clone: opens it in an editor and trusts
+the workspace, runs `npm install` or its scripts, or deploys its metadata to an org. The command's
+help says so.
+
+Every git command runs the same guarded way:
+
+- Without a shell, with `--` before the URL, and with `GIT_TERMINAL_PROMPT=0`, so a missing
+  credential fails that row at once instead of waiting for input nobody can see.
+- With `protocol.ext.allow=never`, because `ext::` URLs run arbitrary commands.
+- With `submodule.recurse=false` and `fetch.recurseSubmodules=false`. These override the
+  developer's own git config, which could otherwise turn submodules on for the `checkout`,
+  `fetch`, and `merge` that `--update` runs. Most of git's own clone-time vulnerabilities, such as
+  CVE-2024-32002, go through submodules.
+
+The config is checked before it's used. A `ref` must be a valid git ref name that doesn't start
+with `-`, so it can't be read as an option. A `path` must be relative and stay inside the
+repository. A `url` can't carry credentials (above). Folder names taken from URLs are reduced to
+safe characters.
+
+**Whose URLs are used.** A Salesforce package build needs the project to list its whole dependency
+hierarchy, so the root project's `dependencies` already name every transitive package, and the
+root's map can give each of them a repository. The root's entry is therefore always used first. A
+dependency's own project file supplies a URL only for a package the root doesn't map. That URL is
+someone else's input, so:
+
+- Only `https://`, `ssh://`, and scp-like `git@host:path` URLs are followed from it. A local path,
+  `file://`, `http://`, or `git://` URL makes that row `Failed`, naming the project file it came
+  from. git also runs that repository's commands with only the `https` and `ssh` protocols
+  allowed, which covers redirects.
+- The run prints a line naming the package and the project file the URL came from, and suggests
+  adding the package to the root's map to choose its repository there.
+
+**Branches move.** Leaving `ref` out (the remote's default branch) or naming a branch is the usual
+case, and it's fine for review, but a later `--update` brings in whatever is newest. After a run,
+one informational line lists the clones that are on a branch and says that a tag as `ref` keeps
+them on one version. It's a note, not a warning, because following the default branch is expected.
+A tag is the normal way to pin. A commit SHA works too, but nothing asks for one.
 
 ### Matching a dependency to an entry
 
@@ -149,8 +186,8 @@ apply then, because two package directories in one project can depend on the sam
 - With `--recursive`, the command walks breadth-first from the root project. Each clone's
   `<clone>/<path>/sfdx-project.json` is read for its own `dependencies` and `plugins.simply.packages` map.
   When a clone has no project file, it's a leaf, and an unreadable or invalid one is a warning,
-  not an error. A dependency's own map comes first, then the root project's map, so the root can
-  supply URLs for transitive dependencies whose projects don't map them.
+  not an error. The root project's map comes first, and a dependency's own map fills in for
+  packages the root doesn't map (see [Security](#security)).
 - **A repository is deduplicated by normalized URL** (lowercased host, with `.git` and any
   trailing `/` removed, and `git@host:x` treated the same as `ssh://git@host/x`). A diamond
   dependency is cloned once.
@@ -181,13 +218,15 @@ The possible statuses are `Cloned`, `Updated`, `Already cloned`, `Dirty, skipped
 
 ### Errors
 
-| Condition                                                  | Result                                                                                        |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `git` isn't on `PATH`                                      | Error before any work is done: `GitNotFoundError`.                                            |
-| A `repository` is missing `url`, or has a non-string field | Error before any work is done, naming the key: `InvalidRepositoryConfigError`.                |
-| A `url` contains credentials                               | Error before any work is done, naming the key: `CredentialsInUrlError`.                       |
-| A clone or checkout fails (auth, network, unknown ref)     | That row is `Failed`, the run continues, and the exit code is non-zero.                       |
-| `<output-dir>/<repo>` exists but isn't a clone of that URL | That row is `Failed` with "directory exists and is not a clone of …". Nothing is overwritten. |
+| Condition                                                   | Result                                                                                                   |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `git` isn't on `PATH`                                       | Error before any work is done: `GitNotFoundError`.                                                       |
+| A `repository` is missing `url`, or has a non-string field  | Error before any work is done, naming the key: `InvalidRepositoryConfigError`.                           |
+| A `ref` isn't a valid ref name, or a `path` leaves the repo | The same `InvalidRepositoryConfigError`, or for a dependency's file, a warning and no recursion into it. |
+| A dependency's file gives a URL that isn't `https` or `ssh` | That row is `Failed`, naming the file, and the run continues.                                            |
+| A `url` contains credentials                                | Error before any work is done, naming the key: `CredentialsInUrlError`.                                  |
+| A clone or checkout fails (auth, network, unknown ref)      | That row is `Failed`, the run continues, and the exit code is non-zero.                                  |
+| `<output-dir>/<repo>` exists but isn't a clone of that URL  | That row is `Failed` with "directory exists and is not a clone of …". Nothing is overwritten.            |
 
 ## Alternatives considered
 
@@ -222,6 +261,16 @@ keyed by package with `repository` as one setting. A package-keyed map gives eac
 place for everything simply knows about it, so a later per-package setting adds a key to an
 existing entry instead of a second map keyed by the same aliases. `ignore` stays where it is,
 because `dependencies manage` already reads it and it's a list, not per-package settings.
+
+**A host allow-list for URLs from dependencies' files** (for example
+`plugins.simply.dependencies.allowedHosts`). Because the root project already lists every
+transitive dependency, it can map every one of them itself, which is a stronger control than a
+host list. Limiting those URLs to `https` and `ssh` and naming where each came from covers the rest
+without more configuration. A host list can still be added later without breaking anything.
+
+**Requiring a commit SHA, like a lockfile's integrity hash.** Tags and the default branch are
+how Salesforce teams refer to versions, and a review copy doesn't need byte-for-byte
+reproducibility. So the command notes branches, and doesn't push anyone toward SHAs.
 
 **Discovering the repository with no configuration.** Package2 records carry no source URL, and
 neither do AppExchange listings in any reliable form. Guessing from naming conventions
@@ -295,6 +344,11 @@ In `simply-plugins`, after that is published:
   dirty tree, a directory that's a clone of a different URL, a failed clone continuing the run,
   URL normalization for deduplication, a ref conflict where the nearest ref wins, a folder-name collision
   producing the group-prefixed name, `--update` on another branch being skipped, reuse of an existing sibling checkout, recursion off by default, a cycle, and a shallow clone with a SHA ref falling back to a full clone.
+- **Security tests:** the root's entry winning over a dependency's, a local or `http` URL from a
+  dependency's file failing its row, an `https` URL from one being cloned with only `https` and
+  `ssh` allowed and its source named, the submodule settings on every git command, a ref starting
+  with `-` and a `path` with `..` being rejected, and the branch note listing only clones on a
+  branch.
 - **Integration test against real `git`:** build three throwaway bare repositories on disk (A
   depends on B, B depends on C, and A depends on C at a different tag), point their `url`s at local
   paths, and assert the directory layout, the checked-out refs, and the warning. No network is

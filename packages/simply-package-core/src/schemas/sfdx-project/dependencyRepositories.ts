@@ -22,16 +22,45 @@ import { z } from 'zod';
 export const PACKAGES_CONFIG_PATH = 'plugins.simply.packages';
 
 /**
+ * Whether `ref` is a ref name git would accept, per `git check-ref-format`, and doesn't start with
+ * `-`. A ref from a dependency's project file is third-party input that ends up in git's
+ * arguments, so a leading `-` must never be read as an option.
+ */
+function isSafeRef(ref: string): boolean {
+  return (
+    !ref.startsWith('-') &&
+    // eslint-disable-next-line no-control-regex -- control characters are exactly what's being refused
+    !/[\x00-\x20\x7f~^:?*[\\]/.test(ref) &&
+    !ref.includes('..') &&
+    !ref.includes('@{') &&
+    !ref.includes('//') &&
+    !/^\/|[/.]$|\.lock$|(^|\/)\./.test(ref) &&
+    ref !== '@'
+  );
+}
+
+/** Whether `value` is a relative path that stays inside the repository: not absolute, and no `..` segment. */
+function isInsideRepository(value: string): boolean {
+  return !/^([\\/]|[a-z]:)/i.test(value) && !value.split(/[\\/]/).includes('..');
+}
+
+/**
  * The `repository` of a `plugins.simply.packages` entry: where that package's source lives.
  * Unknown keys are kept, so a later version can add fields without older ones rejecting the file.
  */
 export const DependencyRepositorySchema = z
   .object({
     url: z.string().min(1).describe('Anything `git clone` accepts. Never include credentials.'),
-    ref: z.string().min(1).optional().describe("Branch, tag, or commit SHA. Default: the remote's default branch."),
+    ref: z
+      .string()
+      .min(1)
+      .refine(isSafeRef, 'must be a branch, tag, or commit SHA that git accepts, and not start with "-"')
+      .optional()
+      .describe("Branch, tag, or commit SHA. Default: the remote's default branch."),
     path: z
       .string()
       .min(1)
+      .refine(isInsideRepository, 'must be a relative path inside the repository, with no ".."')
       .optional()
       .describe("Subdirectory holding the repository's sfdx-project.json. Default: the repository root."),
   })

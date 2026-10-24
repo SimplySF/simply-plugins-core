@@ -98,6 +98,8 @@ type QueuedProject = {
   dir: string;
   project: SfdxProject;
   repositories: DependencyRepositories;
+  /** The key of the dependency this project was cloned for. `undefined` for the root project. */
+  key?: string;
 };
 
 /** A repository already handled in this run, by normalized URL. */
@@ -107,11 +109,33 @@ type VisitedRepository = { ref?: string; via: string; directory: string };
 const SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
 
 /**
- * Settings applied to every git command. `ext::` URLs run arbitrary commands, and with
- * `--recursive` the URLs come from other people's project files, so that transport is refused
- * outright rather than left to the user's git config.
+ * Settings applied to every git command, overriding the user's git config. `ext::` URLs run
+ * arbitrary commands, and with `--recursive` the URLs come from other people's project files, so
+ * that transport is refused outright. Submodules stay off even where the user's config turns them
+ * on for `checkout`, `fetch`, and `merge`, because most of git's clone-time vulnerabilities go
+ * through them.
  */
-const GIT_SAFETY_ARGS = ['-c', 'protocol.ext.allow=never'];
+const GIT_SAFETY_ARGS = [
+  '-c',
+  'protocol.ext.allow=never',
+  '-c',
+  'submodule.recurse=false',
+  '-c',
+  'fetch.recurseSubmodules=false',
+];
+
+/**
+ * Settings added for a repository whose URL came from a dependency's project file rather than the
+ * root's: only `https` and `ssh`, which also holds for any redirect.
+ */
+const THIRD_PARTY_GIT_ARGS = [
+  '-c',
+  'protocol.allow=never',
+  '-c',
+  'protocol.https.allow=always',
+  '-c',
+  'protocol.ssh.allow=always',
+];
 
 /**
  * The default {@link GitRunner}: `git` on `PATH`, run without a shell. `GIT_TERMINAL_PROMPT=0`
@@ -166,6 +190,22 @@ export function normalizeRepositoryUrl(url: string, baseDir: string): string {
   }
 }
 
+/**
+ * Whether `url` uses a network transport that's safe to take from someone else's project file:
+ * `https://`, `ssh://`, or scp-like `git@host:path`. Local paths, `file://`, plain `http://`,
+ * `git://`, and `<transport>::<address>` forms are not.
+ */
+function isNetworkUrl(url: string): boolean {
+  if (/^[a-z][a-z0-9+.-]*::/i.test(url)) return false;
+  if (/^(?:[^@/]+@)?[^/:]+:(?!\/\/)/.test(url) && !/^[a-z]:[\\/]/i.test(url)) return true;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'https:' || protocol === 'ssh:';
+  } catch {
+    return false;
+  }
+}
+
 /** @returns `value` reduced to characters that are safe in a folder name, or `''` if nothing is left. */
 function safeSegment(value: string): string {
   const cleaned = value.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^[.-]+/, '');
@@ -211,6 +251,8 @@ type CloneRun = {
   usedFolders: Set<string>;
   /** Packages already given a `No repository` or `Ignored` row. */
   reportedPackages: Set<string>;
+  /** `<key> (<branch>)` for each repository this run cloned or updated that ended up on a branch. */
+  onBranch: string[];
   queue: QueuedProject[];
 };
 
@@ -257,6 +299,7 @@ export async function clonePackageDependencies(
     visited: new Map(),
     usedFolders: new Set(),
     reportedPackages: new Set(),
+    onBranch: [],
     queue: [{ dir: options.projectDir, project: rootProject, repositories: rootRepositories }],
   };
 
@@ -266,7 +309,20 @@ export async function clonePackageDependencies(
       await visitDependency(run, current, dependency.packageRef, dependency.via);
     }
   }
+
+  if (run.onBranch.length > 0) {
+    run.progress.info?.(
+      `${listOf(run.onBranch)} ${run.onBranch.length === 1 ? 'is' : 'are'} on a branch, so a later --update ` +
+        'brings in newer commits. To stay on one version, set "ref" to a tag.',
+    );
+  }
   return run.results;
+}
+
+/** @returns `a`, `a and b`, or `a, b, and c`. */
+function listOf(items: string[]): string {
+  if (items.length <= 2) return items.join(' and ');
+  return `${items.slice(0, -1).join(', ')}, and ${items.at(-1)!}`;
 }
 
 /** Handle one declared dependency: report it, or clone and (with `recursive`) queue its project. */
@@ -284,7 +340,7 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
     return;
   }
 
-  const { key, repository } = resolved;
+  const { key, repository, from } = resolved;
   const normalizedUrl = normalizeRepositoryUrl(repository.url, current.dir);
   const previous = run.visited.get(normalizedUrl);
   if (previous) {
@@ -306,6 +362,9 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
   };
   run.results.push(row);
 
+  const git = gitFor(run, row, from);
+  if (!git) return;
+
   run.progress.stepStart?.(`${key}: ${repository.url}${repository.ref ? ` @ ${repository.ref}` : ''}`);
   try {
     Object.assign(
@@ -316,8 +375,10 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
         normalizedUrl,
         ref: repository.ref,
         key,
+        git,
       }),
     );
+    await noteBranch(run, row, git);
   } catch (error) {
     row.status = 'Failed';
     row.message = (error as Error).message;
@@ -331,17 +392,50 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
 }
 
 /**
- * @returns The repository entry for a dependency. The declaring project's own map comes first; the
- * root's map fills in for dependencies that don't map their own dependencies.
+ * Choose the git runner for a row's repository. A URL from a dependency's project file (`from`)
+ * must be https or ssh, is named in a progress line, and gets {@link THIRD_PARTY_GIT_ARGS}.
+ *
+ * @returns The runner, or `undefined` after recording why the row failed.
+ */
+function gitFor(run: CloneRun, row: DependencyCloneResult, from: string | undefined): GitRunner | undefined {
+  if (from === undefined) return run.git;
+  const { key, url } = row;
+  if (!isNetworkUrl(url!)) {
+    row.message =
+      `${from}'s sfdx-project.json gives a URL that isn't https or ssh, which is only accepted from your ` +
+      `own project file. Map ${key!} under plugins.simply.packages to clone it.`;
+    return undefined;
+  }
+  run.progress.info?.(
+    `${key!}'s repository comes from ${from}'s sfdx-project.json. Map ${key!} under plugins.simply.packages ` +
+      'to choose it yourself.',
+  );
+  return (args, options) => run.git([...THIRD_PARTY_GIT_ARGS, ...args], options);
+}
+
+/** Remember a repository this run cloned or updated if it's now on a branch, for the closing note. */
+async function noteBranch(run: CloneRun, row: DependencyCloneResult, git: GitRunner): Promise<void> {
+  if (row.status !== 'Cloned' && row.status !== 'Updated') return;
+  const branch = await git(['symbolic-ref', '--quiet', '--short', 'HEAD'], { cwd: row.directory }).catch(() => '');
+  if (branch !== '') run.onBranch.push(`${row.key!} (${branch})`);
+}
+
+/**
+ * @returns The repository entry for a dependency, with `from` naming the dependency whose project
+ * file supplied it when that isn't the root's. A package build needs the root project to list its
+ * whole dependency hierarchy, so the root's map can cover every package and always comes first; a
+ * dependency's own map only fills in for packages the root doesn't map.
  */
 function resolveFor(
   run: CloneRun,
   current: QueuedProject,
   packageRef: string,
-): ResolvedDependencyRepository | undefined {
+): (ResolvedDependencyRepository & { from?: string }) | undefined {
+  const rootAliases = current.project === run.rootProject ? (run.rootProject.packageAliases ?? {}) : {};
+  const fromRoot = resolveDependencyRepository(packageRef, run.rootRepositories, rootAliases);
+  if (fromRoot || current.key === undefined) return fromRoot;
   const own = resolveDependencyRepository(packageRef, current.repositories, current.project.packageAliases ?? {});
-  if (own || current.project === run.rootProject) return own;
-  return resolveDependencyRepository(packageRef, run.rootRepositories);
+  return own && { ...own, from: current.key };
 }
 
 /** Warn when a repository already chosen at one ref is wanted at another. The first ref stays. */
@@ -400,6 +494,8 @@ type SyncRequest = {
   normalizedUrl: string;
   ref?: string;
   key: string;
+  /** The runner for this repository, with {@link THIRD_PARTY_GIT_ARGS} when its URL isn't the root's. */
+  git: GitRunner;
 };
 
 /**
@@ -425,7 +521,7 @@ async function syncRepository(
 
   let remote: string;
   try {
-    remote = await run.git(['remote', 'get-url', 'origin'], { cwd: directory });
+    remote = await request.git(['remote', 'get-url', 'origin'], { cwd: directory });
   } catch {
     return { status: 'Failed', message: `${directory} exists and is not a clone of ${cloneUrl}` };
   }
@@ -433,11 +529,11 @@ async function syncRepository(
     return { status: 'Failed', message: `${directory} exists and is a clone of ${remote}, not ${cloneUrl}` };
   }
 
-  return update ? updateClone(run, request) : { status: 'Already cloned' };
+  return update ? updateClone(request) : { status: 'Already cloned' };
 }
 
 /** `git clone` one repository at its ref. A commit SHA can't be cloned shallowly, so it gets full history. */
-async function cloneRepository(run: CloneRun, { directory, cloneUrl, ref, key }: SyncRequest): Promise<void> {
+async function cloneRepository(run: CloneRun, { directory, cloneUrl, ref, key, git }: SyncRequest): Promise<void> {
   const isSha = ref !== undefined && SHA_PATTERN.test(ref);
   const args = ['clone'];
   if (run.options.depth !== undefined) {
@@ -450,8 +546,8 @@ async function cloneRepository(run: CloneRun, { directory, cloneUrl, ref, key }:
   if (ref && !isSha) args.push('--branch', ref);
   args.push('--', cloneUrl, directory);
 
-  await run.git(args);
-  if (isSha) await run.git(['checkout', '--detach', ref], { cwd: directory });
+  await git(args);
+  if (isSha) await git(['checkout', '--detach', ref], { cwd: directory });
 }
 
 /**
@@ -459,11 +555,11 @@ async function cloneRepository(run: CloneRun, { directory, cloneUrl, ref, key }:
  * ref out when HEAD is detached. A clone on some other branch may be the developer's own working
  * copy, so it's left alone.
  */
-async function updateClone(
-  run: CloneRun,
-  { directory, ref }: SyncRequest,
-): Promise<Pick<DependencyCloneResult, 'status' | 'message'>> {
-  const git = run.git;
+async function updateClone({
+  directory,
+  ref,
+  git,
+}: SyncRequest): Promise<Pick<DependencyCloneResult, 'status' | 'message'>> {
   if ((await git(['status', '--porcelain'], { cwd: directory })) !== '') {
     return { status: 'Dirty, skipped', message: 'uncommitted changes' };
   }
@@ -506,7 +602,7 @@ async function readNestedProject(
 ): Promise<QueuedProject | undefined> {
   try {
     const project = await readSfdxProject(dir);
-    return { dir, project, repositories: readDependencyRepositories(project, `${key}'s sfdx-project.json`) };
+    return { dir, project, key, repositories: readDependencyRepositories(project, `${key}'s sfdx-project.json`) };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     progress.warn?.(`Not following ${key}'s dependencies: ${(error as Error).message}`);

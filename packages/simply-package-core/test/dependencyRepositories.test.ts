@@ -75,6 +75,36 @@ describe('readDependencyRepositories', () => {
     );
   });
 
+  it('accepts the branch, tag, and SHA refs people write', () => {
+    for (const ref of ['main', 'release/2026.10', 'v3.0.0', 'v1.2.0-beta.1', '1a2b3c4d']) {
+      expect(readDependencyRepositories(projectWith({ fflib: { repository: { url: 'x', ref } } })).fflib.ref).toBe(ref);
+    }
+  });
+
+  it('rejects a ref that could be read as an option, or that git would refuse', () => {
+    for (const ref of ['--upload-pack=touch /tmp/x', '-f', 'a..b', 'has space', 'x^', 'x.lock', 'x/', '.hidden', '@']) {
+      expect(() => readDependencyRepositories(projectWith({ fflib: { repository: { url: 'x', ref } } })), ref).toThrow(
+        expect.objectContaining({
+          name: 'InvalidRepositoryConfigError',
+          message: expect.stringContaining('plugins.simply.packages.fflib.repository.ref') as string,
+        }),
+      );
+    }
+  });
+
+  it('rejects a path that leaves the repository', () => {
+    for (const subdirectory of ['../elsewhere', 'a/../../b', '/etc', 'C:\\Users', '..']) {
+      expect(
+        () => readDependencyRepositories(projectWith({ fflib: { repository: { url: 'x', path: subdirectory } } })),
+        subdirectory,
+      ).toThrow(expect.objectContaining({ name: 'InvalidRepositoryConfigError' }));
+    }
+    expect(
+      readDependencyRepositories(projectWith({ fflib: { repository: { url: 'x', path: 'sfdx-source/core' } } })).fflib
+        .path,
+    ).toBe('sfdx-source/core');
+  });
+
   it('rejects a url with credentials, naming the key', () => {
     expect(() =>
       readDependencyRepositories(
