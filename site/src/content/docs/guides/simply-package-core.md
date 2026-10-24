@@ -68,3 +68,48 @@ for (const result of results) {
   console.log(`${result.PackageName}: ${result.Status}`);
 }
 ```
+
+## Cloning the source of a project's package dependencies
+
+The engine behind `sf simply package dependencies clone`. It needs no org: it reads each
+package's `repository` from `plugins.simply.packages` in `sfdx-project.json` and runs your own `git`, so
+any host works and your existing SSH keys or credential helper supply access.
+
+```json
+{
+  "plugins": {
+    "simply": {
+      "packages": {
+        "fflib-apex-common": {
+          "repository": {
+            "url": "https://github.com/apex-enterprise-patterns/fflib-apex-common.git",
+            "ref": "v3.0.0"
+          }
+        },
+        "my-core": {
+          "repository": { "url": "git@gitlab.example.internal:salesforce/my-core.git", "ref": "main" }
+        }
+      }
+    }
+  }
+}
+```
+
+A key matches a dependency's `package` value exactly, or up to its first `@`, so `fflib-apex-common`
+keeps matching as `dependencies manage` moves the dependency from one version alias to the next.
+
+```ts
+import { clonePackageDependencies } from '@simplysf/simply-package-core';
+
+const rows = await clonePackageDependencies({
+  projectDir: process.cwd(),
+  // outputDir: '..', // the default: one sibling folder per repository
+  recursive: true, // also clone dependencies of dependencies
+  depth: 1, // shallow clones for review
+  progress: { warn: console.warn, stepStart: console.log },
+});
+
+for (const row of rows) {
+  console.log(`${row.package}: ${row.status}${row.directory ? ` → ${row.directory}` : ''}`);
+}
+```

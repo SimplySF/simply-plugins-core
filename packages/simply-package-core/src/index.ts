@@ -65,3 +65,30 @@ export {
   type PackageDirDependency,
   type BasePackageDirWithDependencies,
 } from './schemas/sfdx-project/packageDirs.js';
+export {
+  clonePackageDependencies,
+  defaultGitRunner,
+  normalizeRepositoryUrl,
+  type ClonePackageDependenciesOptions,
+  type ClonePackageDependenciesProgress,
+  type DependencyCloneResult,
+  type DependencyCloneStatus,
+  type GitRunner,
+} from './packageDependenciesClone.js';
+export {
+  isIgnoredDependency,
+  resolveDependencyRepository,
+  type ResolvedDependencyRepository,
+} from './dependencyRepositoryResolver.js';
+export {
+  DependencyRepositorySchema,
+  PACKAGES_CONFIG_PATH,
+  PackageConfigSchema,
+  PackagesConfigSchema,
+  hasCredentialsInUrl,
+  readDependencyRepositories,
+  type DependencyRepositories,
+  type DependencyRepository,
+  type PackageConfig,
+  type PackagesConfig,
+} from './schemas/sfdx-project/dependencyRepositories.js';
