@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-package-core%400.3.11...%40simplysf%2Fsimply-package-core%400.4.0) (2026-10-26)
+
+### Features
+
+- **simply-package-core:** clone the source repositories of package dependencies ([#251](https://github.com/SimplySF/simply-plugins-core/issues/251)) ([e58103e](https://github.com/SimplySF/simply-plugins-core/commit/e58103e3c2eab82cc908ebea5fdeac4d93e4d7b5))
+
 ## [0.3.11](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-package-core%400.3.10...%40simplysf%2Fsimply-package-core%400.3.11) (2026-10-13)
 
 **Note:** Version bump only for package @simplysf/simply-package-core
