@@ -197,6 +197,86 @@ describe('clonePackageDependencies', () => {
     expect(infos.some((message) => message.includes('comes from'))).toBe(false);
   });
 
+  it.each(['04t000000000001AAA', 'other-core@1.8.0-3'])(
+    "uses the root's map for a dependency that names the package as %s",
+    async (packageRef) => {
+      const leaf = sourceRepo('org/my-core');
+      const core = sourceRepo(
+        'org/core',
+        JSON.stringify({
+          ...(JSON.parse(
+            projectJson('core', [{ package: packageRef }], {
+              'other-core': { url: 'https://git.example.com/other/core.git' },
+            }),
+          ) as object),
+          packageAliases: { 'other-core@1.8.0-3': '04t000000000001AAA' },
+        }),
+      );
+      const projectDir = rootProject(
+        [{ package: 'core' }],
+        { core: { url: core }, 'my-core': { url: leaf } },
+        { packageAliases: { 'my-core@1.8.0-3': '04t000000000001AAA' } },
+      );
+
+      const results = await clone({ projectDir, recursive: true });
+
+      expect(results.map((row) => [row.package, row.key, row.status])).toStrictEqual([
+        ['core', 'core', 'Cloned'],
+        [packageRef, 'my-core', 'Cloned'],
+      ]);
+      expect(results[1].url).toBe(leaf);
+      expect(infos.some((message) => message.includes('comes from'))).toBe(false);
+    },
+  );
+
+  it("gives each package from one repository its own row, and follows each one's path", async () => {
+    const leafA = sourceRepo('org/leaf-a');
+    const leafB = sourceRepo('org/leaf-b');
+    const mono = sourceRepo('org/mono');
+    fs.mkdirSync(path.join(mono, 'a'));
+    fs.mkdirSync(path.join(mono, 'b'));
+    fs.writeFileSync(path.join(mono, 'a', 'sfdx-project.json'), projectJson('pkg-a', [{ package: 'leaf-a' }]));
+    fs.writeFileSync(path.join(mono, 'b', 'sfdx-project.json'), projectJson('pkg-b', [{ package: 'leaf-b' }]));
+    git(mono, 'add', '.');
+    git(mono, 'commit', '--quiet', '-m', 'packages');
+    const projectDir = rootProject([{ package: 'pkg-a' }, { package: 'pkg-b' }], {
+      'pkg-a': { url: mono, path: 'a' },
+      'pkg-b': { url: mono, path: 'b' },
+      'leaf-a': { url: leafA },
+      'leaf-b': { url: leafB },
+    });
+
+    const results = await clone({ projectDir, recursive: true });
+
+    expect(results.map((row) => [row.package, row.status, row.directory])).toStrictEqual([
+      ['pkg-a', 'Cloned', path.join(workspace, 'mono')],
+      ['pkg-b', 'Cloned', path.join(workspace, 'mono')],
+      ['leaf-a', 'Cloned', path.join(workspace, 'leaf-a')],
+      ['leaf-b', 'Cloned', path.join(workspace, 'leaf-b')],
+    ]);
+    expect(results[1].message).toBe('same repository as pkg-a');
+  });
+
+  it("reports a dependency that points back at the root project's repository, without touching it", async () => {
+    const appUrl = 'https://git.example.com/org/app.git';
+    const core = sourceRepo('org/core', projectJson('core', [{ package: 'my-app' }], { 'my-app': { url: appUrl } }));
+    const projectDir = rootProject([{ package: 'core' }], { core: { url: core } });
+    git(projectDir, 'init', '--quiet', '--initial-branch', 'main');
+    git(projectDir, 'remote', 'add', 'origin', appUrl);
+    const calls: string[][] = [];
+
+    const results = await clone({ projectDir, recursive: true, update: true, git: servingGit({}, calls) });
+
+    expect(results.map((row) => [row.package, row.status, row.directory])).toStrictEqual([
+      ['core', 'Cloned', path.join(workspace, 'core')],
+      ['my-app', 'Already cloned', projectDir],
+    ]);
+    expect(results[1].message).toBe('the project itself');
+    expect(fs.readdirSync(workspace).sort()).toStrictEqual(['app', 'core']);
+    expect(calls.some((args) => args.includes(appUrl) && !args.includes('get-url'))).toBe(false);
+    expect(warnings).toStrictEqual([]);
+  });
+
   it("fails a dependency's URL that isn't https or ssh, naming where it came from", async () => {
     const leaf = sourceRepo('org/leaf');
     const core = sourceRepo('org/core', projectJson('core', [{ package: 'leaf' }], { leaf: { url: leaf } }));
@@ -302,9 +382,41 @@ describe('clonePackageDependencies', () => {
     expect(warnings).toStrictEqual([expect.stringContaining("can't check out commit")]);
   });
 
+  it('clones a branch or tag whose name looks like a SHA as a branch or tag', async () => {
+    const repo = sourceRepo('org/hexed');
+    const dated = sourceRepo('org/dated', undefined, ['20260101']);
+    git(repo, 'switch', '--quiet', '-c', 'cafe123');
+    fs.writeFileSync(path.join(repo, 'branch.txt'), 'branch');
+    git(repo, 'add', '.');
+    git(repo, 'commit', '--quiet', '-m', 'branch');
+    git(repo, 'switch', '--quiet', 'main');
+    const projectDir = rootProject([{ package: 'hexed' }, { package: 'tagged' }], {
+      hexed: { url: repo, ref: 'cafe123' },
+      tagged: { url: dated, ref: '20260101' },
+    });
+
+    const results = await clone({ projectDir, depth: 1 });
+
+    expect(statuses(results)).toStrictEqual([
+      ['hexed', 'Cloned'],
+      ['tagged', 'Cloned'],
+    ]);
+    expect(git(path.join(workspace, 'hexed'), 'symbolic-ref', '--short', 'HEAD')).toBe('cafe123');
+    expect(git(path.join(workspace, 'dated'), 'describe', '--tags', '--exact-match')).toBe('20260101');
+    expect(warnings).toStrictEqual([]);
+  });
+
   describe('with an existing clone', () => {
     let repo: string;
     let projectDir: string;
+
+    /** Change the root's ref for core, as a user pinning a version after the first clone would. */
+    function setRef(ref: string): void {
+      fs.writeFileSync(
+        path.join(projectDir, 'sfdx-project.json'),
+        projectJson('my-app', [{ package: 'core' }], { core: { url: repo, ref } }),
+      );
+    }
 
     beforeEach(async () => {
       repo = sourceRepo('org/core');
@@ -334,6 +446,27 @@ describe('clonePackageDependencies', () => {
       git(path.join(workspace, 'core'), 'switch', '--quiet', '-c', 'my-work');
       const [row] = await clone({ projectDir, update: true });
       expect(row).toMatchObject({ status: 'On other branch, skipped', message: 'on my-work, not main' });
+    });
+
+    it('moves it from the default branch to a tag that is set later, with update', async () => {
+      git(repo, 'tag', 'v3.0.0');
+      setRef('v3.0.0');
+
+      expect(statuses(await clone({ projectDir, update: true }))).toStrictEqual([['core', 'Updated']]);
+      expect(git(path.join(workspace, 'core'), 'describe', '--tags', '--exact-match')).toBe('v3.0.0');
+      expect(() => git(path.join(workspace, 'core'), 'symbolic-ref', '--quiet', 'HEAD')).toThrow();
+    });
+
+    it('skips it with update when the default branch has commits of its own, naming the tag', async () => {
+      git(repo, 'tag', 'v3.0.0');
+      setRef('v3.0.0');
+      const clonePath = path.join(workspace, 'core');
+      fs.writeFileSync(path.join(clonePath, 'mine.txt'), 'mine');
+      git(clonePath, 'add', '.');
+      git(clonePath, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--quiet', '-m', 'mine');
+
+      const [row] = await clone({ projectDir, update: true });
+      expect(row).toMatchObject({ status: 'On other branch, skipped', message: 'on main, not tag v3.0.0' });
     });
 
     it('fails, without touching it, when the folder is a clone of something else', async () => {
@@ -381,15 +514,53 @@ describe('clonePackageDependencies', () => {
 });
 
 describe('defaultGitRunner', () => {
-  let originalGlobalConfig: string | undefined;
+  const savedEnv = ['GIT_CONFIG_GLOBAL', 'GIT_SSH_COMMAND', 'GIT_SSH', 'PATH'] as const;
+  let originalEnv: Partial<Record<(typeof savedEnv)[number], string>>;
 
   beforeEach(() => {
-    originalGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
+    originalEnv = Object.fromEntries(savedEnv.map((name) => [name, process.env[name]]));
   });
 
   afterEach(() => {
-    if (originalGlobalConfig === undefined) delete process.env.GIT_CONFIG_GLOBAL;
-    else process.env.GIT_CONFIG_GLOBAL = originalGlobalConfig;
+    for (const name of savedEnv) {
+      if (originalEnv[name] === undefined) delete process.env[name];
+      else process.env[name] = originalEnv[name];
+    }
+  });
+
+  /** Put an `ssh` on PATH that records its arguments and fails, and return where it records them. */
+  function fakeSsh(): string {
+    const bin = path.join(tmp, 'bin');
+    const argsFile = path.join(tmp, 'ssh-args');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'ssh'), `#!/bin/sh\necho "$@" > '${argsFile}'\nexit 255\n`, { mode: 0o755 });
+    process.env.PATH = `${bin}${path.delimiter}${process.env.PATH ?? ''}`;
+    process.env.GIT_CONFIG_GLOBAL = path.join(tmp, 'empty-gitconfig');
+    fs.writeFileSync(process.env.GIT_CONFIG_GLOBAL, '');
+    delete process.env.GIT_SSH;
+    return argsFile;
+  }
+
+  it.skipIf(process.platform === 'win32')('runs ssh in batch mode, so it fails instead of prompting', async () => {
+    const argsFile = fakeSsh();
+    delete process.env.GIT_SSH_COMMAND;
+
+    await expect(
+      defaultGitRunner(['ls-remote', 'ssh://git@git.example.com/org/core.git'], { cwd: tmp }),
+    ).rejects.toThrow();
+    expect(fs.readFileSync(argsFile, 'utf-8')).toContain('-o BatchMode=yes');
+  });
+
+  it.skipIf(process.platform === 'win32')("leaves the user's own ssh command alone", async () => {
+    const argsFile = fakeSsh();
+    process.env.GIT_SSH_COMMAND = 'ssh -o ConnectTimeout=5';
+
+    await expect(
+      defaultGitRunner(['ls-remote', 'ssh://git@git.example.com/org/core.git'], { cwd: tmp }),
+    ).rejects.toThrow();
+    const args = fs.readFileSync(argsFile, 'utf-8');
+    expect(args).toContain('ConnectTimeout=5');
+    expect(args).not.toContain('BatchMode');
   });
 
   it("keeps submodules and the ext transport off, whatever the user's git config says", async () => {

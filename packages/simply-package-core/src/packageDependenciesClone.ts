@@ -29,6 +29,7 @@ import {
 import {
   readDependencyRepositories,
   type DependencyRepositories,
+  type DependencyRepository,
 } from './schemas/sfdx-project/dependencyRepositories.js';
 
 /** The outcome recorded for one dependency. */
@@ -103,10 +104,26 @@ type QueuedProject = {
 };
 
 /** A repository already handled in this run, by normalized URL. */
-type VisitedRepository = { ref?: string; via: string; directory: string };
+type VisitedRepository = {
+  ref?: string;
+  via: string;
+  directory: string;
+  /** The first row for this repository. `undefined` for the root project's own repository. */
+  row?: DependencyCloneResult;
+  /** The keys that already have a row for this repository. */
+  keys: Set<string>;
+  /** The `path`s inside this repository already followed with `recursive`. */
+  paths: Set<string>;
+};
 
-/** Looks like a commit SHA rather than a branch or tag name. */
+/**
+ * Could be a commit SHA. A branch or tag can look like one too (`cafe123`, `20260101`), so a ref
+ * that matches is checked against the remote's branches and tags before it's treated as a SHA.
+ */
 const SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
+
+/** What a `ref` names, which decides how it's cloned and checked out. */
+type RefKind = 'branch' | 'tag' | 'commit';
 
 /**
  * Settings applied to every git command, overriding the user's git config. `ext::` URLs run
@@ -139,14 +156,16 @@ const THIRD_PARTY_GIT_ARGS = [
 
 /**
  * The default {@link GitRunner}: `git` on `PATH`, run without a shell. `GIT_TERMINAL_PROMPT=0`
- * makes a missing credential fail fast instead of waiting for input nobody can see.
+ * makes a missing credential fail fast instead of waiting for input nobody can see, and
+ * {@link sshBatchMode} does the same for ssh's own host-key and passphrase prompts.
  */
-export const defaultGitRunner: GitRunner = (args, options) =>
-  new Promise((resolve, reject) => {
+export const defaultGitRunner: GitRunner = async (args, options) => {
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', ...(await sshBatchMode(options?.cwd)) };
+  return new Promise((resolve, reject) => {
     execFile(
       'git',
       [...GIT_SAFETY_ARGS, ...args],
-      { cwd: options?.cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: 16 * 1024 * 1024 },
+      { cwd: options?.cwd, env, maxBuffer: 16 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr.trim() || error.message));
@@ -156,6 +175,22 @@ export const defaultGitRunner: GitRunner = (args, options) =>
       },
     );
   });
+};
+
+/**
+ * `GIT_SSH_COMMAND='ssh -o BatchMode=yes'`, so an unknown host key or a key passphrase fails the
+ * row instead of prompting on a terminal behind the spinner (or hanging CI). Left out when the user
+ * already chose how git runs ssh, through `GIT_SSH_COMMAND`, `GIT_SSH`, or `core.sshCommand`.
+ */
+async function sshBatchMode(cwd?: string): Promise<NodeJS.ProcessEnv> {
+  if (process.env.GIT_SSH_COMMAND !== undefined || process.env.GIT_SSH !== undefined) return {};
+  const configured = await new Promise<boolean>((resolve) => {
+    execFile('git', ['config', '--get', 'core.sshCommand'], { cwd }, (error, stdout) =>
+      resolve(!error && stdout.trim() !== ''),
+    );
+  });
+  return configured ? {} : { GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' };
+}
 
 /**
  * Reduce a git URL to `host/path` so that the same repository compares equal however it's
@@ -302,6 +337,7 @@ export async function clonePackageDependencies(
     onBranch: [],
     queue: [{ dir: options.projectDir, project: rootProject, repositories: rootRepositories }],
   };
+  if (!options.dryRun) await visitRootRepository(run);
 
   while (run.queue.length > 0) {
     const current = run.queue.shift()!;
@@ -317,6 +353,25 @@ export async function clonePackageDependencies(
     );
   }
   return run.results;
+}
+
+/**
+ * Mark the root project's own repository as visited, so a dependency that maps a package back to it
+ * gets a row but is never cloned beside it, fetched, or merged. Its folder name is reserved too.
+ * A root project that isn't in a git repository, or has no `origin`, has nothing to mark.
+ */
+async function visitRootRepository(run: CloneRun): Promise<void> {
+  const cwd = run.options.projectDir;
+  let directory: string;
+  let url: string;
+  try {
+    directory = path.resolve(await run.git(['rev-parse', '--show-toplevel'], { cwd }));
+    url = await run.git(['remote', 'get-url', 'origin'], { cwd });
+  } catch {
+    return;
+  }
+  run.visited.set(normalizeRepositoryUrl(url, directory), { via: '', directory, keys: new Set(), paths: new Set() });
+  if (path.dirname(directory) === run.outputDir) run.usedFolders.add(path.basename(directory));
 }
 
 /** @returns `a`, `a and b`, or `a, b, and c`. */
@@ -344,13 +399,11 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
   const normalizedUrl = normalizeRepositoryUrl(repository.url, current.dir);
   const previous = run.visited.get(normalizedUrl);
   if (previous) {
-    warnOnRefConflict(run, key, repository.ref, via, previous);
+    await revisitRepository(run, previous, { packageRef, key, repository, via });
     return;
   }
 
   const directory = path.join(run.outputDir, chooseFolder(run, normalizedUrl, key));
-  run.visited.set(normalizedUrl, { ref: repository.ref, via, directory });
-
   const row: DependencyCloneResult = {
     package: packageRef,
     key,
@@ -360,6 +413,15 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
     via,
     directory,
   };
+  const visited: VisitedRepository = {
+    ref: repository.ref,
+    via,
+    directory,
+    row,
+    keys: new Set([key]),
+    paths: new Set(),
+  };
+  run.visited.set(normalizedUrl, visited);
   run.results.push(row);
 
   const git = gitFor(run, row, from);
@@ -385,10 +447,53 @@ async function visitDependency(run: CloneRun, current: QueuedProject, packageRef
   }
   run.progress.stepStop?.(row.message ? `${row.status}: ${row.message}` : row.status);
 
-  if (run.options.recursive && row.status !== 'Failed' && fs.existsSync(directory)) {
-    const nested = await readNestedProject(path.join(directory, repository.path ?? ''), key, run.progress);
-    if (nested) run.queue.push(nested);
-  }
+  await followNestedProject(run, visited, repository.path, key);
+}
+
+/**
+ * Handle a dependency whose repository this run already has. The same key again (a diamond) adds
+ * nothing. A different package, such as another package directory of a monorepo, gets its own row
+ * with the first row's outcome, and with `recursive` its own `path` is followed. A package whose
+ * repository is the root project's own gets a row, but is never fetched or followed.
+ */
+async function revisitRepository(
+  run: CloneRun,
+  previous: VisitedRepository,
+  dependency: { packageRef: string; key: string; repository: DependencyRepository; via: string },
+): Promise<void> {
+  const { packageRef, key, repository, via } = dependency;
+  if (previous.row) warnOnRefConflict(run, key, repository.ref, via, previous);
+  if (previous.keys.has(key)) return;
+  previous.keys.add(key);
+
+  run.results.push({
+    package: packageRef,
+    key,
+    url: repository.url,
+    ref: previous.ref,
+    via,
+    directory: previous.directory,
+    ...(previous.row
+      ? { status: previous.row.status, message: `same repository as ${previous.row.key!}` }
+      : { status: 'Already cloned', message: 'the project itself' }),
+  });
+
+  if (previous.row) await followNestedProject(run, previous, repository.path, key);
+}
+
+/** With `recursive`, queue the project at `subPath` of a repository this run has, once per path. */
+async function followNestedProject(
+  run: CloneRun,
+  visited: VisitedRepository,
+  subPath: string | undefined,
+  key: string,
+): Promise<void> {
+  if (!run.options.recursive || visited.row?.status === 'Failed' || !fs.existsSync(visited.directory)) return;
+  const dir = path.join(visited.directory, subPath ?? '');
+  if (visited.paths.has(dir)) return;
+  visited.paths.add(dir);
+  const nested = await readNestedProject(dir, key, run.progress);
+  if (nested) run.queue.push(nested);
 }
 
 /**
@@ -425,16 +530,26 @@ async function noteBranch(run: CloneRun, row: DependencyCloneResult, git: GitRun
  * file supplied it when that isn't the root's. A package build needs the root project to list its
  * whole dependency hierarchy, so the root's map can cover every package and always comes first; a
  * dependency's own map only fills in for packages the root doesn't map.
+ *
+ * A dependency's project may name a package differently from the root: by a bare ID, or by another
+ * alias. So the root's map is tried through the root's `packageAliases`, then through the ID the
+ * dependency's own `packageAliases` give, and then through the dependency's aliases themselves.
  */
 function resolveFor(
   run: CloneRun,
   current: QueuedProject,
   packageRef: string,
 ): (ResolvedDependencyRepository & { from?: string }) | undefined {
-  const rootAliases = current.project === run.rootProject ? (run.rootProject.packageAliases ?? {}) : {};
-  const fromRoot = resolveDependencyRepository(packageRef, run.rootRepositories, rootAliases);
-  if (fromRoot || current.key === undefined) return fromRoot;
-  const own = resolveDependencyRepository(packageRef, current.repositories, current.project.packageAliases ?? {});
+  const rootAliases = run.rootProject.packageAliases ?? {};
+  if (current.key === undefined) return resolveDependencyRepository(packageRef, run.rootRepositories, rootAliases);
+
+  const ownAliases = current.project.packageAliases ?? {};
+  const fromRoot =
+    resolveDependencyRepository(packageRef, run.rootRepositories, rootAliases) ??
+    resolveDependencyRepository(ownAliases[packageRef] ?? packageRef, run.rootRepositories, rootAliases) ??
+    resolveDependencyRepository(packageRef, run.rootRepositories, ownAliases);
+  if (fromRoot) return fromRoot;
+  const own = resolveDependencyRepository(packageRef, current.repositories, ownAliases);
   return own && { ...own, from: current.key };
 }
 
@@ -534,7 +649,9 @@ async function syncRepository(
 
 /** `git clone` one repository at its ref. A commit SHA can't be cloned shallowly, so it gets full history. */
 async function cloneRepository(run: CloneRun, { directory, cloneUrl, ref, key, git }: SyncRequest): Promise<void> {
-  const isSha = ref !== undefined && SHA_PATTERN.test(ref);
+  // Only a ref that could be a SHA costs the extra round trip; any other ref is a branch or a tag,
+  // and `--branch` takes either.
+  const isSha = ref !== undefined && SHA_PATTERN.test(ref) && (await remoteRefKind(git, cloneUrl, ref)) === 'commit';
   const args = ['clone'];
   if (run.options.depth !== undefined) {
     if (isSha) {
@@ -551,32 +668,71 @@ async function cloneRepository(run: CloneRun, { directory, cloneUrl, ref, key, g
 }
 
 /**
+ * @returns What `ref` names on `remote` (a URL, or `origin` with `cwd`): a branch, then a tag, or
+ * failing both, a commit when it looks like a SHA. Anything else is called a branch, so the git
+ * command that uses it fails naming it.
+ */
+async function remoteRefKind(git: GitRunner, remote: string, ref: string, cwd?: string): Promise<RefKind> {
+  const listed = await git(['ls-remote', '--heads', '--tags', '--end-of-options', remote, ref], { cwd });
+  const names = new Set(listed.split('\n').map((line) => line.split('\t')[1]));
+  if (names.has(`refs/heads/${ref}`)) return 'branch';
+  if (names.has(`refs/tags/${ref}`)) return 'tag';
+  return SHA_PATTERN.test(ref) ? 'commit' : 'branch';
+}
+
+/**
  * Bring an existing, clean clone to its ref: fast-forward when it's on that branch, or check the
  * ref out when HEAD is detached. A clone on some other branch may be the developer's own working
- * copy, so it's left alone.
+ * copy, so it's left alone, unless it's still on the remote's default branch with no commits of its
+ * own, as a clone made before a "ref" was set is. That one moves to the ref.
  */
 async function updateClone({
   directory,
   ref,
   git,
 }: SyncRequest): Promise<Pick<DependencyCloneResult, 'status' | 'message'>> {
-  if ((await git(['status', '--porcelain'], { cwd: directory })) !== '') {
+  const cwd = directory;
+  if ((await git(['status', '--porcelain'], { cwd })) !== '') {
     return { status: 'Dirty, skipped', message: 'uncommitted changes' };
   }
 
-  const branch = await git(['symbolic-ref', '--quiet', '--short', 'HEAD'], { cwd: directory }).catch(() => '');
-  const wanted = ref ?? (await defaultBranch(git, directory));
-  if (branch !== '' && wanted !== undefined && branch !== wanted) {
-    return { status: 'On other branch, skipped', message: `on ${branch}, not ${wanted}` };
+  const branch = await git(['symbolic-ref', '--quiet', '--short', 'HEAD'], { cwd }).catch(() => '');
+  const remoteDefault = await defaultBranch(git, directory);
+  const wanted = ref ?? remoteDefault;
+  if (wanted === undefined) {
+    await git(['fetch', '--tags', 'origin'], { cwd });
+    if (branch !== '') await git(['merge', '--ff-only', '@{upstream}'], { cwd });
+    return { status: 'Updated' };
   }
 
-  await git(['fetch', '--tags', 'origin'], { cwd: directory });
-  if (branch !== '') {
-    await git(['merge', '--ff-only', '@{upstream}'], { cwd: directory });
-  } else if (wanted !== undefined) {
-    await git(['checkout', SHA_PATTERN.test(wanted) ? '--detach' : '--quiet', wanted], { cwd: directory });
+  const kind = await remoteRefKind(git, 'origin', wanted, cwd);
+  if (branch !== '' && !(kind === 'branch' && branch === wanted)) {
+    const movable = branch === remoteDefault && !(await hasOwnCommits(git, directory));
+    if (!movable) {
+      const target = kind === 'branch' ? wanted : `${kind} ${wanted}`;
+      return { status: 'On other branch, skipped', message: `on ${branch}, not ${target}` };
+    }
+  }
+
+  // A shallow clone only tracks the branch it was made from, so a branch ref is fetched by name.
+  const branchRefspec = kind === 'branch' ? [`+refs/heads/${wanted}:refs/remotes/origin/${wanted}`] : [];
+  await git(['fetch', '--tags', 'origin', ...branchRefspec], { cwd });
+  if (kind === 'branch') {
+    if (branch !== wanted) await git(['checkout', '--quiet', wanted], { cwd });
+    await git(['merge', '--ff-only', '@{upstream}'], { cwd });
+  } else {
+    await git(['checkout', '--quiet', '--detach', wanted], { cwd });
   }
   return { status: 'Updated' };
+}
+
+/** @returns Whether the checked-out branch has commits its upstream doesn't, or has no upstream. */
+async function hasOwnCommits(git: GitRunner, directory: string): Promise<boolean> {
+  try {
+    return (await git(['rev-list', '--count', '@{upstream}..HEAD'], { cwd: directory })) !== '0';
+  } catch {
+    return true;
+  }
 }
 
 /** @returns The remote's default branch name as the clone knows it, or `undefined` if it doesn't. */

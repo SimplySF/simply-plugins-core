@@ -81,7 +81,7 @@ packaging library forwards unknown dependency keys to the server.
 | `repository` field | Type     | Required | Meaning                                                                                                                                                                                                                                                                                                      |
 | ------------------ | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `url`              | `string` | yes      | Anything `git clone` accepts: `https://…`, `ssh://…`, `git@host:group/repo.git`, or a local path. The host doesn't matter.                                                                                                                                                                                   |
-| `ref`              | `string` | no       | Branch, tag, or commit SHA to check out. If it's omitted, the clone uses the remote's default branch. It must be a valid git ref name, and can't start with `-`.                                                                                                                                             |
+| `ref`              | `string` | no       | Branch, tag, or commit SHA to check out. A ref of 7 to 40 hex characters is treated as a SHA only when the remote has no branch or tag by that name. If it's omitted, the clone uses the remote's default branch. It must be a valid git ref name, and can't start with `-`.                                 |
 | `path`             | `string` | no       | Subdirectory of the repository where its `sfdx-project.json` lives, for monorepos that hold several packages. The default is the repository root. The clone still contains the whole repository. `path` only tells `--recursive` where to look for the next project file. It must be relative, with no `..`. |
 
 An entry is keyed by package, not by feature, so settings for one package stay together. Only
@@ -106,7 +106,10 @@ help says so.
 Every git command runs the same guarded way:
 
 - Without a shell, with `--` before the URL, and with `GIT_TERMINAL_PROMPT=0`, so a missing
-  credential fails that row at once instead of waiting for input nobody can see.
+  credential fails that row at once instead of waiting for input nobody can see. For the same
+  reason ssh runs with `-o BatchMode=yes`, so an unknown host key or a key passphrase fails the row
+  rather than prompting behind the spinner (or hanging CI). That's skipped when the developer has
+  set `GIT_SSH_COMMAND`, `GIT_SSH`, or `core.sshCommand`.
 - With `protocol.ext.allow=never`, because `ext::` URLs run arbitrary commands.
 - With `submodule.recurse=false` and `fetch.recurseSubmodules=false`. These override the
   developer's own git config, which could otherwise turn submodules on for the `checkout`,
@@ -120,8 +123,10 @@ safe characters.
 
 **Whose URLs are used.** A Salesforce package build needs the project to list its whole dependency
 hierarchy, so the root project's `dependencies` already name every transitive package, and the
-root's map can give each of them a repository. The root's entry is therefore always used first. A
-dependency's own project file supplies a URL only for a package the root doesn't map. That URL is
+root's map can give each of them a repository. The root's entry is therefore always used first,
+however the dependency's project names the package: the root's map is looked up through the root's
+`packageAliases`, through the ID the dependency's own `packageAliases` give, and through the
+dependency's aliases themselves. A dependency's own project file supplies a URL only for a package the root doesn't map. That URL is
 someone else's input, so:
 
 - Only `https://`, `ssh://`, and scp-like `git@host:path` URLs are followed from it. A local path,
@@ -165,13 +170,13 @@ sf simply package dependencies clone [--output-dir <dir>] [--recursive] [--depth
                                      [--update] [--dry-run] [--json]
 ```
 
-| Flag           | Default                     | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--output-dir` | `..` (the project's parent) | Directory, relative to the project root, that receives one clone per repository, at `<output-dir>/<repo>`. `<repo>` is the last segment of the URL without `.git`, so `fflib-apex-common.git` clones to `../fflib-apex-common`.                                                                                                                                                                                                                                                                                          |
-| `--recursive`  | off                         | Also clone the dependencies of each dependency, following each clone's `sfdx-project.json`. Without it, only this project's direct dependencies are cloned.                                                                                                                                                                                                                                                                                                                                                              |
-| `--depth`      | full history                | Passed to `git clone --depth`. `1` gives a fast, shallow review copy. A shallow clone can't check out a SHA that isn't the tip of a branch, so a shallow clone with a SHA `ref` falls back to a full clone of that repository and prints a warning.                                                                                                                                                                                                                                                                      |
-| `--update`     | off                         | For a repository that's already cloned, run `git fetch` and bring it to `ref`: a fast-forward when it's on the `ref` branch, or a fresh checkout when HEAD is detached (as it is after cloning a tag or SHA). Without this flag, an existing clone is left as it is (`Already cloned`). A clone with uncommitted changes is never touched (`Dirty, skipped`), and neither is one on some other branch (`On other branch, skipped`, naming the branch), because a sibling folder may be the developer's own working copy. |
-| `--dry-run`    | off                         | Resolve and print the plan, but don't run `git`. A folder that already exists is reported as `Already cloned` without checking its remote. With `--recursive`, the plan follows only folders already on disk, because the other dependencies' project files aren't there yet.                                                                                                                                                                                                                                            |
+| Flag           | Default                     | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--output-dir` | `..` (the project's parent) | Directory, relative to the project root, that receives one clone per repository, at `<output-dir>/<repo>`. `<repo>` is the last segment of the URL without `.git`, so `fflib-apex-common.git` clones to `../fflib-apex-common`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `--recursive`  | off                         | Also clone the dependencies of each dependency, following each clone's `sfdx-project.json`. Without it, only this project's direct dependencies are cloned.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `--depth`      | full history                | Passed to `git clone --depth`. `1` gives a fast, shallow review copy. A shallow clone can't check out a SHA that isn't the tip of a branch, so a shallow clone with a SHA `ref` falls back to a full clone of that repository and prints a warning.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `--update`     | off                         | For a repository that's already cloned, run `git fetch` and bring it to `ref`: a fast-forward when it's on the `ref` branch, or a fresh checkout when HEAD is detached (as it is after cloning a tag or SHA). Without this flag, an existing clone is left as it is (`Already cloned`). A clone with uncommitted changes is never touched (`Dirty, skipped`), and neither is one on some other branch (`On other branch, skipped`, naming the branch), because a sibling folder may be the developer's own working copy. The exception is a clone still on the remote's default branch with no commits of its own, as one made before `ref` was set is: it moves to `ref`, whether that names a branch, a tag, or a SHA. |
+| `--dry-run`    | off                         | Resolve and print the plan, but don't run `git`. A folder that already exists is reported as `Already cloned` without checking its remote. With `--recursive`, the plan follows only folders already on disk, because the other dependencies' project files aren't there yet.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 Clones go **next to** the project, not inside it, so they stay out of the project's git status,
 editor searches, linters, and test runners, and need no `.gitignore` entry. This also matches the
@@ -190,7 +195,13 @@ apply then, because two package directories in one project can depend on the sam
   packages the root doesn't map (see [Security](#security)).
 - **A repository is deduplicated by normalized URL** (lowercased host, with `.git` and any
   trailing `/` removed, and `git@host:x` treated the same as `ssh://git@host/x`). A diamond
-  dependency is cloned once.
+  dependency is cloned once. A different package whose entry names the same repository (another
+  package directory of a monorepo, with its own `path`) still gets its own row, with the first
+  row's status, and with `--recursive` its own `path` is followed.
+- **The root project's own repository** counts as visited from the start (its `origin`, read with
+  git, so not under `--dry-run`). A dependency that maps a package back to it gets an
+  `Already cloned` row naming the project's folder, and the project is never cloned beside itself,
+  fetched, or merged.
 - **The same repository reached with two different refs** is cloned once, at the ref found nearest
   the root (breadth-first order makes that deterministic). The conflict is printed as a warning that
   names both paths. One working tree per repository keeps the parent folder readable.
@@ -202,14 +213,14 @@ apply then, because two package directories in one project can depend on the sam
 
 ### Output
 
-A table with one row per dependency, in the order they were visited:
+A table with one row per dependency, in the order they were visited. A row with no ref or no directory leaves that cell empty:
 
 ```
 KEY                 REF      STATUS          VIA                    DIRECTORY
 fflib-apex-common   v3.0.0   Cloned          my-app                 ../fflib-apex-common
 my-core             main     Already cloned  my-app                 ../my-core
 at4dx               master   Cloned          my-core                ../at4dx              (--recursive)
-SomeAppExchange…    —        No repository   my-app                 —
+SomeAppExchange…             No repository   my-app
 ```
 
 The possible statuses are `Cloned`, `Updated`, `Already cloned`, `Dirty, skipped`, `On other branch, skipped`,
@@ -344,7 +355,13 @@ In `simply-plugins`, after that is published:
   dirty tree, a directory that's a clone of a different URL, a failed clone continuing the run,
   URL normalization for deduplication, a ref conflict where the nearest ref wins, a folder-name collision
   producing the group-prefixed name, `--update` on another branch being skipped, reuse of an existing sibling checkout, recursion off by default, a cycle, and a shallow clone with a SHA ref falling back to a full clone.
-- **Security tests:** the root's entry winning over a dependency's, a local or `http` URL from a
+  Also: two packages in one repository at different `path`s each getting a row and being followed,
+  a dependency mapped back to the root's own repository being left alone, a branch or tag named
+  like a SHA being cloned as one, and `--update` moving a clean default-branch clone to a tag set
+  later (but skipping it once it has commits of its own).
+- **Security tests:** the root's entry winning over a dependency's (also when the dependency
+  names the package by a bare ID or another alias), ssh running in batch mode unless the user set
+  their own ssh command, a local or `http` URL from a
   dependency's file failing its row, an `https` URL from one being cloned with only `https` and
   `ssh` allowed and its source named, the submodule settings on every git command, a ref starting
   with `-` and a `path` with `..` being rejected, and the branch note listing only clones on a
