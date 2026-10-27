@@ -365,7 +365,9 @@ async function visitRootRepository(run: CloneRun): Promise<void> {
   let directory: string;
   let url: string;
   try {
-    directory = path.resolve(await run.git(['rev-parse', '--show-toplevel'], { cwd }));
+    // Relative to projectDir rather than --show-toplevel, which git spells its own way (on Windows,
+    // long names where projectDir may hold 8.3 short ones), so the folder compares equal to outputDir.
+    directory = path.resolve(cwd, await run.git(['rev-parse', '--show-cdup'], { cwd }));
     url = await run.git(['remote', 'get-url', 'origin'], { cwd });
   } catch {
     return;
