@@ -20,7 +20,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject } from '@simplysf/simply-core';
 import { logger } from '../../src/logger.js';
 import { resolveDevHubs } from '../../src/build/devHubs.js';
-import { getRemainingDailyScratchOrgs } from '../../src/sfOrg.js';
+import {
+  assignPermissionSetLicenses,
+  assignPermissionSets,
+  getOrgConnection,
+  getRemainingDailyScratchOrgs,
+} from '../../src/sfOrg.js';
 import { createScratchOrg } from '../../src/build/createScratchOrg.js';
 
 vi.mock('execa');
@@ -44,7 +49,12 @@ vi.mock('../../src/logger.js', () => ({
   },
 }));
 vi.mock('../../src/build/devHubs.js', () => ({ resolveDevHubs: vi.fn() }));
-vi.mock('../../src/sfOrg.js', () => ({ getRemainingDailyScratchOrgs: vi.fn() }));
+vi.mock('../../src/sfOrg.js', () => ({
+  assignPermissionSets: vi.fn(),
+  assignPermissionSetLicenses: vi.fn(),
+  getOrgConnection: vi.fn(),
+  getRemainingDailyScratchOrgs: vi.fn(),
+}));
 
 const hubA = { alias: 'hub-a', username: 'a@hub.com', clientId: 'id-a', instanceUrl: 'https://a.com' };
 const hubB = { alias: 'hub-b', username: 'b@hub.com', clientId: 'id-b', instanceUrl: 'https://b.com' };
@@ -57,18 +67,24 @@ function mockSfdxProjectJson(overrides: Record<string, unknown> = {}): void {
 
 const createResult = { username: 'scratch@test', orgId: '00D...' };
 
+const userUpdateMock = vi.fn();
+const scratchConnection = {
+  query: vi.fn(),
+  singleRecordQuery: vi.fn(),
+  sobject: vi.fn(() => ({ update: userUpdateMock })),
+};
+
 describe('createScratchOrg', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveDevHubs).mockResolvedValue([hubA, hubB]);
     vi.mocked(getRemainingDailyScratchOrgs).mockResolvedValue(5);
+    vi.mocked(getOrgConnection).mockResolvedValue(scratchConnection as never);
+    scratchConnection.query.mockRejectedValue(new Error("No such column 'CountryCode' on entity 'User'"));
     mockSfdxProjectJson();
     vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return { stdout: JSON.stringify({ result: createResult }) };
-      }
-      if (cmd === 'sf' && args[0] === 'data' && args[1] === 'query') {
-        return Promise.reject(new Error('no picklist'));
       }
       return { stdout: '' };
     }) as never);
@@ -103,9 +119,6 @@ describe('createScratchOrg', () => {
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return { stdout: JSON.stringify({ result: createResult }) };
       }
-      if (cmd === 'sf' && args[0] === 'data' && args[1] === 'query') {
-        return Promise.reject(new Error('no picklist'));
-      }
       return { stdout: '' };
     }) as never);
 
@@ -126,9 +139,6 @@ describe('createScratchOrg', () => {
           return Promise.reject(error);
         }
         return { stdout: JSON.stringify({ result: createResult }) };
-      }
-      if (cmd === 'sf' && args[0] === 'data' && args[1] === 'query') {
-        return Promise.reject(new Error('no picklist'));
       }
       return { stdout: '' };
     }) as never);
@@ -178,18 +188,53 @@ describe('createScratchOrg', () => {
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return { stdout: JSON.stringify({ result: createResult }) };
       }
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'assign') {
-        return { stdout: JSON.stringify({ status: 0 }) };
-      }
-      if (cmd === 'sf' && args[0] === 'data' && args[1] === 'query') {
-        return Promise.reject(new Error('no picklist'));
-      }
       return { stdout: '' };
     }) as never);
 
     await createScratchOrg({}, [hubA.alias]);
 
-    expect(execa).toHaveBeenCalledWith('sf', ['org', 'assign', 'permset', '--json', '--name', 'MyPermSet']);
-    expect(execa).toHaveBeenCalledWith('sf', ['org', 'assign', 'permset-license', '--json', '--name', 'MyLicense']);
+    expect(assignPermissionSets).toHaveBeenCalledWith(['MyPermSet']);
+    expect(assignPermissionSetLicenses).toHaveBeenCalledWith(['MyLicense']);
+    expect(logger.success).toHaveBeenCalledWith('Permission sets assigned successfully.');
+    expect(logger.success).toHaveBeenCalledWith('Permission set licenses assigned successfully.');
+  });
+
+  it('should log and rethrow a failed permission set assignment', async () => {
+    mockSfdxProjectJson({ packageMetadataAccess: { permissionSets: ['MyPermSet'] } });
+    vi.mocked(resolveDevHubs).mockResolvedValue([hubA]);
+    vi.mocked(assignPermissionSets).mockRejectedValue(new Error('Permission set assignment failed: [...]'));
+
+    // Like any other failure after a Dev Hub was chosen, it ends the run rather than trying the next hub.
+    await expect(createScratchOrg({}, [hubA.alias])).rejects.toThrow(
+      `Scratch org creation failed with a non-recoverable error using Dev Hub ${hubA.alias}.`,
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error assigning permission sets:',
+      'Permission set assignment failed: [...]',
+    );
+  });
+
+  it("should set the default user's country when State/Country picklists are enabled", async () => {
+    vi.mocked(resolveDevHubs).mockResolvedValue([hubA]);
+    scratchConnection.query.mockResolvedValue({ records: [] });
+    scratchConnection.singleRecordQuery.mockResolvedValue({ Id: '005000000000001' });
+
+    await createScratchOrg({}, [hubA.alias]);
+
+    expect(getOrgConnection).toHaveBeenCalledWith();
+    expect(scratchConnection.query).toHaveBeenCalledWith('SELECT CountryCode FROM User LIMIT 1');
+    expect(scratchConnection.singleRecordQuery).toHaveBeenCalledWith("SELECT Id FROM User WHERE Name = 'User User'");
+    expect(scratchConnection.sobject).toHaveBeenCalledWith('User');
+    expect(userUpdateMock).toHaveBeenCalledWith({ Id: '005000000000001', CountryCode: 'US' });
+    expect(logger.success).toHaveBeenCalledWith('Default country set.');
+  });
+
+  it('should skip the country update when State/Country picklists are not enabled', async () => {
+    vi.mocked(resolveDevHubs).mockResolvedValue([hubA]);
+
+    await createScratchOrg({}, [hubA.alias]);
+
+    expect(userUpdateMock).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith('State/Country picklists not detected. Skipping default country update.');
   });
 });

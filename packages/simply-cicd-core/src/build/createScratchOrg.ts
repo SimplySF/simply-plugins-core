@@ -16,24 +16,23 @@
 
 import { promises as fs } from 'node:fs';
 import { getDefaultPackageDirectory, readSfdxProject, type SfdxProject } from '@simplysf/simply-core';
-import { runSf, runSfJson } from '../exec/sfCli.js';
+import { runSf } from '../exec/sfCli.js';
 import { logger } from '../logger.js';
-import { getRemainingDailyScratchOrgs } from '../sfOrg.js';
+import {
+  assignPermissionSetLicenses as assignLicensesToOrgUser,
+  assignPermissionSets as assignPermissionSetsToOrgUser,
+  getOrgConnection,
+  getRemainingDailyScratchOrgs,
+} from '../sfOrg.js';
 import { resolveDevHubs, type ResolvedDevHub } from './devHubs.js';
-
-type SfPermsetAssignResult = { status: number; failures?: unknown };
 
 async function assignPermissionSets(permissionSets: string[]): Promise<void> {
   if (permissionSets.length === 0) {
     return;
   }
   logger.info('Assigning permission sets...');
-  const args = ['org', 'assign', 'permset', '--json', ...permissionSets.flatMap((ps) => ['--name', ps])];
   try {
-    const result = await runSfJson<SfPermsetAssignResult>(args);
-    if (result.status !== 0) {
-      throw new Error(`Permission set assignment failed: ${JSON.stringify(result.failures)}`);
-    }
+    await assignPermissionSetsToOrgUser(permissionSets);
     logger.success('Permission sets assigned successfully.');
   } catch (e) {
     logger.error('Error assigning permission sets:', (e as Error).message);
@@ -46,12 +45,8 @@ async function assignPermissionSetLicenses(licenses: string[]): Promise<void> {
     return;
   }
   logger.info('Assigning permission set licenses...');
-  const args = ['org', 'assign', 'permset-license', '--json', ...licenses.flatMap((psl) => ['--name', psl])];
   try {
-    const result = await runSfJson<SfPermsetAssignResult>(args);
-    if (result.status !== 0) {
-      throw new Error(`Permission set license assignment failed: ${JSON.stringify(result.failures)}`);
-    }
+    await assignLicensesToOrgUser(licenses);
     logger.success('Permission set licenses assigned successfully.');
   } catch (e) {
     logger.error('Error assigning permission set licenses:', (e as Error).message);
@@ -71,19 +66,13 @@ async function assignPermissions(sfdxProjectJson: SfdxProject): Promise<void> {
 
 async function trySetDefaultCountry(): Promise<void> {
   try {
-    await runSf(['data', 'query', '--query', 'SELECT CountryCode FROM User', '--json']);
+    // Runs against the just-created scratch org (the default target org). CountryCode only exists
+    // with State and Country/Territory picklists enabled, so this query is the feature probe.
+    const connection = await getOrgConnection();
+    await connection.query('SELECT CountryCode FROM User LIMIT 1');
     logger.info('State/Country picklists detected. Setting default country for user...');
-    await runSf([
-      'data',
-      'update',
-      'record',
-      '--sobject',
-      'User',
-      '--where',
-      "Name='User User'",
-      '--values',
-      "CountryCode='US'",
-    ]);
+    const { Id } = await connection.singleRecordQuery<{ Id: string }>("SELECT Id FROM User WHERE Name = 'User User'");
+    await connection.sobject('User').update({ Id, CountryCode: 'US' });
     logger.success('Default country set.');
   } catch {
     logger.info('State/Country picklists not detected. Skipping default country update.');

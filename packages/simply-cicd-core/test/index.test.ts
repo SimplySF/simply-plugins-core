@@ -28,6 +28,7 @@ import * as api from '../src/index.js';
  */
 it('exports the expected set of runtime values', () => {
   expect(Object.keys(api).sort()).toStrictEqual([
+    'AssignmentError',
     'DEFAULT_VERSION_TAG_FORMAT',
     'FLEXIPAGE_DELTA',
     'FLOW_DELTA',
@@ -55,6 +56,8 @@ it('exports the expected set of runtime values', () => {
     'appendToEnvFile',
     'applyMaxProjectsLimit',
     'applyProjectUpdate',
+    'assignPermissionSetLicenses',
+    'assignPermissionSets',
     'authenticateOrg',
     'buildCompilerConfig',
     'buildJunitJestConfig',
@@ -94,6 +97,7 @@ it('exports the expected set of runtime values', () => {
     'generateMrDescription',
     'getAlmProjectKeys',
     'getCommitStories',
+    'getOrgConnection',
     'getOrgInstanceUrl',
     'getPackageOriginOverride',
     'getPackageVersionHistory',

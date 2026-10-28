@@ -13,19 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import { promises as fsPromises } from 'node:fs';
-import { execa } from 'execa';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanupScratchOrgs } from '../../src/build/cleanupScratchOrgs.js';
 import { resolveDevHubs } from '../../src/build/devHubs.js';
 import { logger } from '../../src/logger.js';
+import { getOrgConnection } from '../../src/sfOrg.js';
 
-vi.mock('execa');
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return { ...actual, promises: { ...actual.promises, writeFile: vi.fn(), readFile: vi.fn(), unlink: vi.fn() } };
-});
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -38,6 +31,7 @@ vi.mock('../../src/logger.js', () => ({
   },
 }));
 vi.mock('../../src/build/devHubs.js', () => ({ resolveDevHubs: vi.fn() }));
+vi.mock('../../src/sfOrg.js', () => ({ getOrgConnection: vi.fn() }));
 
 const resolvedHub = {
   alias: 'main',
@@ -46,11 +40,16 @@ const resolvedHub = {
   instanceUrl: 'https://login.salesforce.com',
 };
 
+const queryMock = vi.fn();
+const destroyMock = vi.fn();
+const sobjectMock = vi.fn(() => ({ destroy: destroyMock }));
+
 describe('cleanupScratchOrgs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveDevHubs).mockResolvedValue([resolvedHub]);
-    vi.mocked(execa).mockResolvedValue({ stdout: '' } as never);
+    vi.mocked(getOrgConnection).mockResolvedValue({ query: queryMock, sobject: sobjectMock } as never);
+    queryMock.mockResolvedValue({ records: [] });
   });
 
   it('should do nothing when given no Dev Hub aliases', async () => {
@@ -58,7 +57,7 @@ describe('cleanupScratchOrgs', () => {
 
     await cleanupScratchOrgs([]);
 
-    expect(execa).not.toHaveBeenCalled();
+    expect(getOrgConnection).not.toHaveBeenCalled();
     expect(logger.success).toHaveBeenCalledWith('Scratch org cleanup complete.');
   });
 
@@ -66,53 +65,73 @@ describe('cleanupScratchOrgs', () => {
     vi.mocked(resolveDevHubs).mockRejectedValue(new Error('No authorization'));
 
     await expect(cleanupScratchOrgs(['main'])).rejects.toThrow('No authorization');
-    expect(execa).not.toHaveBeenCalled();
+    expect(getOrgConnection).not.toHaveBeenCalled();
   });
 
-  it('should bulk-delete scratch orgs when the CSV has data rows beyond the header', async () => {
-    const csv = 'Id\n0GQ000000000001\n0GQ000000000002\n';
-    vi.mocked(execa).mockResolvedValueOnce({ stdout: csv } as never);
-    vi.mocked(fsPromises.readFile).mockResolvedValue(csv);
+  it('should query the Dev Hub for scratch orgs older than three hours', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-28T12:00:00.000Z'));
+
+    await cleanupScratchOrgs(['main']);
+    vi.useRealTimers();
+
+    expect(getOrgConnection).toHaveBeenCalledWith('devhub@example.com');
+    expect(queryMock).toHaveBeenCalledWith(
+      'SELECT Id FROM ActiveScratchOrg WHERE CreatedDate < 2026-10-28T09:00:00.000Z',
+      { autoFetch: true, maxFetch: 50_000 },
+    );
+  });
+
+  it('should delete every old scratch org, without failing the batch on one bad record', async () => {
+    queryMock.mockResolvedValue({ records: [{ Id: '0GQ000000000001' }, { Id: '0GQ000000000002' }] });
+    destroyMock.mockResolvedValue([
+      { id: '0GQ000000000001', success: true },
+      { id: '0GQ000000000002', success: true },
+    ]);
 
     await cleanupScratchOrgs(['main']);
 
     expect(logger.info).toHaveBeenCalledWith('Found 2 old scratch orgs in devhub@example.com. Deleting...');
-    expect(execa).toHaveBeenCalledWith(
-      'sf',
-      [
-        'data',
-        'bulk',
-        'delete',
-        '--sobject',
-        'ActiveScratchOrg',
-        '--file',
-        expect.stringContaining('devhub@example.com_orgs.csv'),
-        '--target-org',
-        'devhub@example.com',
-        '--wait',
-        '30',
-      ],
-      { stdio: 'inherit' },
-    );
+    expect(sobjectMock).toHaveBeenCalledWith('ActiveScratchOrg');
+    expect(destroyMock).toHaveBeenCalledWith(['0GQ000000000001', '0GQ000000000002'], {
+      allOrNone: false,
+      allowRecursive: true,
+    });
+    expect(logger.info).toHaveBeenCalledWith('Deleted 2 of 2 old scratch orgs in devhub@example.com.');
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('should not attempt deletion when the CSV only has a header row (this used to be broken: the original split on individual characters, not lines, so this branch was unreachable)', async () => {
-    const csv = 'Id\n';
-    vi.mocked(execa).mockResolvedValueOnce({ stdout: csv } as never);
-    vi.mocked(fsPromises.readFile).mockResolvedValue(csv);
+  it('should warn about each scratch org it could not delete and report the rest', async () => {
+    queryMock.mockResolvedValue({ records: [{ Id: '0GQ000000000001' }, { Id: '0GQ000000000002' }] });
+    destroyMock.mockResolvedValue([
+      { id: '0GQ000000000001', success: true },
+      { id: '0GQ000000000002', success: false, errors: [{ message: 'entity is deleted' }] },
+    ]);
 
+    await cleanupScratchOrgs(['main']);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Could not delete scratch org 0GQ000000000002 in devhub@example.com: entity is deleted',
+    );
+    expect(logger.info).toHaveBeenCalledWith('Deleted 1 of 2 old scratch orgs in devhub@example.com.');
+  });
+
+  it('should not attempt deletion when no old scratch orgs are found', async () => {
     await cleanupScratchOrgs(['main']);
 
     expect(logger.info).toHaveBeenCalledWith('No old scratch orgs found in devhub@example.com.');
-    expect(execa).not.toHaveBeenCalledWith('sf', expect.arrayContaining(['bulk']), expect.any(Object));
+    expect(destroyMock).not.toHaveBeenCalled();
   });
 
-  it('should clean up the temp CSV file even when the query fails', async () => {
-    vi.mocked(execa).mockRejectedValueOnce(new Error('query failed'));
+  it('should log and carry on when a Dev Hub query fails', async () => {
+    queryMock.mockRejectedValue(new Error('INVALID_SESSION_ID'));
 
     await cleanupScratchOrgs(['main']);
 
-    expect(logger.error).toHaveBeenCalledWith('Failed to cleanup scratch orgs for devhub@example.com:', undefined);
-    expect(fsPromises.unlink).toHaveBeenCalledWith(expect.stringContaining('devhub@example.com_orgs.csv'));
+    expect(logger.error).toHaveBeenCalledWith(
+      'Failed to cleanup scratch orgs for devhub@example.com:',
+      'INVALID_SESSION_ID',
+    );
+    expect(logger.success).toHaveBeenCalledWith('Scratch org cleanup complete.');
   });
 });
