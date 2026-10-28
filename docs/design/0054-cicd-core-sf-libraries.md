@@ -1,6 +1,8 @@
 # 0054 — Replacing `sf` CLI shell-outs in `simply-cicd-core` with library calls
 
-**Status:** Draft
+**Status:** Implemented (phases 1–6: PRs #257, #258, #259, #260, #261, #262; released as
+`@simplysf/simply-cicd-core@0.9.0`, `@simplysf/simply-package-core@0.5.0`,
+`@simplysf/simply-apex-core@0.4.0`)
 **Package:** `packages/simply-cicd-core`; small additions to `packages/simply-package-core` and
 `packages/simply-apex-core`
 **Date:** 2026-10-28
@@ -193,9 +195,37 @@ pipeline against a real Dev Hub: create, push, test and delete a scratch org; cr
 package version; install it into a sandbox; then confirm a follow-on `sf org display` in the same job
 resolves the alias and default org written in-process (phases 3–4).
 
+## Implementation notes
+
+What the implementation changed or settled relative to the plan above:
+
+- **Inventory.** There were 24 `sf` call sites, not 21 (see the note under the mapping table). All
+  but the two `sf plugins` calls are gone; `exec/sfCli.ts` remains only for those. `runSfJson` has
+  no callers left but stays exported, since removing it is a breaking change.
+- **Scratch org daily limit (phase 4).** Not an `SfError` from `@salesforce/core`: it is the Dev Hub
+  API's own `LIMIT_EXCEEDED` error on the ScratchOrgInfo insert, passed through. The fallback to the
+  next Dev Hub checks that `errorCode` (plus the message text) rather than `SfError.name`.
+- **Package install (phase 5).** `installPackageVersion()` landed in `simply-package-core` as
+  planned. `sf package install --wait` exited 0 when an install was still running at the wait;
+  that outcome is kept (`status: 'IN_PROGRESS'`), but `deployProject` now logs it as a warning.
+- **Apex tests (phase 6).** `runApexTestsWithResults()` landed in `simply-apex-core`. To write the
+  same `test-result-<id>.json` the CLI wrote, `formatTestResultJson()` reproduces
+  `@salesforce/plugin-apex`'s `JsonReporter` format (not exported by apex-node), with its
+  BSD-3-Clause notice retained in the source.
+- **Source push (phase 6).** The open question below was settled in favor of keeping the tracked push.
+  `@salesforce/source-tracking` is pinned to `^7.8.20`, the last line on `@salesforce/core` 8 / SDR
+  12 like the rest of the workspace; 8.x needs core 9 / SDR 13 and belongs to a workspace-wide
+  upgrade.
+- **Ride-along fixes.** `grep` (`hasApexTests`) and `find -delete` (`pushScratch`, which now skips
+  `.git` and `node_modules`) became Node fs operations. `chmod -R` in `deployCommon` was kept: it
+  isn't an `sf` call and its failure is already non-fatal.
+- **Releases.** The `simply-cicd-core` 0.3.0, 0.6.0, 0.7.0 and 0.8.0 releases failed to publish on a
+  Sigstore transparency-log conflict (409); each following release included their changes, so
+  nothing shipped is missing, but those versions don't exist on npm.
+
 ## Open questions
 
-- **Tracked push vs. full deploy for `pushScratch` (phase 6).** If every real pipeline only pushes to
+- ~~**Tracked push vs. full deploy for `pushScratch` (phase 6).**~~ Settled: tracked push kept. If every real pipeline only pushes to
   freshly created scratch orgs, a plain SDR deploy is simpler and avoids the
   `@salesforce/source-tracking` dependency. Pipeline owners decide; default is to preserve tracked
   behavior.
