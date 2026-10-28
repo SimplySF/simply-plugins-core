@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.6.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.5.0...%40simplysf%2Fsimply-cicd-core%400.6.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** authenticate orgs in-process instead of via sf org login ([#259](https://github.com/SimplySF/simply-plugins-core/issues/259)) ([50a8330](https://github.com/SimplySF/simply-plugins-core/commit/50a83300fd2844e69922277d31cab826f8cf37ab))
+
 # [0.5.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.4.0...%40simplysf%2Fsimply-cicd-core%400.5.0) (2026-10-28)
 
 ### Features
