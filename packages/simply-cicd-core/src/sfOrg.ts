@@ -34,16 +34,45 @@ export async function getOrgInstanceUrl(aliasOrUsername?: string): Promise<strin
 
 type OrgLimits = Partial<Record<string, { Max: number; Remaining: number }>>;
 
+/** One org limit as the REST `limits` resource reports it. */
+export type OrgLimit = { max: number; remaining: number };
+
+/**
+ * A Dev Hub's two scratch org limits. Each is `undefined` when the org doesn't report it (an org
+ * that isn't a Dev Hub reports neither).
+ */
+export type ScratchOrgCapacity = {
+  /** `DailyScratchOrgs`: signups left today, which a deleted scratch org does not give back. */
+  daily?: OrgLimit;
+  /** `ActiveScratchOrgs`: scratch orgs that can exist at once; deleting one frees a slot. */
+  active?: OrgLimit;
+};
+
+function toOrgLimit(limit: { Max: number; Remaining: number } | undefined): OrgLimit | undefined {
+  return limit ? { max: limit.Max, remaining: limit.Remaining } : undefined;
+}
+
+/**
+ * The Dev Hub's daily and active scratch org limits, read in one `limits` call.
+ *
+ * @param hubAliasOrUsername - The Dev Hub. Must already be authenticated.
+ */
+export async function getScratchOrgCapacity(hubAliasOrUsername: string): Promise<ScratchOrgCapacity> {
+  const org = await resolveOrg(hubAliasOrUsername, { isDevHub: true });
+  const limits = (await org.getConnection().limits()) as unknown as OrgLimits;
+  return { daily: toOrgLimit(limits.DailyScratchOrgs), active: toOrgLimit(limits.ActiveScratchOrgs) };
+}
+
 /**
  * How many more scratch orgs the Dev Hub may create today (its `DailyScratchOrgs` limit), or
  * `undefined` when the org doesn't report that limit.
  *
+ * @deprecated Use {@link getScratchOrgCapacity}, which also reports the `ActiveScratchOrgs` limit a
+ * signup needs room under.
  * @param hubAliasOrUsername - The Dev Hub. Must already be authenticated.
  */
 export async function getRemainingDailyScratchOrgs(hubAliasOrUsername: string): Promise<number | undefined> {
-  const org = await resolveOrg(hubAliasOrUsername, { isDevHub: true });
-  const limits = (await org.getConnection().limits()) as unknown as OrgLimits;
-  return limits.DailyScratchOrgs?.Remaining;
+  return (await getScratchOrgCapacity(hubAliasOrUsername)).daily?.remaining;
 }
 
 /**
