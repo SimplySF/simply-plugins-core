@@ -165,7 +165,8 @@ describe('VersionTagFormat.matchPattern', () => {
   it('should no longer match a different patch line that merely starts with the same digits', () => {
     // git's glob, reduced to the one wildcard the pattern uses.
     const pattern = VersionTagFormat.parse(DEFAULT_VERSION_TAG_FORMAT).matchPattern('1.2.3.NEXT');
-    const glob = new RegExp(`^${pattern.replace(/[.+]/g, '\\$&').replace(/\*/g, '.*')}$`);
+    const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const glob = new RegExp(`^${pattern.split('*').map(escapeRegExp).join('.*')}$`);
 
     expect(glob.test('v1.2.3.4')).toBe(true);
     expect(glob.test('v1.2.3.4-feature-1')).toBe(true);

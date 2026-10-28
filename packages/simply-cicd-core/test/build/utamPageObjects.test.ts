@@ -56,12 +56,19 @@ describe('sanitizePrereleaseId', () => {
     ['feature/x/y', 'feature-x-y'],
     ['release/1.0_rc', 'release-1-0-rc'],
     ['--weird--', 'weird'],
+    ['---', ''],
+    ['a--b', 'a--b'],
   ])('should reduce %s to the semver prerelease alphabet as %s', (raw, expected) => {
     expect(sanitizePrereleaseId(raw)).toBe(expected);
   });
 
   it('should prefix an all-numeric identifier that has a leading zero, which semver forbids', () => {
     expect(sanitizePrereleaseId('007')).toBe('v007');
+  });
+
+  it('should stay linear on a long run of interior hyphens', () => {
+    const raw = `a${'-'.repeat(100_000)}b`;
+    expect(sanitizePrereleaseId(raw)).toBe(raw);
   });
 
   it('should leave an all-numeric identifier without a leading zero alone', () => {

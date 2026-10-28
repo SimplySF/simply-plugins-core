@@ -51,13 +51,25 @@ export function readUtamPluginConfig(project: SfdxProject): UtamPluginConfig {
 }
 
 /**
+ * Strip leading and trailing hyphens. Done by index rather than `/^-+|-+$/`, whose trailing
+ * alternative backtracks quadratically on a long run of interior hyphens.
+ */
+function trimHyphens(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === '-') start++;
+  while (end > start && value[end - 1] === '-') end--;
+  return value.slice(start, end);
+}
+
+/**
  * Reduce a git tag suffix to something semver accepts as a prerelease identifier.
  *
  * Semver's prerelease alphabet is `[0-9A-Za-z-]`; a branch name's `/` and `.` are the common
  * offenders, so each run of anything else collapses to a single hyphen.
  */
 export function sanitizePrereleaseId(raw: string): string {
-  const cleaned = raw.replace(/[^0-9A-Za-z-]+/g, '-').replace(/^-+|-+$/g, '');
+  const cleaned = trimHyphens(raw.replace(/[^0-9A-Za-z-]+/g, '-'));
 
   // Semver forbids leading zeros in an all-numeric identifier, so a branch literally named `007`
   // would otherwise produce a version every registry rejects. Prefixing keeps it traceable.
