@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.7.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.6.0...%40simplysf%2Fsimply-cicd-core%400.7.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** create and delete scratch orgs in-process ([#260](https://github.com/SimplySF/simply-plugins-core/issues/260)) ([a52a17d](https://github.com/SimplySF/simply-plugins-core/commit/a52a17de2d2339c2be87705a040246ecb02904b3))
+
 # [0.6.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.5.0...%40simplysf%2Fsimply-cicd-core%400.6.0) (2026-10-28)
 
 ### Features
