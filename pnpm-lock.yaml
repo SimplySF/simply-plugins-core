@@ -166,7 +166,7 @@ importers:
         specifier: ^7.8.20
         version: 7.8.20(supports-color@8.1.1)
       '@simplysf/simply-apex-core':
-        specifier: workspace:^0.3.17
+        specifier: workspace:^0.4.0
         version: link:../simply-apex-core
       '@simplysf/simply-core':
         specifier: workspace:^1.6.12

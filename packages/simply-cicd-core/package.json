@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-cicd-core",
   "description": "The library layer behind @simplysf/simply-cicd: build/deploy/notify pipeline stages, sfdx-dependabot, ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab) — published separately for direct consumption (e.g. a bot or script) without the CLI framework",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -42,7 +42,7 @@
     "@salesforce/packaging": "^4.22.16",
     "@salesforce/source-deploy-retrieve": "^12.37.2",
     "@salesforce/source-tracking": "^7.8.20",
-    "@simplysf/simply-apex-core": "workspace:^0.3.17",
+    "@simplysf/simply-apex-core": "workspace:^0.4.0",
     "@simplysf/simply-core": "workspace:^1.6.12",
     "@simplysf/simply-package-core": "workspace:^0.5.0",
     "@simplysf/simply-permissions-core": "workspace:^0.10.2",

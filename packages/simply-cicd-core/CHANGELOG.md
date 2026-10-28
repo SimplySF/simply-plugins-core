@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.9.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.8.0...%40simplysf%2Fsimply-cicd-core%400.9.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** push source and run Apex tests in-process ([#262](https://github.com/SimplySF/simply-plugins-core/issues/262)) ([4848a30](https://github.com/SimplySF/simply-plugins-core/commit/4848a3081b35f48d2bdedc7bb19c473b99451e67))
+
 # [0.8.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.7.0...%40simplysf%2Fsimply-cicd-core%400.8.0) (2026-10-28)
 
 ### Features
