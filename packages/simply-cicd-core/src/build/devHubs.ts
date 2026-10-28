@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { SfError } from '@salesforce/core';
+import { logger } from '../logger.js';
 import { resolveAuthInfo } from '../resolveOrg.js';
 
 export type ResolvedDevHub = {
@@ -50,7 +52,28 @@ async function resolveDevHub(alias: string): Promise<ResolvedDevHub> {
   };
 }
 
-/** Resolves multiple Dev Hub aliases in parallel. Each must already be authenticated. */
+/**
+ * Resolves multiple Dev Hub aliases in parallel. Each must already be authenticated.
+ *
+ * A blank entry is skipped with a warning rather than failing the run: it's what an unset CI
+ * variable produces (`--dev-hub "$BACKUP_DEVHUB"`), and the remaining Dev Hubs can still be used.
+ *
+ * @throws {SfError} `NoDevHubGivenError` if every entry is blank; `NamedOrgNotFoundError` if no
+ * auth exists for an alias or username.
+ */
 export async function resolveDevHubs(aliases: string[]): Promise<ResolvedDevHub[]> {
-  return Promise.all(aliases.map(resolveDevHub));
+  const given = aliases.map((alias) => alias.trim()).filter((alias) => alias.length > 0);
+  const blanks = aliases.length - given.length;
+  if (blanks > 0) {
+    logger.warn(
+      `Ignoring ${blanks} empty --dev-hub value${blanks === 1 ? '' : 's'} (an unset CI variable passed as --dev-hub?).`,
+    );
+    if (given.length === 0) {
+      throw new SfError(
+        'Every --dev-hub value is empty. Pass the alias or username of an authenticated Dev Hub, and check that the CI variable it comes from is set in this job.',
+        'NoDevHubGivenError',
+      );
+    }
+  }
+  return Promise.all(given.map(resolveDevHub));
 }

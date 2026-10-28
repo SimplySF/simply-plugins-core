@@ -82,6 +82,11 @@ describe('resolveAuthInfo', () => {
     expect(authInfoCreateMock).toHaveBeenCalledWith({ username: 'me@example.com' });
   });
 
+  it.each(['', '   '])('rejects a blank value %j before calling AuthInfo.create', async (value) => {
+    await expect(resolveAuthInfo(value)).rejects.toMatchObject({ name: 'NoUsernameFoundError' });
+    expect(authInfoCreateMock).not.toHaveBeenCalled();
+  });
+
   it('passes a username through unchanged', async () => {
     await resolveAuthInfo('other@example.com');
     expect(authInfoCreateMock).toHaveBeenCalledWith({ username: 'other@example.com' });

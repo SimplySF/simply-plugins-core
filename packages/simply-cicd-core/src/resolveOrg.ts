@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { AuthInfo, ConfigAggregator, Org, StateAggregator } from '@salesforce/core';
+import { AuthInfo, ConfigAggregator, Org, SfError, StateAggregator } from '@salesforce/core';
 
 export type ResolveOrgOptions = {
   /** Fall back to the default Dev Hub (`target-dev-hub`) instead of the default target org. */
@@ -47,9 +47,15 @@ export async function resolveOrg(aliasOrUsername?: string, options: ResolveOrgOp
  * The saved auth for an alias or username, without connecting to the org. `AuthInfo.create` only
  * accepts a username, so an alias is resolved to its username first.
  *
- * @throws {SfError} `NamedOrgNotFoundError` if no auth exists for the alias/username.
+ * @throws {SfError} `NamedOrgNotFoundError` if no auth exists for the alias/username;
+ * `NoUsernameFoundError` if it's blank (rather than `AuthInfo.create`'s unhelpful
+ * `AuthInfoCreationError`).
  */
 export async function resolveAuthInfo(aliasOrUsername: string): Promise<AuthInfo> {
+  const name = aliasOrUsername.trim();
+  if (!name) {
+    throw new SfError('No org alias or username was given (it was empty).', 'NoUsernameFoundError');
+  }
   const stateAggregator = await StateAggregator.getInstance();
-  return AuthInfo.create({ username: stateAggregator.aliases.resolveUsername(aliasOrUsername.trim()) });
+  return AuthInfo.create({ username: stateAggregator.aliases.resolveUsername(name) });
 }
