@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { runSf } from './exec/sfCli.js';
+import { AuthInfo, AuthRemover, SfdcUrl, SfError, SfProject } from '@salesforce/core';
 import { logger } from './logger.js';
+
+/** `@salesforce/core`'s JWT-capable OAuth options (not exported from its root). */
+type JwtOAuth2Config = NonNullable<AuthInfo.Options['oauth2Options']>;
 
 export type AuthenticateOrgOptions = {
   alias?: string;
@@ -35,68 +35,90 @@ export type AuthenticateOrgOptions = {
 export type AuthenticateOrgResult = {
   success: boolean;
   username?: string;
+  /** The saved auth fields, as `sf org login … --json` returned them (tokens decrypted). */
   result?: unknown;
   message?: string;
 };
 
-type SfAuthResult = { status: number; message?: string; result?: unknown };
+/**
+ * Where a JWT login goes: the given instance URL, else the project's `sfdcLoginUrl`, else
+ * production — the same resolution `sf org login jwt` applies, including its refusal of a
+ * Lightning domain (`*.lightning.force.com`), which can't serve OAuth.
+ */
+async function resolveLoginUrl(instanceUrl: string | undefined): Promise<string> {
+  let loginUrl = instanceUrl;
+  if (!loginUrl) {
+    try {
+      const projectJson = await (await SfProject.resolve()).resolveProjectConfig();
+      loginUrl = typeof projectJson.sfdcLoginUrl === 'string' ? projectJson.sfdcLoginUrl : SfdcUrl.PRODUCTION;
+    } catch {
+      loginUrl = SfdcUrl.PRODUCTION;
+    }
+  }
+  const url = new SfdcUrl(loginUrl);
+  if (url.isLightningDomain() || (url.isInternalUrl() && url.origin.includes('.lightning.'))) {
+    throw new SfError(
+      'Use the "My Domain" URL (.my.salesforce.com) as the instance URL, not the Lightning domain (.lightning.force.com).',
+      'LightningDomain',
+    );
+  }
+  return loginUrl;
+}
 
-/** Authenticates to a Salesforce organization using either a JWT flow or an SFDX auth URL. */
+/** JWT bearer login, as `sf org login jwt`: an existing auth file for the user is replaced. */
+async function loginWithJwt(username: string, oauth2Options: JwtOAuth2Config): Promise<AuthInfo> {
+  try {
+    return await AuthInfo.create({ username, oauth2Options });
+  } catch (error) {
+    if ((error as Error).name !== 'AuthInfoOverwriteError') {
+      throw error;
+    }
+    await (await AuthRemover.create()).removeAuth(username);
+    return AuthInfo.create({ username, oauth2Options });
+  }
+}
+
+/**
+ * Authenticates to a Salesforce org using either a JWT flow or an SFDX auth URL, in-process via
+ * `@salesforce/core`. The auth, alias and default-org settings are written to the same `~/.sf`
+ * state `sf org login jwt` / `sf org login sfdx-url` write, so later `sf` processes see them.
+ *
+ * @throws If authentication fails; the failure is logged first.
+ */
 export async function authenticateOrg(options: AuthenticateOrgOptions): Promise<AuthenticateOrgResult> {
   const { alias, authUrl, clientId, instanceUrl, jwtKeyFile, username, setDefault, setDefaultDevHub, debug } = options;
   const authEntity = alias ?? username ?? 'unknown org';
   logger.info(`Authenticating to org: ${authEntity}`);
 
   try {
-    let authArgs: string[];
+    const authInfo = authUrl
+      ? await AuthInfo.create({ oauth2Options: AuthInfo.parseSfdxAuthUrl(authUrl) })
+      : await loginWithJwt(username ?? '', {
+          clientId,
+          privateKeyFile: jwtKeyFile,
+          loginUrl: await resolveLoginUrl(instanceUrl),
+        });
+    await authInfo.save();
+    await authInfo.handleAliasAndDefaultSettings({
+      alias,
+      setDefault: setDefault ?? false,
+      setDefaultDevHub: setDefaultDevHub ?? false,
+    });
 
-    if (authUrl) {
-      const tempDir = await mkdtemp(join(tmpdir(), 'sfdx-auth-'));
-      const authUrlFile = join(tempDir, 'auth-url.txt');
-      await writeFile(authUrlFile, authUrl);
-      authArgs = ['org', 'login', 'sfdx-url', '--sfdx-url-file', authUrlFile, '--json'];
-    } else {
-      authArgs = [
-        'login',
-        'org',
-        'jwt',
-        '--username',
-        username ?? '',
-        '--jwt-key-file',
-        jwtKeyFile ?? '',
-        '--client-id',
-        clientId ?? '',
-        '--instance-url',
-        instanceUrl ?? '',
-        '--json',
-      ];
-    }
-
-    if (alias) {
-      authArgs.push('--alias', alias);
-    }
-    if (setDefault) {
-      authArgs.push('--set-default');
-    }
-    if (setDefaultDevHub) {
-      authArgs.push('--set-default-dev-hub');
-    }
-
-    const { stdout } = await runSf(authArgs);
+    const fields = authUrl ? { clientSecret: '', ...authInfo.getFields(true) } : authInfo.getFields(true);
+    await AuthInfo.identifyPossibleScratchOrgs(fields, authInfo);
 
     if (debug) {
-      logger.raw(stdout);
-    }
-
-    const authResult = JSON.parse(stdout) as SfAuthResult;
-    if (authResult.status > 0) {
-      logger.error(`Authentication failed for ${authEntity}: ${authResult.message ?? 'unknown error'}`);
-      // In cleanup, we don't want to exit the whole process.
-      return { success: false, message: authResult.message, username };
+      // Only identifying fields: the CLI's --json output this used to print included live tokens.
+      logger.debug('Authenticated:', {
+        username: fields.username,
+        orgId: fields.orgId,
+        instanceUrl: fields.instanceUrl,
+      });
     }
 
     logger.success(`Successfully authenticated to org: ${authEntity}`);
-    return { success: true, username, result: authResult.result };
+    return { success: true, username: fields.username ?? username, result: fields };
   } catch (error) {
     logger.error(`Authentication failed for ${authEntity}`);
     logger.error(String(error));
