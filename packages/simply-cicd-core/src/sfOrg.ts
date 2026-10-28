@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-import { Org } from '@salesforce/core';
+import { Org, User, type Connection } from '@salesforce/core';
+import { escapeSoqlLiteral } from '@simplysf/simply-core';
+import { logger } from './logger.js';
 
 /**
  * The org's instance URL, e.g. `https://my-domain.my.salesforce.com`.
@@ -40,4 +42,107 @@ export async function getRemainingDailyScratchOrgs(hubAliasOrUsername: string): 
   const org = await Org.create({ aliasOrUsername: hubAliasOrUsername });
   const limits = (await org.getConnection().limits()) as unknown as OrgLimits;
   return limits.DailyScratchOrgs?.Remaining;
+}
+
+/**
+ * A connection to an authenticated org.
+ *
+ * @param aliasOrUsername - The org. Omit to use the default target org, as `sf` commands without
+ * `--target-org` do.
+ */
+export async function getOrgConnection(aliasOrUsername?: string): Promise<Connection> {
+  const org = await Org.create({ aliasOrUsername });
+  return org.getConnection();
+}
+
+/** One failed assignment, shaped like the `failures` entries of `sf org assign … --json`. */
+export type AssignmentFailure = { name: string; message: string };
+
+/** Thrown when any assignment failed; `failures` lists each one. */
+export class AssignmentError extends Error {
+  public constructor(
+    message: string,
+    public readonly failures: AssignmentFailure[],
+  ) {
+    super(`${message}: ${JSON.stringify(failures)}`);
+    this.name = 'AssignmentError';
+  }
+}
+
+async function resolveOrgUser(aliasOrUsername?: string): Promise<{ org: Org; username: string; userId: string }> {
+  const org = await Org.create({ aliasOrUsername });
+  const username = org.getUsername() ?? '';
+  const { Id: userId } = await org
+    .getConnection()
+    .singleRecordQuery<{ Id: string }>(`SELECT Id FROM User WHERE Username = '${escapeSoqlLiteral(username)}'`);
+  return { org, username, userId };
+}
+
+/**
+ * Assigns permission sets to an org's own user, one at a time: what `sf org assign permset --name …`
+ * does. An already-assigned permission set is a failure, as it is for the CLI.
+ *
+ * @param permissionSetNames - Permission set API names.
+ * @param aliasOrUsername - The org. Omit to use the default target org.
+ * @throws {AssignmentError} If any assignment failed; the others are still attempted.
+ */
+export async function assignPermissionSets(permissionSetNames: string[], aliasOrUsername?: string): Promise<void> {
+  const { org, username, userId } = await resolveOrgUser(aliasOrUsername);
+  const user = await User.create({ org });
+  const failures: AssignmentFailure[] = [];
+  for (const permissionSetName of permissionSetNames) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- one at a time, matching the CLI
+      await user.assignPermissionSets(userId, [permissionSetName]);
+    } catch (error) {
+      failures.push({ name: username, message: (error as Error).message });
+    }
+  }
+  if (failures.length > 0) {
+    throw new AssignmentError('Permission set assignment failed', failures);
+  }
+}
+
+/**
+ * Assigns permission set licenses to an org's own user: what `sf org assign permset-license --name …`
+ * does. A license is matched by `DeveloperName` or `MasterLabel`; one that is already assigned is
+ * a success (with a warning), as it is for the CLI.
+ *
+ * @param licenseNames - Permission set license developer names or labels.
+ * @param aliasOrUsername - The org. Omit to use the default target org.
+ * @throws {AssignmentError} If any assignment failed; the others are still attempted.
+ */
+export async function assignPermissionSetLicenses(licenseNames: string[], aliasOrUsername?: string): Promise<void> {
+  const { org, username, userId } = await resolveOrgUser(aliasOrUsername);
+  const connection = org.getConnection();
+  const failures: AssignmentFailure[] = [];
+  for (const licenseName of licenseNames) {
+    const literal = escapeSoqlLiteral(licenseName);
+    let licenseId: string;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- one at a time, keeps failures in input order
+      ({ Id: licenseId } = await connection.singleRecordQuery<{ Id: string }>(
+        `SELECT Id FROM PermissionSetLicense WHERE DeveloperName = '${literal}' OR MasterLabel = '${literal}'`,
+      ));
+    } catch {
+      failures.push({ name: username, message: `PermissionSetLicense not found: ${licenseName}` });
+      continue;
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await connection
+        .sobject('PermissionSetLicenseAssign')
+        .create({ AssigneeId: userId, PermissionSetLicenseId: licenseId });
+    } catch (error) {
+      const message = (error as Error).message;
+      if (message.startsWith('duplicate value found')) {
+        logger.warn(`Permission set license ${licenseName} is already assigned to ${username}.`);
+      } else {
+        failures.push({ name: username, message });
+      }
+    }
+  }
+  if (failures.length > 0) {
+    throw new AssignmentError('Permission set license assignment failed', failures);
+  }
 }
