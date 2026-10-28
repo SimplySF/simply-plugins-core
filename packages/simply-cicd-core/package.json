@@ -1,6 +1,6 @@
 {
   "name": "@simplysf/simply-cicd-core",
-  "description": "ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab) — the library layer behind @simplysf/simply-cicd, published separately for direct consumption (e.g. a bot or script) without the CLI framework",
+  "description": "The library layer behind @simplysf/simply-cicd: build/deploy/notify pipeline stages, sfdx-dependabot, ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab) — published separately for direct consumption (e.g. a bot or script) without the CLI framework",
   "version": "0.2.2",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
@@ -36,7 +36,18 @@
     }
   },
   "type": "module",
-  "dependencies": {},
+  "dependencies": {
+    "@salesforce/core": "^8.30.0",
+    "@salesforce/kit": "^3.2.6",
+    "@simplysf/simply-core": "workspace:^1.6.11",
+    "@simplysf/simply-package-core": "workspace:^0.4.0",
+    "@simplysf/simply-permissions-core": "workspace:^0.10.1",
+    "chalk": "^5.6.2",
+    "execa": "^8.0.1",
+    "handlebars": "^4.7.9",
+    "log-symbols": "^7.0.1",
+    "zod": "^4.6.7"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
     "vitest": "^4.1.10"

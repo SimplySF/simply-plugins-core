@@ -22,7 +22,7 @@ This repository is a monorepo. Fourteen packages are published independently to 
 | [`@simplysf/simply-package-core`](packages/simply-package-core)             | Package/package-version alias resolution, `sfdx-project.json` dependency management, package dependency installation, and Dev Hub version lookup   |
 | [`@simplysf/simply-schema-core`](packages/simply-schema-core)               | sObject schema generation (CSV/Excel parsing, field/object normalization) and interactive schema-report rendering                                  |
 | [`@simplysf/simply-project-setup-core`](packages/simply-project-setup-core) | Salesforce DX project file/dependency standardization engine (template packs, `.gitignore` composition, `package.json` scripts/dependency merging) |
-| [`@simplysf/simply-cicd-core`](packages/simply-cicd-core)                   | ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab)                                                                       |
+| [`@simplysf/simply-cicd-core`](packages/simply-cicd-core)                   | CI/CD pipeline stages, ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab)                                                |
 | [`@simplysf/simply-settings-core`](packages/simply-settings-core)           | State and Country/Territory picklist automation: create states through Setup and activate them via AddressSettings                                 |
 | [`@simplysf/simply-flow-core`](packages/simply-flow-core)                   | Flow deactivation/deletion and obsolete Flow version pruning                                                                                       |
 
