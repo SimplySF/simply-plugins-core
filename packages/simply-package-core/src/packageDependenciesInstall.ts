@@ -38,7 +38,7 @@ import type { PackageDirDependency } from './schemas/sfdx-project/packageDirs.js
 type PackageInstallRequest = PackagingSObjects.PackageInstallRequest;
 
 /** The lowest API version whose package-install endpoints this service uses. */
-const MIN_API_VERSION = 36;
+export const MIN_API_VERSION = 36;
 
 /** The outcome recorded for one dependency. `''` means no decision was made before the run stopped. */
 export type PackageInstallStatus = '' | 'Skipped' | 'Installing' | 'Installed' | 'Failed';
@@ -73,12 +73,12 @@ export type PackageInstallApexCompileType = 'all' | 'package';
  * lowercase values are what the Tooling API accepts (and what `sf package install` sends), even
  * though `@salesforce/packaging` types the field as `'Custom' | 'Full' | 'None'` — hence the cast.
  */
-const securityTypeApiValue: Record<PackageInstallSecurityType, PackageInstallCreateRequest['SecurityType']> = {
+export const securityTypeApiValue: Record<PackageInstallSecurityType, PackageInstallCreateRequest['SecurityType']> = {
   AllUsers: 'full' as PackageInstallCreateRequest['SecurityType'],
   AdminsOnly: 'none' as PackageInstallCreateRequest['SecurityType'],
 };
 /** Maps {@link PackageInstallUpgradeType} to the `PackageInstallCreateRequest` API value. */
-const upgradeTypeApiValue: Record<PackageInstallUpgradeType, PackageInstallCreateRequest['UpgradeType']> = {
+export const upgradeTypeApiValue: Record<PackageInstallUpgradeType, PackageInstallCreateRequest['UpgradeType']> = {
   Delete: 'delete-only',
   DeprecateOnly: 'deprecate-only',
   Mixed: 'mixed-mode',

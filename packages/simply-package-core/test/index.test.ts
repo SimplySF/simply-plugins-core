@@ -44,6 +44,7 @@ it('exports the expected set of runtime values', () => {
     'findPackageVersions',
     'hasCredentialsInUrl',
     'installPackageDependencies',
+    'installPackageVersion',
     'isDependenciesPackagingDirectory',
     'isIgnoredDependency',
     'isPackage2Id',
