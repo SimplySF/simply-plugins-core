@@ -19,6 +19,7 @@ import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject } from '@simplysf/simply-core';
 import { appendToEnvFile } from '../../src/env.js';
+import { getPackageVersionReport, listInstalledPackages } from '../../src/sfPackages.js';
 import {
   projectNotifyAfterScript,
   projectNotifyBeforeScript,
@@ -35,6 +36,7 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, promises: { ...actual.promises, readFile: vi.fn(), writeFile: vi.fn() } };
 });
 vi.mock('../../src/env.js', () => ({ appendToEnvFile: vi.fn() }));
+vi.mock('../../src/sfPackages.js', () => ({ getPackageVersionReport: vi.fn(), listInstalledPackages: vi.fn() }));
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -105,19 +107,17 @@ describe('projectNotification', () => {
 
     it('queries the pre-authenticated alias/packaging DevHub and resolves both package versions on success', async () => {
       vi.mocked(readSfdxProject).mockResolvedValue({ packageDirectories: [{ default: true, package: 'my-pkg' }] });
-      vi.mocked(execa).mockImplementation((async (command: string, args: string[] = []) => {
-        if (command === 'sf' && args[0] === 'package' && args[1] === 'installed') {
-          return {
-            stdout: JSON.stringify({
-              result: [{ SubscriberPackageName: 'my-pkg', SubscriberPackageVersionNumber: '2.40.0.10' }],
-            }),
-          };
-        }
-        if (command === 'sf' && args[0] === 'package' && args[1] === 'version') {
-          return { stdout: JSON.stringify({ result: { Version: '2.41.0.1' } }) };
-        }
-        throw new Error(`Unexpected execa call: ${command} ${args.join(' ')}`);
-      }) as never);
+      vi.mocked(listInstalledPackages).mockResolvedValue([
+        {
+          Id: '0A3',
+          SubscriberPackageId: '033',
+          SubscriberPackageName: 'my-pkg',
+          SubscriberPackageVersionNumber: '2.40.0.10',
+        },
+      ]);
+      vi.mocked(getPackageVersionReport).mockResolvedValue({ Version: '2.41.0.1' } as Awaited<
+        ReturnType<typeof getPackageVersionReport>
+      >);
 
       await projectNotifyBeforeScript(
         baseOptions({
@@ -128,12 +128,9 @@ describe('projectNotification', () => {
         }),
       );
 
-      expect(execa).toHaveBeenCalledWith(
-        'sf',
-        expect.arrayContaining(['package', 'installed', 'list', '--target-org', 'my-org']),
-      );
-      expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--target-dev-hub', 'packaging-devhub']));
-      expect(execa).not.toHaveBeenCalledWith(expect.stringContaining('sf login org jwt'), expect.anything());
+      expect(listInstalledPackages).toHaveBeenCalledWith('my-org');
+      expect(getPackageVersionReport).toHaveBeenCalledWith('04tSJ000000AKwjYAG', 'packaging-devhub');
+      expect(execa).not.toHaveBeenCalled();
       expect(appendToEnvFile).toHaveBeenCalledWith(
         'project-build.env',
         { PREV_INSTALLED_PACKAGE_VERSION: 'v2.40.0.10', TARGET_PACKAGE_VERSION: 'v2.41.0.1' },

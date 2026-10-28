@@ -153,6 +153,9 @@ importers:
       '@salesforce/kit':
         specifier: ^3.2.6
         version: 3.2.6
+      '@salesforce/packaging':
+        specifier: ^4.22.16
+        version: 4.27.8(supports-color@8.1.1)
       '@simplysf/simply-core':
         specifier: workspace:^1.6.12
         version: link:../simply-core
@@ -10009,7 +10012,7 @@ snapshots:
       '@salesforce/source-deploy-retrieve': 12.37.2(supports-color@8.1.1)
       '@salesforce/ts-types': 2.0.12
       '@salesforce/types': 1.8.0
-      fast-xml-parser: 5.11.0
+      fast-xml-parser: 5.11.1
       globby: 11.1.0
       graphology: 0.26.0(graphology-types@0.24.8)
       graphology-traversal: 0.3.1(graphology-types@0.24.8)

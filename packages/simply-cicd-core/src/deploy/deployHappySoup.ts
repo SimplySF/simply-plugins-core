@@ -17,9 +17,9 @@
 import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
 import { createVcsProvider, type VcsProvider, type VcsProviderKind } from '../vcs/index.js';
-import { runSf } from '../exec/sfCli.js';
 import { addGitRemote } from '../git.js';
 import { logger } from '../logger.js';
+import { getOrgInstanceUrl } from '../sfOrg.js';
 import {
   installPackageDependencies as installPackageDependenciesCommon,
   resolveUpgradedPackages,
@@ -152,8 +152,7 @@ async function tagDeployment(config: TagDeploymentConfig): Promise<void> {
   const vcsProvider = createVcsProvider(vcsProviderKind, { host: vcsHost, token: projectAccessToken });
   const remoteAlias = await addGitRemote(ciPipelineId, projectAccessToken, ciProjectPath, vcsProvider);
 
-  const { stdout: orgDisplay } = await runSf(['org', 'display', '--target-org', alias ?? '', '--json']);
-  const instanceUrlResult = (JSON.parse(orgDisplay) as { result: { instanceUrl: string } }).result.instanceUrl;
+  const instanceUrlResult = await getOrgInstanceUrl(alias);
   const instanceSlug = instanceUrlResult.split('.')[0];
   const orgDomainPrefix = instanceSlug.replace('https://', '');
   if (!orgDomainPrefix) {

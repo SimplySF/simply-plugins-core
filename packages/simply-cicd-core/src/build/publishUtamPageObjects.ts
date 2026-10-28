@@ -19,9 +19,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { execa } from 'execa';
 import { getDefaultPackageDirectory, readSfdxProject } from '@simplysf/simply-core';
-import { runSfJson } from '../exec/sfCli.js';
 import { appendToEnvFile } from '../env.js';
 import { logger } from '../logger.js';
+import { getPackageVersionReport } from '../sfPackages.js';
 import { determineTagSuffix } from './createPackageVersion.js';
 import { getSkipReason } from './skipGuard.js';
 import { VersionTagFormat } from './versionTagFormat.js';
@@ -43,16 +43,6 @@ import {
 
 /** The default dotenv file, matching what `create-package-version`/`create-fallback-tag` write. */
 const DEFAULT_ENV_FILE = 'subscriberPackageVersionId.env';
-
-/** The fields read off `sf package version report --package <04t> --json`. */
-type PackageVersionReport = {
-  Version?: string;
-  /** The commit SHA `create-package-version` tagged the version with. */
-  Tag?: string;
-  /** The pipeline URL `create-package-version` used as the version description. */
-  Description?: string;
-  Package2Name?: string;
-};
 
 type UtamPackageJson = { version?: string; bin?: string | Record<string, string> };
 
@@ -228,16 +218,7 @@ async function resolveTarget(options: PublishUtamPageObjectsOptions): Promise<Pu
     );
   }
 
-  const { result: report } = await runSfJson<{ result: PackageVersionReport }>([
-    'package',
-    'version',
-    'report',
-    '--package',
-    subscriberPackageVersionId,
-    '--target-dev-hub',
-    options.packagingDevhub,
-    '--json',
-  ]);
+  const report = await getPackageVersionReport(subscriberPackageVersionId, options.packagingDevhub);
   if (!report.Version) {
     throw new Error(
       `Could not read a version number for ${subscriberPackageVersionId} from its package version report.`,
@@ -256,7 +237,7 @@ async function resolveTarget(options: PublishUtamPageObjectsOptions): Promise<Pu
     sources,
     utamPluginConfig,
     npmPackageName,
-    salesforcePackageName: report.Package2Name ?? defaultPackageDir.package ?? 'package',
+    salesforcePackageName: defaultPackageDir.package ?? 'package',
     salesforceVersion: report.Version,
     version: toNpmVersion(report.Version, tagSuffix),
     distTag: options.npmDistTag ?? toDistTag(tagSuffix),

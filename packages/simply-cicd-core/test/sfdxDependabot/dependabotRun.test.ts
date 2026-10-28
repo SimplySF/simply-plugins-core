@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VcsProject } from '../../src/vcs/index.js';
 import { filterProject, generateMrDescription, resolvePackageDetails } from '../../src/sfdxDependabot/dependabotRun.js';
 
-vi.mock('execa');
+const orgCreateMock = vi.hoisted(() => vi.fn());
+const toolingQueryMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@salesforce/core', () => ({ Org: { create: orgCreateMock } }));
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -33,12 +35,13 @@ vi.mock('../../src/logger.js', () => ({
 }));
 
 const packageQueryResult = {
-  result: { records: [{ Name: 'lwc-utilities', MajorVersion: 2, MinorVersion: 41, PatchVersion: 0, BuildNumber: 1 }] },
+  records: [{ Name: 'lwc-utilities', MajorVersion: 2, MinorVersion: 41, PatchVersion: 0, BuildNumber: 1 }],
 };
 
 describe('dependabotRun', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    orgCreateMock.mockResolvedValue({ getConnection: () => ({ tooling: { query: toolingQueryMock } }) });
   });
 
   afterEach(() => {
@@ -57,24 +60,34 @@ describe('dependabotRun', () => {
     });
 
     it('parses and returns package details on successful query', async () => {
-      vi.mocked(execa).mockResolvedValue({ stdout: JSON.stringify(packageQueryResult) } as never);
+      toolingQueryMock.mockResolvedValue(packageQueryResult);
 
       const details = await resolvePackageDetails('hub@example.com', '04tSJ000000AKwjYAG');
       expect(details).toEqual({ packageName: 'lwc-utilities', packageVersion: '2.41.0-1' });
-      expect(execa).toHaveBeenCalledWith(
-        'sf',
-        expect.arrayContaining(['data', 'query', '-o', 'hub@example.com', '--use-tooling-api']),
+      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'hub@example.com' });
+      expect(toolingQueryMock).toHaveBeenCalledWith(
+        "SELECT MajorVersion, MinorVersion, PatchVersion, Name, BuildNumber FROM SubscriberPackageVersion WHERE Id = '04tSJ000000AKwjYAG'",
       );
     });
 
+    it('escapes the version ID it interpolates into the query', async () => {
+      toolingQueryMock.mockResolvedValue(packageQueryResult);
+
+      await resolvePackageDetails('hub@example.com', "04t' OR Id != '");
+
+      expect(toolingQueryMock).toHaveBeenCalledWith(expect.stringContaining("WHERE Id = '04t\\' OR Id != \\''"));
+    });
+
     it('throws if query returns no records', async () => {
-      vi.mocked(execa).mockResolvedValue({ stdout: JSON.stringify({ result: { records: [] } }) } as never);
+      toolingQueryMock.mockResolvedValue({ records: [] });
       await expect(resolvePackageDetails('hub@example.com', '04tSJ000000AKwjYAG')).rejects.toThrow('No records found');
     });
 
     it('throws on query exception', async () => {
-      vi.mocked(execa).mockRejectedValue(new Error('SF CLI not found'));
-      await expect(resolvePackageDetails('hub@example.com', '04tSJ000000AKwjYAG')).rejects.toThrow('SF CLI not found');
+      toolingQueryMock.mockRejectedValue(new Error('INVALID_SESSION_ID'));
+      await expect(resolvePackageDetails('hub@example.com', '04tSJ000000AKwjYAG')).rejects.toThrow(
+        'INVALID_SESSION_ID',
+      );
     });
   });
 

@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
+import { Org } from '@salesforce/core';
+import { escapeSoqlLiteral } from '@simplysf/simply-core';
 import type { VcsProject, VcsProvider } from '../vcs/index.js';
-import { runSfJson } from '../exec/sfCli.js';
 import { logger } from '../logger.js';
 import { updateSfdxProject } from './updater.js';
 import type { UpdateSfdxProjectResult } from './updater.js';
@@ -44,15 +45,11 @@ export async function resolvePackageDetails(
 
   logger.info(`Querying DevHub for package details of 04t version: ${subscriberPackageVersionId}...`);
 
-  const query = `SELECT MajorVersion, MinorVersion, PatchVersion, Name, BuildNumber FROM SubscriberPackageVersion WHERE Id = '${subscriberPackageVersionId}'`;
-  const args = ['data', 'query', '-o', devhubUsername, '-q', query, '--use-tooling-api', '--json'];
+  const query = `SELECT MajorVersion, MinorVersion, PatchVersion, Name, BuildNumber FROM SubscriberPackageVersion WHERE Id = '${escapeSoqlLiteral(subscriberPackageVersionId)}'`;
 
   try {
-    const queryResult = await runSfJson<{
-      records?: SubscriberPackageVersionRecord[];
-      result?: { records?: SubscriberPackageVersionRecord[] };
-    }>(args);
-    const records = queryResult.result?.records ?? queryResult.records;
+    const devHub = await Org.create({ aliasOrUsername: devhubUsername });
+    const { records } = await devHub.getConnection().tooling.query<SubscriberPackageVersionRecord>(query);
 
     if (!records || records.length === 0) {
       throw new Error(`No records found for Id: ${subscriberPackageVersionId}`);

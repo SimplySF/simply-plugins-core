@@ -20,6 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject } from '@simplysf/simply-core';
 import { logger } from '../../src/logger.js';
 import { resolveDevHubs } from '../../src/build/devHubs.js';
+import { getRemainingDailyScratchOrgs } from '../../src/sfOrg.js';
 import { createScratchOrg } from '../../src/build/createScratchOrg.js';
 
 vi.mock('execa');
@@ -43,6 +44,7 @@ vi.mock('../../src/logger.js', () => ({
   },
 }));
 vi.mock('../../src/build/devHubs.js', () => ({ resolveDevHubs: vi.fn() }));
+vi.mock('../../src/sfOrg.js', () => ({ getRemainingDailyScratchOrgs: vi.fn() }));
 
 const hubA = { alias: 'hub-a', username: 'a@hub.com', clientId: 'id-a', instanceUrl: 'https://a.com' };
 const hubB = { alias: 'hub-b', username: 'b@hub.com', clientId: 'id-b', instanceUrl: 'https://b.com' };
@@ -53,21 +55,15 @@ function mockSfdxProjectJson(overrides: Record<string, unknown> = {}): void {
   });
 }
 
-function mockLimits(remaining: number): { stdout: string } {
-  return { stdout: JSON.stringify({ result: [{ name: 'DailyScratchOrgs', remaining }] }) };
-}
-
 const createResult = { username: 'scratch@test', orgId: '00D...' };
 
 describe('createScratchOrg', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveDevHubs).mockResolvedValue([hubA, hubB]);
+    vi.mocked(getRemainingDailyScratchOrgs).mockResolvedValue(5);
     mockSfdxProjectJson();
     vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'list' && args[2] === 'limits') {
-        return mockLimits(5);
-      }
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return { stdout: JSON.stringify({ result: createResult }) };
       }
@@ -102,10 +98,8 @@ describe('createScratchOrg', () => {
   });
 
   it('should skip a Dev Hub with no remaining daily capacity and try the next one', async () => {
+    vi.mocked(getRemainingDailyScratchOrgs).mockImplementation(async (hub) => (hub === hubA.username ? 0 : 5));
     vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'list' && args[2] === 'limits') {
-        return args.includes(hubA.username) ? mockLimits(0) : mockLimits(5);
-      }
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return { stdout: JSON.stringify({ result: createResult }) };
       }
@@ -124,9 +118,6 @@ describe('createScratchOrg', () => {
 
   it('should try the next Dev Hub when creation fails with a scratch org limit error', async () => {
     vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'list' && args[2] === 'limits') {
-        return mockLimits(5);
-      }
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         if (args.includes(hubA.username)) {
           const error = Object.assign(new Error('LIMIT_EXCEEDED'), {
@@ -150,9 +141,6 @@ describe('createScratchOrg', () => {
 
   it('should throw immediately on a non-recoverable creation error, without trying the next Dev Hub', async () => {
     vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'list' && args[2] === 'limits') {
-        return mockLimits(5);
-      }
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return Promise.reject(new Error('unexpected failure'));
       }
@@ -166,12 +154,7 @@ describe('createScratchOrg', () => {
   });
 
   it('should throw once every Dev Hub has been exhausted', async () => {
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'list' && args[2] === 'limits') {
-        return mockLimits(0);
-      }
-      return { stdout: '' };
-    }) as never);
+    vi.mocked(getRemainingDailyScratchOrgs).mockResolvedValue(0);
 
     await expect(createScratchOrg({}, [hubA.alias, hubB.alias])).rejects.toThrow(
       'Scratch org creation failed for all available Dev Hubs.',
@@ -192,9 +175,6 @@ describe('createScratchOrg', () => {
     });
     vi.mocked(resolveDevHubs).mockResolvedValue([hubA]);
     vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'list' && args[2] === 'limits') {
-        return mockLimits(5);
-      }
       if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
         return { stdout: JSON.stringify({ result: createResult }) };
       }

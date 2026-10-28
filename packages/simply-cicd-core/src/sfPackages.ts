@@ -23,7 +23,7 @@ import {
   type PackageInstallUpgradeType,
   type PackageToInstall,
 } from '@simplysf/simply-package-core';
-import { runSfJson } from './exec/sfCli.js';
+import { PackageVersion, SubscriberPackageVersion, type PackageVersionReportResult } from '@salesforce/packaging';
 import { logger } from './logger.js';
 import type { UpgradedPackage } from './schemas/deployProgress.js';
 
@@ -39,8 +39,7 @@ export type InstallPackageDependenciesConfig = {
   upgradeType?: PackageInstallUpgradeType;
 };
 
-/** The fields read off `sf package version report --package <id> --json`. */
-type PackageVersionReport = { Version?: string; Description?: string; Tag?: string };
+export type { PackageVersionReportResult };
 
 /**
  * Adapts the library's progress callbacks onto this package's logger. Step boundaries become info
@@ -121,23 +120,82 @@ function upgradedEntries(installResults: PackageToInstall[]): PackageToInstall[]
   );
 }
 
-/** Runs `sf package version report` for one subscriber package version. Returns `undefined` on failure. */
+/**
+ * The Dev Hub's report for one package version: what `sf package version report --json` returns,
+ * including the computed `Version` (`major.minor.patch.build`), `Tag`, `Description` and
+ * `CodeCoverage`.
+ *
+ * Unlike the CLI, `CodeCoverage` is `null` (not `'N/A'`) for a version that skipped validation or
+ * belongs to an org-dependent package.
+ *
+ * @param packageVersionId - A `04t` subscriber package version ID (or `05i` package version ID).
+ * @param devHubAliasOrUsername - The Dev Hub that owns the package. Must already be authenticated.
+ * @throws {SfError} If the Dev Hub can't be resolved or the version doesn't exist.
+ */
+export async function getPackageVersionReport(
+  packageVersionId: string,
+  devHubAliasOrUsername: string,
+): Promise<PackageVersionReportResult> {
+  const devHub = await Org.create({ aliasOrUsername: devHubAliasOrUsername });
+  const packageVersion = new PackageVersion({
+    connection: devHub.getConnection(),
+    project: undefined,
+    idOrAlias: packageVersionId,
+  });
+  return packageVersion.report();
+}
+
+/** One row of {@link listInstalledPackages}: the fields `sf package installed list --json` returns. */
+export type InstalledPackage = {
+  Id: string;
+  SubscriberPackageId: string;
+  SubscriberPackageName?: string;
+  SubscriberPackageNamespace?: string;
+  SubscriberPackageVersionId?: string;
+  SubscriberPackageVersionName?: string;
+  /** `major.minor.patch.build`. */
+  SubscriberPackageVersionNumber?: string;
+};
+
+/**
+ * The packages installed in an org, shaped like `sf package installed list --json`'s result rows.
+ *
+ * @param aliasOrUsername - The org to inspect. Must already be authenticated.
+ */
+export async function listInstalledPackages(aliasOrUsername: string): Promise<InstalledPackage[]> {
+  const org = await Org.create({ aliasOrUsername });
+  const installed = await SubscriberPackageVersion.installedList(org.getConnection());
+  return installed.map((row) => ({
+    Id: row.Id,
+    SubscriberPackageId: row.SubscriberPackageId,
+    ...(row.SubscriberPackage
+      ? {
+          SubscriberPackageName: row.SubscriberPackage.Name,
+          SubscriberPackageNamespace: row.SubscriberPackage.NamespacePrefix,
+        }
+      : {}),
+    ...(row.SubscriberPackageVersion
+      ? {
+          SubscriberPackageVersionId: row.SubscriberPackageVersion.Id,
+          SubscriberPackageVersionName: row.SubscriberPackageVersion.Name,
+          SubscriberPackageVersionNumber: [
+            row.SubscriberPackageVersion.MajorVersion,
+            row.SubscriberPackageVersion.MinorVersion,
+            row.SubscriberPackageVersion.PatchVersion,
+            row.SubscriberPackageVersion.BuildNumber,
+          ].join('.'),
+        }
+      : {}),
+  }));
+}
+
+/** {@link getPackageVersionReport}, but warns and returns `undefined` on failure. */
 async function reportPackageVersion(
   subscriberPackageVersionId: string,
   packagingDevhub: string,
-): Promise<PackageVersionReport | undefined> {
+): Promise<PackageVersionReportResult | undefined> {
   try {
-    const { result } = await runSfJson<{ result: PackageVersionReport }>([
-      'package',
-      'version',
-      'report',
-      '--package',
-      subscriberPackageVersionId,
-      '--target-dev-hub',
-      packagingDevhub,
-      '--json',
-    ]);
-    return result;
+    return await getPackageVersionReport(subscriberPackageVersionId, packagingDevhub);
   } catch (error) {
     logger.warn(`Could not get package version report for ${subscriberPackageVersionId}: ${(error as Error).message}`);
     return undefined;

@@ -16,16 +16,36 @@
 
 import { Duration } from '@salesforce/kit';
 import type { InstallPackageDependenciesOptions } from '@simplysf/simply-package-core';
-import { execa } from 'execa';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../src/logger.js';
-import { installPackageDependencies, resolveUpgradedPackages, type PackageToInstall } from '../src/sfPackages.js';
+import {
+  getPackageVersionReport,
+  installPackageDependencies,
+  listInstalledPackages,
+  resolveUpgradedPackages,
+  type PackageToInstall,
+} from '../src/sfPackages.js';
 
 const orgCreateMock = vi.hoisted(() => vi.fn());
 const sfProjectResolveMock = vi.hoisted(() => vi.fn());
 const installPackageDependenciesCoreMock = vi.hoisted(() => vi.fn());
+const packageVersionCtorMock = vi.hoisted(() => vi.fn());
+const packageVersionReportMock = vi.hoisted(() => vi.fn());
+const installedListMock = vi.hoisted(() => vi.fn());
 
-vi.mock('execa');
+vi.mock('@salesforce/packaging', () => ({
+  PackageVersion: class {
+    private readonly idOrAlias: string;
+    public constructor(options: { idOrAlias: string }) {
+      packageVersionCtorMock(options);
+      this.idOrAlias = options.idOrAlias;
+    }
+    public report(): Promise<unknown> {
+      return packageVersionReportMock(this.idOrAlias) as Promise<unknown>;
+    }
+  },
+  SubscriberPackageVersion: { installedList: installedListMock },
+}));
 vi.mock('@salesforce/core', () => ({
   Org: { create: orgCreateMock },
   SfProject: { resolve: sfProjectResolveMock },
@@ -138,9 +158,76 @@ describe('installPackageDependencies', () => {
   });
 });
 
+describe('getPackageVersionReport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+  });
+
+  it('reports the version through the Dev Hub connection', async () => {
+    packageVersionReportMock.mockResolvedValue({ Version: '1.2.3.4', Tag: 'sha' });
+
+    const report = await getPackageVersionReport('04t1', 'packaging-devhub');
+
+    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    expect(packageVersionCtorMock).toHaveBeenCalledWith({ connection, project: undefined, idOrAlias: '04t1' });
+    expect(report).toEqual({ Version: '1.2.3.4', Tag: 'sha' });
+  });
+
+  it('propagates a failure to resolve the Dev Hub', async () => {
+    orgCreateMock.mockRejectedValue(new Error('No authorization information found for packaging-devhub.'));
+
+    await expect(getPackageVersionReport('04t1', 'packaging-devhub')).rejects.toThrow('No authorization information');
+  });
+});
+
+describe('listInstalledPackages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+  });
+
+  it('shapes rows like sf package installed list --json, joining the version number', async () => {
+    installedListMock.mockResolvedValue([
+      {
+        Id: '0A3000000000001',
+        SubscriberPackageId: '033000000000001',
+        SubscriberPackage: { Name: 'my-pkg', NamespacePrefix: 'ns' },
+        SubscriberPackageVersion: {
+          Id: '04t000000000001',
+          Name: 'Spring',
+          MajorVersion: 2,
+          MinorVersion: 40,
+          PatchVersion: 0,
+          BuildNumber: 10,
+        },
+      },
+      { Id: '0A3000000000002', SubscriberPackageId: '033000000000002' },
+    ]);
+
+    const installed = await listInstalledPackages('my-org');
+
+    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'my-org' });
+    expect(installedListMock).toHaveBeenCalledWith(connection);
+    expect(installed).toEqual([
+      {
+        Id: '0A3000000000001',
+        SubscriberPackageId: '033000000000001',
+        SubscriberPackageName: 'my-pkg',
+        SubscriberPackageNamespace: 'ns',
+        SubscriberPackageVersionId: '04t000000000001',
+        SubscriberPackageVersionName: 'Spring',
+        SubscriberPackageVersionNumber: '2.40.0.10',
+      },
+      { Id: '0A3000000000002', SubscriberPackageId: '033000000000002' },
+    ]);
+  });
+});
+
 describe('resolveUpgradedPackages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
   });
 
   it('returns an empty array when nothing in the results upgraded an existing package', async () => {
@@ -158,7 +245,7 @@ describe('resolveUpgradedPackages', () => {
     );
 
     expect(result).toEqual([]);
-    expect(execa).not.toHaveBeenCalled();
+    expect(packageVersionReportMock).not.toHaveBeenCalled();
   });
 
   it('returns an empty array and warns when no packaging DevHub alias is given', async () => {
@@ -179,14 +266,11 @@ describe('resolveUpgradedPackages', () => {
   });
 
   it('builds an UpgradedPackage entry from the prev/target version reports', async () => {
-    vi.mocked(execa).mockImplementation((async (_cmd: string, args: string[] = []) => {
-      const packageId = args[args.indexOf('--package') + 1];
-      const reports: Record<string, unknown> = {
-        '04t1': { Version: '1.0.0.1', Tag: 'sha-prev' },
-        '04t2': { Version: '1.1.0.1', Tag: 'sha-target', Description: 'https://gitlab.com/g/p/-/pipelines/1' },
-      };
-      return { stdout: JSON.stringify({ result: reports[packageId] }) };
-    }) as never);
+    const reports: Record<string, unknown> = {
+      '04t1': { Version: '1.0.0.1', Tag: 'sha-prev' },
+      '04t2': { Version: '1.1.0.1', Tag: 'sha-target', Description: 'https://gitlab.com/g/p/-/pipelines/1' },
+    };
+    packageVersionReportMock.mockImplementation(async (id: string) => reports[id]);
 
     const result = await resolveUpgradedPackages(
       [
@@ -200,7 +284,7 @@ describe('resolveUpgradedPackages', () => {
       devhubConfig,
     );
 
-    expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--target-dev-hub', 'packaging-devhub']));
+    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
     expect(result).toEqual([
       {
         packageName: 'MyDependency',
@@ -216,7 +300,7 @@ describe('resolveUpgradedPackages', () => {
   });
 
   it('skips a package whose version report could not be resolved', async () => {
-    vi.mocked(execa).mockRejectedValue(new Error('package not found'));
+    packageVersionReportMock.mockRejectedValue(new Error('package not found'));
 
     const result = await resolveUpgradedPackages(
       [
