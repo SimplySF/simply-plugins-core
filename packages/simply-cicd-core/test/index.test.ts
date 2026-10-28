@@ -108,6 +108,7 @@ it('exports the expected set of runtime values', () => {
     'getPackageVersionReport',
     'getRemainingDailyScratchOrgs',
     'getRemoteCommitStories',
+    'getScratchOrgCapacity',
     'getSkipReason',
     'happySoupNotifyAfterScript',
     'happySoupNotifyBeforeScript',

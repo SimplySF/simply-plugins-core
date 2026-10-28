@@ -24,7 +24,7 @@ import {
   assignPermissionSets,
   createScratchOrgOnHub,
   getOrgConnection,
-  getRemainingDailyScratchOrgs,
+  getScratchOrgCapacity,
 } from '../../src/sfOrg.js';
 import { createScratchOrg } from '../../src/build/createScratchOrg.js';
 
@@ -53,7 +53,7 @@ vi.mock('../../src/sfOrg.js', () => ({
   assignPermissionSetLicenses: vi.fn(),
   createScratchOrgOnHub: vi.fn(),
   getOrgConnection: vi.fn(),
-  getRemainingDailyScratchOrgs: vi.fn(),
+  getScratchOrgCapacity: vi.fn(),
 }));
 
 const hubA = { alias: 'hub-a', username: 'a@hub.com', clientId: 'id-a', instanceUrl: 'https://a.com' };
@@ -63,6 +63,11 @@ function mockSfdxProjectJson(overrides: Record<string, unknown> = {}): void {
   vi.mocked(readSfdxProject).mockResolvedValue({
     packageDirectories: [{ default: true, definitionFile: 'config/project-scratch-def.json', ...overrides }],
   });
+}
+
+/** Capacity with `daily`/`active` signups remaining, out of 200 a day and 40 at once. */
+function capacity(daily: number, active: number) {
+  return { daily: { max: 200, remaining: daily }, active: { max: 40, remaining: active } };
 }
 
 const createResult = { username: 'scratch@test', orgId: '00D...' };
@@ -78,7 +83,7 @@ describe('createScratchOrg', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveDevHubs).mockResolvedValue([hubA, hubB]);
-    vi.mocked(getRemainingDailyScratchOrgs).mockResolvedValue(5);
+    vi.mocked(getScratchOrgCapacity).mockResolvedValue(capacity(5, 3));
     vi.mocked(getOrgConnection).mockResolvedValue(scratchConnection as never);
     scratchConnection.query.mockRejectedValue(new Error("No such column 'CountryCode' on entity 'User'"));
     mockSfdxProjectJson();
@@ -100,13 +105,57 @@ describe('createScratchOrg', () => {
     expect(logger.success).toHaveBeenCalledWith(`Scratch org created successfully using Dev Hub ${hubA.alias}.`);
   });
 
-  it('should skip a Dev Hub with no remaining daily capacity and try the next one', async () => {
-    vi.mocked(getRemainingDailyScratchOrgs).mockImplementation(async (hub) => (hub === hubA.username ? 0 : 5));
+  it('logs both limits for the Dev Hub it attempts', async () => {
+    await createScratchOrg({}, [hubA.alias]);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      `Attempting to create scratch org with Dev Hub ${hubA.alias} (5 signups left today, 3 of 40 active slots free).`,
+    );
+  });
+
+  it('should skip a Dev Hub with no signups left today and try the next one', async () => {
+    vi.mocked(getScratchOrgCapacity).mockImplementation(async (hub) =>
+      hub === hubA.username ? capacity(0, 3) : capacity(5, 3),
+    );
 
     const result = await createScratchOrg({}, [hubA.alias, hubB.alias]);
 
     expect(result).toEqual(createResult);
-    expect(logger.warn).toHaveBeenCalledWith(`Dev Hub ${hubA.alias} has no remaining scratch orgs. Skipping.`);
+    expect(logger.warn).toHaveBeenCalledWith(
+      `Dev Hub ${hubA.alias} has no scratch org signups left today (daily limit 200). Skipping.`,
+    );
+    expect(createScratchOrgOnHub).not.toHaveBeenCalledWith(hubA.username, expect.anything());
+    expect(createScratchOrgOnHub).toHaveBeenCalledWith(hubB.username, expect.anything());
+  });
+
+  it('should skip a Dev Hub at its active scratch org limit, even with signups left today', async () => {
+    vi.mocked(getScratchOrgCapacity).mockImplementation(async (hub) =>
+      hub === hubA.username ? capacity(150, 0) : capacity(5, 3),
+    );
+
+    const result = await createScratchOrg({}, [hubA.alias, hubB.alias]);
+
+    expect(result).toEqual(createResult);
+    expect(logger.warn).toHaveBeenCalledWith(
+      `Dev Hub ${hubA.alias} is at its active scratch org limit (40 active). Skipping.`,
+    );
+    expect(createScratchOrgOnHub).not.toHaveBeenCalledWith(hubA.username, expect.anything());
+    expect(createScratchOrgOnHub).toHaveBeenCalledWith(hubB.username, expect.anything());
+  });
+
+  it.each([
+    ['no limits', {}],
+    ['only the daily limit', { daily: { max: 200, remaining: 5 } }],
+  ])('should skip a Dev Hub that reports %s', async (_label, reported) => {
+    vi.mocked(getScratchOrgCapacity).mockImplementation(async (hub) =>
+      hub === hubA.username ? reported : capacity(5, 3),
+    );
+
+    await createScratchOrg({}, [hubA.alias, hubB.alias]);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      `Dev Hub ${hubA.alias} does not report its scratch org limits (is it a Dev Hub?). Skipping.`,
+    );
     expect(createScratchOrgOnHub).toHaveBeenCalledWith(hubB.username, expect.anything());
   });
 
@@ -127,7 +176,9 @@ describe('createScratchOrg', () => {
     const result = await createScratchOrg({}, [hubA.alias, hubB.alias]);
 
     expect(result).toEqual(createResult);
-    expect(logger.warn).toHaveBeenCalledWith(`Dev Hub ${hubA.alias} reached its daily limit. Trying next Dev Hub...`);
+    expect(logger.warn).toHaveBeenCalledWith(
+      `Dev Hub ${hubA.alias} reached a scratch org limit. Trying next Dev Hub...`,
+    );
   });
 
   it('should throw immediately on a non-recoverable creation error, without trying the next Dev Hub', async () => {
@@ -140,7 +191,9 @@ describe('createScratchOrg', () => {
   });
 
   it('should throw once every Dev Hub has been exhausted', async () => {
-    vi.mocked(getRemainingDailyScratchOrgs).mockResolvedValue(0);
+    vi.mocked(getScratchOrgCapacity).mockImplementation(async (hub) =>
+      hub === hubA.username ? capacity(0, 3) : capacity(5, 0),
+    );
 
     await expect(createScratchOrg({}, [hubA.alias, hubB.alias])).rejects.toThrow(
       'Scratch org creation failed for all available Dev Hubs.',

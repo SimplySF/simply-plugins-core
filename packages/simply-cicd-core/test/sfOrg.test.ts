@@ -28,6 +28,7 @@ import {
   getOrgConnection,
   getOrgInstanceUrl,
   getRemainingDailyScratchOrgs,
+  getScratchOrgCapacity,
 } from '../src/sfOrg.js';
 
 const resolveOrgMock = vi.hoisted(() => vi.fn());
@@ -87,6 +88,29 @@ describe('sfOrg', () => {
     it.each([undefined, ''])('leaves %j to resolveOrg, which means the default target org', async (alias) => {
       await getOrgInstanceUrl(alias);
       expect(resolveOrgMock).toHaveBeenCalledWith(alias);
+    });
+  });
+
+  describe('getScratchOrgCapacity', () => {
+    it("returns the Dev Hub's daily and active scratch org limits from one limits call", async () => {
+      limitsMock.mockResolvedValue({
+        DailyScratchOrgs: { Max: 200, Remaining: 37 },
+        ActiveScratchOrgs: { Max: 40, Remaining: 0 },
+        DailyApiRequests: {},
+      });
+
+      expect(await getScratchOrgCapacity('my-hub')).toEqual({
+        daily: { max: 200, remaining: 37 },
+        active: { max: 40, remaining: 0 },
+      });
+      expect(resolveOrgMock).toHaveBeenCalledWith('my-hub', { isDevHub: true });
+      expect(limitsMock).toHaveBeenCalledOnce();
+    });
+
+    it('leaves out a limit the org does not report', async () => {
+      limitsMock.mockResolvedValue({ DailyApiRequests: { Max: 1, Remaining: 1 } });
+
+      expect(await getScratchOrgCapacity('hub@example.com')).toEqual({ daily: undefined, active: undefined });
     });
   });
 

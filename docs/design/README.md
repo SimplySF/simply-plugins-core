@@ -94,6 +94,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0052](0052-package-dependencies-clone.md)                           | `simply package dependencies clone`                                                   | In progress |
 | [0053](0053-simply-cicd-core-common.md)                              | Moving the rest of `simply-cicd`'s `common/` into `simply-cicd-core`                  | Implemented |
 | [0054](0054-cicd-core-sf-libraries.md)                               | `simply-cicd-core`: replace `sf` CLI shell-outs with library calls                    | Implemented |
+| [0055](0055-scratch-org-active-limit-check.md)                       | `create-scratch` checks the Dev Hub's active scratch org limit too                    | Implemented |
 
 ## Template
 

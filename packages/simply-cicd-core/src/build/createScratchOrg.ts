@@ -23,7 +23,8 @@ import {
   createScratchOrgOnHub,
   type CreatedScratchOrg,
   getOrgConnection,
-  getRemainingDailyScratchOrgs,
+  getScratchOrgCapacity,
+  type ScratchOrgCapacity,
 } from '../sfOrg.js';
 import { resolveDevHubs, type ResolvedDevHub } from './devHubs.js';
 
@@ -82,17 +83,39 @@ async function trySetDefaultCountry(username: string | undefined): Promise<void>
 
 export type ScratchOrgCreateResult = CreatedScratchOrg;
 
+/**
+ * The Dev Hub's limits when it can take a signup right now, or why it can't. A signup needs room
+ * under both limits: one left for today (`DailyScratchOrgs`), and a free slot under the number that
+ * may exist at once (`ActiveScratchOrgs`). A limit the org doesn't report counts as no room, since
+ * only a Dev Hub reports them.
+ */
+function checkCapacity({ daily, active }: ScratchOrgCapacity): Required<ScratchOrgCapacity> | string {
+  if (!daily || !active) {
+    return 'does not report its scratch org limits (is it a Dev Hub?)';
+  }
+  if (daily.remaining <= 0) {
+    return `has no scratch org signups left today (daily limit ${daily.max})`;
+  }
+  if (active.remaining <= 0) {
+    return `is at its active scratch org limit (${active.max} active)`;
+  }
+  return { daily, active };
+}
+
 async function attemptScratchOrgCreation(
   hub: ResolvedDevHub,
   definitionFile: string,
   durationDays: number,
 ): Promise<ScratchOrgCreateResult | undefined> {
-  const remaining = await getRemainingDailyScratchOrgs(hub.username);
-  if (remaining === undefined || remaining <= 0) {
-    logger.warn(`Dev Hub ${hub.alias} has no remaining scratch orgs. Skipping.`);
+  const capacity = checkCapacity(await getScratchOrgCapacity(hub.username));
+  if (typeof capacity === 'string') {
+    logger.warn(`Dev Hub ${hub.alias} ${capacity}. Skipping.`);
     return undefined;
   }
-  logger.info(`Attempting to create scratch org with Dev Hub ${hub.alias} (${remaining} remaining).`);
+  const { daily, active } = capacity;
+  logger.info(
+    `Attempting to create scratch org with Dev Hub ${hub.alias} (${daily.remaining} signups left today, ${active.remaining} of ${active.max} active slots free).`,
+  );
 
   const createResult = await createScratchOrgOnHub(hub.username, {
     definitionFile,
@@ -106,8 +129,9 @@ async function attemptScratchOrgCreation(
 }
 
 /**
- * The Dev Hub refusing the signup because its daily allocation is used up. That's the API's own
- * `LIMIT_EXCEEDED` error on the ScratchOrgInfo insert, passed through by @salesforce/core.
+ * The Dev Hub refusing the signup because its daily or active allocation is used up, which can
+ * still happen after the capacity check when another pipeline signs up in between. That's the
+ * API's own `LIMIT_EXCEEDED` error on the ScratchOrgInfo insert, passed through by @salesforce/core.
  */
 function isScratchOrgLimitError(error: unknown, message: string): boolean {
   return (
@@ -174,7 +198,7 @@ export async function createScratchOrg(
       logger.error(`Scratch org creation failed with Dev Hub ${hub.alias}:`);
       const errorMessage = extractScratchOrgErrorMessage(error);
       if (isScratchOrgLimitError(error, errorMessage)) {
-        logger.warn(`Dev Hub ${hub.alias} reached its daily limit. Trying next Dev Hub...`);
+        logger.warn(`Dev Hub ${hub.alias} reached a scratch org limit. Trying next Dev Hub...`);
         continue;
       }
       throw new Error(`Scratch org creation failed with a non-recoverable error using Dev Hub ${hub.alias}.`, {
