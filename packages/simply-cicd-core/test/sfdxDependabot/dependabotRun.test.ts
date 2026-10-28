@@ -18,10 +18,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VcsProject } from '../../src/vcs/index.js';
 import { filterProject, generateMrDescription, resolvePackageDetails } from '../../src/sfdxDependabot/dependabotRun.js';
 
-const orgCreateMock = vi.hoisted(() => vi.fn());
+const resolveOrgMock = vi.hoisted(() => vi.fn());
 const toolingQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@salesforce/core', () => ({ Org: { create: orgCreateMock } }));
+vi.mock('../../src/resolveOrg.js', () => ({ resolveOrg: resolveOrgMock }));
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -41,7 +41,7 @@ const packageQueryResult = {
 describe('dependabotRun', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => ({ tooling: { query: toolingQueryMock } }) });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => ({ tooling: { query: toolingQueryMock } }) });
   });
 
   afterEach(() => {
@@ -64,7 +64,7 @@ describe('dependabotRun', () => {
 
       const details = await resolvePackageDetails('hub@example.com', '04tSJ000000AKwjYAG');
       expect(details).toEqual({ packageName: 'lwc-utilities', packageVersion: '2.41.0-1' });
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'hub@example.com' });
+      expect(resolveOrgMock).toHaveBeenCalledWith('hub@example.com', { isDevHub: true });
       expect(toolingQueryMock).toHaveBeenCalledWith(
         "SELECT MajorVersion, MinorVersion, PatchVersion, Name, BuildNumber FROM SubscriberPackageVersion WHERE Id = '04tSJ000000AKwjYAG'",
       );

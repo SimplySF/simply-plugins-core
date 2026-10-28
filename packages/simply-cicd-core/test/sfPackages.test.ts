@@ -28,7 +28,7 @@ import {
   type PackageToInstall,
 } from '../src/sfPackages.js';
 
-const orgCreateMock = vi.hoisted(() => vi.fn());
+const resolveOrgMock = vi.hoisted(() => vi.fn());
 const sfProjectResolveMock = vi.hoisted(() => vi.fn());
 const installPackageDependenciesCoreMock = vi.hoisted(() => vi.fn());
 const packageVersionCtorMock = vi.hoisted(() => vi.fn());
@@ -37,6 +37,7 @@ const installedListMock = vi.hoisted(() => vi.fn());
 const packageVersionCreateMock = vi.hoisted(() => vi.fn());
 const getCreateStatusMock = vi.hoisted(() => vi.fn());
 
+vi.mock('../src/resolveOrg.js', () => ({ resolveOrg: resolveOrgMock }));
 vi.mock('@salesforce/packaging', () => ({
   PackageVersion: class {
     public static create = packageVersionCreateMock;
@@ -53,7 +54,6 @@ vi.mock('@salesforce/packaging', () => ({
   SubscriberPackageVersion: { installedList: installedListMock },
 }));
 vi.mock('@salesforce/core', () => ({
-  Org: { create: orgCreateMock },
   SfProject: { resolve: sfProjectResolveMock },
 }));
 vi.mock('@simplysf/simply-package-core', () => ({ installPackageDependencies: installPackageDependenciesCoreMock }));
@@ -82,7 +82,7 @@ function coreCallOptions(n = 0): InstallPackageDependenciesOptions {
 describe('installPackageDependencies', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection });
     sfProjectResolveMock.mockResolvedValue(project);
     installPackageDependenciesCoreMock.mockResolvedValue([]);
   });
@@ -105,7 +105,7 @@ describe('installPackageDependencies', () => {
       upgradeType: 'DeprecateOnly',
     });
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'my-org' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('my-org');
     expect(installPackageDependenciesCoreMock).toHaveBeenCalledTimes(1);
     const options = coreCallOptions();
     expect(options).toMatchObject({
@@ -124,7 +124,7 @@ describe('installPackageDependencies', () => {
   it('falls back to the default target org, a 120 minute wait, and a Mixed Upgrade install', async () => {
     await installPackageDependencies();
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: undefined });
+    expect(resolveOrgMock).toHaveBeenCalledWith(undefined);
     const options = coreCallOptions();
     expect(options.installType).toBe('Upgrade');
     expect(options.upgradeType).toBe('Mixed');
@@ -167,7 +167,7 @@ describe('installPackageDependencies', () => {
 describe('getPackageVersionReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection });
   });
 
   it('reports the version through the Dev Hub connection', async () => {
@@ -175,13 +175,13 @@ describe('getPackageVersionReport', () => {
 
     const report = await getPackageVersionReport('04t1', 'packaging-devhub');
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('packaging-devhub', { isDevHub: true });
     expect(packageVersionCtorMock).toHaveBeenCalledWith({ connection, project: undefined, idOrAlias: '04t1' });
     expect(report).toEqual({ Version: '1.2.3.4', Tag: 'sha' });
   });
 
   it('propagates a failure to resolve the Dev Hub', async () => {
-    orgCreateMock.mockRejectedValue(new Error('No authorization information found for packaging-devhub.'));
+    resolveOrgMock.mockRejectedValue(new Error('No authorization information found for packaging-devhub.'));
 
     await expect(getPackageVersionReport('04t1', 'packaging-devhub')).rejects.toThrow('No authorization information');
   });
@@ -199,7 +199,7 @@ describe('requestPackageVersionCreate', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection });
     sfProjectResolveMock.mockResolvedValue(project);
     packageVersionCreateMock.mockResolvedValue({ Id: '08c000000000001', Status: 'Queued' });
     delete process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT;
@@ -208,7 +208,7 @@ describe('requestPackageVersionCreate', () => {
   it('starts the create with the options sf package version create sends, without waiting', async () => {
     const result = await requestPackageVersionCreate(options);
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('packaging-devhub', { isDevHub: true });
     const [createOptions, polling] = packageVersionCreateMock.mock.calls[0] as [
       Record<string, unknown>,
       { timeout: Duration; frequency: Duration },
@@ -252,7 +252,7 @@ describe('requestPackageVersionCreate', () => {
 describe('getPackageVersionCreateStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection });
   });
 
   it("returns the request's status from the Dev Hub", async () => {
@@ -260,7 +260,7 @@ describe('getPackageVersionCreateStatus', () => {
 
     const status = await getPackageVersionCreateStatus('08c000000000001', 'packaging-devhub');
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('packaging-devhub', { isDevHub: true });
     expect(getCreateStatusMock).toHaveBeenCalledWith('08c000000000001', connection);
     expect(status).toEqual({ Id: '08c000000000001', Status: 'InProgress', Error: [] });
   });
@@ -269,7 +269,7 @@ describe('getPackageVersionCreateStatus', () => {
 describe('listInstalledPackages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection });
   });
 
   it('shapes rows like sf package installed list --json, joining the version number', async () => {
@@ -292,7 +292,7 @@ describe('listInstalledPackages', () => {
 
     const installed = await listInstalledPackages('my-org');
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'my-org' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('my-org');
     expect(installedListMock).toHaveBeenCalledWith(connection);
     expect(installed).toEqual([
       {
@@ -312,7 +312,7 @@ describe('listInstalledPackages', () => {
 describe('resolveUpgradedPackages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection });
   });
 
   it('returns an empty array when nothing in the results upgraded an existing package', async () => {
@@ -369,7 +369,7 @@ describe('resolveUpgradedPackages', () => {
       devhubConfig,
     );
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('packaging-devhub', { isDevHub: true });
     expect(result).toEqual([
       {
         packageName: 'MyDependency',

@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-import { Org, SfError, SfProject } from '@salesforce/core';
+import { SfError, SfProject } from '@salesforce/core';
 import type { Duration } from '@salesforce/kit';
 import { ComponentSet, ComponentSetBuilder, ComponentStatus, RequestStatus } from '@salesforce/source-deploy-retrieve';
 import { SourceTracking } from '@salesforce/source-tracking';
 import { logger } from './logger.js';
+import { resolveOrg } from './resolveOrg.js';
 
 export type DeployProjectSourceOptions = {
   /** The org to deploy to. Omit to use the default target org. */
@@ -55,7 +56,7 @@ export type DeployProjectSourceResult = {
  */
 export async function deployProjectSource(options: DeployProjectSourceOptions): Promise<DeployProjectSourceResult> {
   const { aliasOrUsername, sourceDirs, ignoreWarnings = false, wait } = options;
-  const org = await Org.create({ aliasOrUsername });
+  const org = await resolveOrg(aliasOrUsername);
   const project = await SfProject.resolve();
   const tracking = await SourceTracking.create({ org, project, subscribeSDREvents: true, ignoreConflicts: true });
 

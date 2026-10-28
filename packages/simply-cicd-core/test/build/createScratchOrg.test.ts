@@ -179,8 +179,8 @@ describe('createScratchOrg', () => {
 
     await createScratchOrg({}, [hubA.alias]);
 
-    expect(assignPermissionSets).toHaveBeenCalledWith(['MyPermSet']);
-    expect(assignPermissionSetLicenses).toHaveBeenCalledWith(['MyLicense']);
+    expect(assignPermissionSets).toHaveBeenCalledWith(['MyPermSet'], 'scratch@test');
+    expect(assignPermissionSetLicenses).toHaveBeenCalledWith(['MyLicense'], 'scratch@test');
     expect(logger.success).toHaveBeenCalledWith('Permission sets assigned successfully.');
     expect(logger.success).toHaveBeenCalledWith('Permission set licenses assigned successfully.');
   });
@@ -207,7 +207,7 @@ describe('createScratchOrg', () => {
 
     await createScratchOrg({}, [hubA.alias]);
 
-    expect(getOrgConnection).toHaveBeenCalledWith();
+    expect(getOrgConnection).toHaveBeenCalledWith('scratch@test');
     expect(scratchConnection.query).toHaveBeenCalledWith('SELECT CountryCode FROM User LIMIT 1');
     expect(scratchConnection.singleRecordQuery).toHaveBeenCalledWith("SELECT Id FROM User WHERE Name = 'User User'");
     expect(scratchConnection.sobject).toHaveBeenCalledWith('User');

@@ -19,14 +19,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../src/logger.js';
 import { deployProjectSource } from '../src/sfDeploy.js';
 
-const orgCreateMock = vi.hoisted(() => vi.fn());
+const resolveOrgMock = vi.hoisted(() => vi.fn());
 const projectResolveMock = vi.hoisted(() => vi.fn());
 const trackingCreateMock = vi.hoisted(() => vi.fn());
 const builderBuildMock = vi.hoisted(() => vi.fn());
 
+vi.mock('../src/resolveOrg.js', () => ({ resolveOrg: resolveOrgMock }));
 vi.mock('@salesforce/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@salesforce/core')>()),
-  Org: { create: orgCreateMock },
   SfProject: { resolve: projectResolveMock },
 }));
 vi.mock('@salesforce/source-tracking', () => ({ SourceTracking: { create: trackingCreateMock } }));
@@ -83,7 +83,7 @@ describe('deployProjectSource', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue(org);
+    resolveOrgMock.mockResolvedValue(org);
     projectResolveMock.mockResolvedValue(project);
     tracking = { projectPath: '/project', registry: {}, localChangesAsComponentSet: vi.fn() };
     trackingCreateMock.mockResolvedValue(tracking);
@@ -96,7 +96,7 @@ describe('deployProjectSource', () => {
 
     const result = await deployProjectSource({ wait });
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: undefined });
+    expect(resolveOrgMock).toHaveBeenCalledWith(undefined);
     expect(trackingCreateMock).toHaveBeenCalledWith({
       org,
       project,
@@ -131,7 +131,7 @@ describe('deployProjectSource', () => {
       aliasOrUsername: 'scratch',
     });
 
-    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'scratch' });
+    expect(resolveOrgMock).toHaveBeenCalledWith('scratch');
     expect(builderBuildMock).toHaveBeenCalledWith({
       sourcepath: ['force-app', 'seed-app'],
       sourceapiversion: '62.0',
