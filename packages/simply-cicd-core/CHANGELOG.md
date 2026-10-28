@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.10.0...%40simplysf%2Fsimply-cicd-core%400.10.1) (2026-10-28)
+
+### Bug Fixes
+
+- **simply-cicd-core:** skip blank --dev-hub values instead of failing with AuthInfoCreationError ([#266](https://github.com/SimplySF/simply-plugins-core/issues/266)) ([d9bdba9](https://github.com/SimplySF/simply-plugins-core/commit/d9bdba910bbe2f96db1e85554cd174f8535eaef0))
+
 # [0.10.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.9.1...%40simplysf%2Fsimply-cicd-core%400.10.0) (2026-10-28)
 
 ### Features
