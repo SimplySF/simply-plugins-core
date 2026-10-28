@@ -65,3 +65,12 @@ export {
   type ApexTestSuiteErrorCode,
   type ApexTestSuiteGenerateResult,
 } from './apexTestSuite.js';
+
+export {
+  formatTestResultJson,
+  runApexTestsWithResults,
+  type ApexTestResultJson,
+  type ApexTestResultJsonTest,
+  type RunApexTestsWithResultsOptions,
+  type RunApexTestsWithResultsResult,
+} from './apexTestRun.js';

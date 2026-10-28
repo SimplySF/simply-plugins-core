@@ -79,6 +79,7 @@ it('exports the expected set of runtime values', () => {
     'deployHappySoup',
     'deployProgressSchema',
     'deployProject',
+    'deployProjectSource',
     'deployRulesSchema',
     'deployStageSchema',
     'detectIndentation',

@@ -16,10 +16,11 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { execa } from 'execa';
+import { Duration } from '@salesforce/kit';
+import { runApexTestsWithResults, type RunApexTestsWithResultsOptions } from '@simplysf/simply-apex-core';
 import { readSfdxProject } from '@simplysf/simply-core';
-import { runSf } from './exec/sfCli.js';
 import { logger } from './logger.js';
+import { getOrgConnection } from './sfOrg.js';
 
 export type HasApexTestsOptions = {
   debugMode?: boolean;
@@ -57,12 +58,15 @@ export async function hasApexTests(options?: HasApexTestsOptions): Promise<boole
   for (const dir of packageDirs) {
     try {
       // eslint-disable-next-line no-await-in-loop -- stops at the first directory with a match
-      await execa('grep', ['-q', '-r', '-i', '--include=*.cls', '@isTest\\b', dir]);
-      return true;
+      if (await directoryHasApexTests(dir)) {
+        return true;
+      }
+      if (options?.debugMode) {
+        logger.log(`No Apex tests found in ${dir}.`);
+      }
     } catch (error) {
       if (options?.debugMode) {
-        const err = error as { shortMessage?: string };
-        logger.log(`No Apex tests found in ${dir} or an error occurred during search.`, err.shortMessage);
+        logger.log(`No Apex tests found in ${dir} or an error occurred during search.`, (error as Error).message);
       }
     }
   }
@@ -70,12 +74,29 @@ export async function hasApexTests(options?: HasApexTestsOptions): Promise<boole
   return false;
 }
 
-/** Kicks off the `sf apex test run`, swallowing any failure so the run's artifacts (namely the
- * test run ID file) can still be inspected afterward to distinguish an execution failure from a
- * genuine test failure. */
-async function executeTestRun(args: string[]): Promise<Error | undefined> {
+/** What `grep -q -r -i --include=*.cls '@isTest\b' <dir>` checked, without depending on grep. */
+async function directoryHasApexTests(dir: string): Promise<boolean> {
+  const entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith('.cls')) {
+      // eslint-disable-next-line no-await-in-loop -- stops at the first match
+      const source = await fs.readFile(path.join(entry.parentPath, entry.name), 'utf-8');
+      if (/@isTest\b/i.test(source)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Runs the tests, swallowing any failure so the run's artifacts (namely the test run ID file) can
+ * still be inspected afterward to distinguish an execution failure from a genuine test failure. */
+async function executeTestRun(
+  alias: string | undefined,
+  options: Omit<RunApexTestsWithResultsOptions, 'connection'>,
+): Promise<Error | undefined> {
   try {
-    await runSf(args, { stdio: 'pipe' });
+    await runApexTestsWithResults({ ...options, connection: await getOrgConnection(alias) });
     return undefined;
   } catch (e) {
     return e as Error;
@@ -89,7 +110,7 @@ async function resolveTestRunId(testRunIdFile: string, execError: Error | undefi
     return (await fs.readFile(testRunIdFile, 'utf-8')).trim();
   } catch (readIdError) {
     if (execError) {
-      logger.error('Apex test run failed.', (execError as { shortMessage?: string }).shortMessage);
+      logger.error('Apex test run failed.', execError.message);
       throw execError;
     }
 
@@ -166,30 +187,16 @@ export async function runApexTests(options: RunApexTestsOptions): Promise<void> 
   const testResultsDir = './test-results/apex';
   await fs.mkdir(testResultsDir, { recursive: true });
 
-  const args = [
-    'apex',
-    'test',
-    'run',
-    '--code-coverage',
-    '--result-format',
-    'junit',
-    '--output-dir',
-    testResultsDir,
-    '--wait',
-    wait,
-  ];
-
-  if (alias) {
-    args.push('--target-org', alias);
-  }
-
-  if (testSuite) {
-    args.push('--suite-names', testSuite);
-  } else {
-    args.push('--test-level', testLevel);
-  }
-
-  const execError = await executeTestRun(args);
+  // What `sf apex test run --code-coverage --result-format junit --output-dir <dir> --wait <wait>
+  // [--suite-names <suite> | --test-level <level>]` ran and wrote.
+  const execError = await executeTestRun(alias, {
+    codeCoverage: true,
+    outputDir: testResultsDir,
+    wait: Duration.minutes(Number(wait)),
+    ...(testSuite
+      ? { suiteNames: [testSuite] }
+      : { testLevel: testLevel as RunApexTestsWithResultsOptions['testLevel'] }),
+  });
   const testRunId = await resolveTestRunId(path.join(testResultsDir, 'test-run-id.txt'), execError);
 
   let testRunOutcome: string | undefined;

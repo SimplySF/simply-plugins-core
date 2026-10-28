@@ -52,6 +52,8 @@ it('exports the expected set of runtime values', () => {
       'scanTestClasses',
       'buildApexTestSuiteXml',
       'ApexTestSuiteError',
+      'formatTestResultJson',
+      'runApexTestsWithResults',
     ].sort(),
   );
 });
