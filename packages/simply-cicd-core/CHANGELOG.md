@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.9.0...%40simplysf%2Fsimply-cicd-core%400.9.1) (2026-10-28)
+
+### Bug Fixes
+
+- **simply-cicd-core:** resolve org aliases and fresh defaults for every org lookup ([#264](https://github.com/SimplySF/simply-plugins-core/issues/264)) ([c2847a6](https://github.com/SimplySF/simply-plugins-core/commit/c2847a6219e404c9e099cfdeffc8d1440f9931c2))
+
 # [0.9.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.8.0...%40simplysf%2Fsimply-cicd-core%400.9.0) (2026-10-28)
 
 ### Features
