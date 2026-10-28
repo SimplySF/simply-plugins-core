@@ -16,11 +16,12 @@
 
 import { promises as fs } from 'node:fs';
 import { getDefaultPackageDirectory, readSfdxProject, type SfdxProject } from '@simplysf/simply-core';
-import { runSf } from '../exec/sfCli.js';
 import { logger } from '../logger.js';
 import {
   assignPermissionSetLicenses as assignLicensesToOrgUser,
   assignPermissionSets as assignPermissionSetsToOrgUser,
+  createScratchOrgOnHub,
+  type CreatedScratchOrg,
   getOrgConnection,
   getRemainingDailyScratchOrgs,
 } from '../sfOrg.js';
@@ -79,12 +80,12 @@ async function trySetDefaultCountry(): Promise<void> {
   }
 }
 
-export type ScratchOrgCreateResult = Record<string, unknown>;
+export type ScratchOrgCreateResult = CreatedScratchOrg;
 
 async function attemptScratchOrgCreation(
   hub: ResolvedDevHub,
   definitionFile: string,
-  duration: string,
+  durationDays: number,
 ): Promise<ScratchOrgCreateResult | undefined> {
   const remaining = await getRemainingDailyScratchOrgs(hub.username);
   if (remaining === undefined || remaining <= 0) {
@@ -93,52 +94,34 @@ async function attemptScratchOrgCreation(
   }
   logger.info(`Attempting to create scratch org with Dev Hub ${hub.alias} (${remaining} remaining).`);
 
-  const { stdout } = await runSf([
-    'org',
-    'create',
-    'scratch',
-    '--target-dev-hub',
-    hub.username,
-    '--duration-days',
-    duration,
-    '--definition-file',
+  const createResult = await createScratchOrgOnHub(hub.username, {
     definitionFile,
-    '--wait',
-    '20',
-    '--set-default',
-    '--json',
-  ]);
-  const createResult = (JSON.parse(stdout) as { result: ScratchOrgCreateResult }).result;
+    durationDays,
+    waitMinutes: 20,
+    setDefault: true,
+  });
   await fs.writeFile('SCRATCH_ORG_INFO.json', JSON.stringify(createResult, null, 2));
   logger.success(`Scratch org created successfully using Dev Hub ${hub.alias}.`);
   return createResult;
 }
 
-function isScratchOrgLimitError(message: string): boolean {
+/**
+ * The Dev Hub refusing the signup because its daily allocation is used up. That's the API's own
+ * `LIMIT_EXCEEDED` error on the ScratchOrgInfo insert, passed through by @salesforce/core.
+ */
+function isScratchOrgLimitError(error: unknown, message: string): boolean {
   return (
+    (error as { errorCode?: string }).errorCode === 'LIMIT_EXCEEDED' ||
     message.includes(
       'The signup request failed because this organization has reached its daily scratch org signup limit',
-    ) || message.includes('LIMIT_EXCEEDED')
+    ) ||
+    message.includes('LIMIT_EXCEEDED')
   );
 }
 
 function extractScratchOrgErrorMessage(error: unknown): string {
-  const err = error as Error & { stdout?: string };
-  let errorMessage = err.message;
-  if (err.stdout) {
-    try {
-      const errorResult = JSON.parse(err.stdout) as { message?: string; stack?: string };
-      errorMessage = errorResult.message ?? errorMessage;
-      logger.error(errorMessage);
-      if (errorResult.stack) {
-        logger.error(errorResult.stack);
-      }
-    } catch {
-      logger.error(err.stdout);
-    }
-  } else {
-    logger.error(err.message);
-  }
+  const errorMessage = (error as Error).message;
+  logger.error(errorMessage);
   return errorMessage;
 }
 
@@ -168,12 +151,17 @@ export async function createScratchOrg(
     throw new Error('You must specify a definitionFile in the default package directory in sfdx-project.json');
   }
 
-  const duration = options.scratchDurationDays ?? '1';
+  const rawDurationDays = options.scratchDurationDays ?? '1';
+  const durationDays = Number(rawDurationDays);
+  // `sf org create scratch --duration-days` accepted 1–30 and rejected anything else up front.
+  if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 30) {
+    throw new Error(`Scratch org duration must be a whole number of days from 1 to 30, got "${rawDurationDays}".`);
+  }
 
   for (const hub of devHubs) {
     try {
       // eslint-disable-next-line no-await-in-loop -- each Dev Hub is only attempted after the previous one is exhausted
-      const createResult = await attemptScratchOrgCreation(hub, definitionFile, duration);
+      const createResult = await attemptScratchOrgCreation(hub, definitionFile, durationDays);
       if (!createResult) {
         continue;
       }
@@ -185,7 +173,7 @@ export async function createScratchOrg(
     } catch (error) {
       logger.error(`Scratch org creation failed with Dev Hub ${hub.alias}:`);
       const errorMessage = extractScratchOrgErrorMessage(error);
-      if (isScratchOrgLimitError(errorMessage)) {
+      if (isScratchOrgLimitError(error, errorMessage)) {
         logger.warn(`Dev Hub ${hub.alias} reached its daily limit. Trying next Dev Hub...`);
         continue;
       }

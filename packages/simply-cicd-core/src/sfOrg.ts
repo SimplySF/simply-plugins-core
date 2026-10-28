@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-import { Org, User, type Connection } from '@salesforce/core';
+import { promises as fs } from 'node:fs';
+import { AuthInfo, AuthRemover, Org, scratchOrgCreate, SfError, User, type Connection } from '@salesforce/core';
+import { Duration } from '@salesforce/kit';
 import { escapeSoqlLiteral } from '@simplysf/simply-core';
 import { logger } from './logger.js';
 
@@ -145,4 +147,86 @@ export async function assignPermissionSetLicenses(licenseNames: string[], aliasO
   if (failures.length > 0) {
     throw new AssignmentError('Permission set license assignment failed', failures);
   }
+}
+
+/** What `sf org create scratch --json` returns: the fields `SCRATCH_ORG_INFO.json` is written from. */
+export type CreatedScratchOrg = {
+  username?: string;
+  scratchOrgInfo?: Record<string, unknown>;
+  authFields?: Record<string, unknown>;
+  warnings: string[];
+  orgId?: string;
+};
+
+export type CreateScratchOrgOnHubOptions = {
+  /** Path to the scratch org definition file. */
+  definitionFile: string;
+  durationDays: number;
+  /** Minutes to wait for the org to be ready. */
+  waitMinutes: number;
+  /** Make the new org the default target org (`--set-default`). */
+  setDefault?: boolean;
+};
+
+/**
+ * Creates a scratch org from a Dev Hub, as `sf org create scratch --definition-file … --json` does,
+ * and returns the same result shape. The org is authenticated and source tracking is enabled, as
+ * the CLI's defaults.
+ *
+ * @param hubAliasOrUsername - The Dev Hub. Must already be authenticated.
+ * @throws {SfError} If signup fails or doesn't finish within the wait.
+ */
+export async function createScratchOrgOnHub(
+  hubAliasOrUsername: string,
+  options: CreateScratchOrgOnHubOptions,
+): Promise<CreatedScratchOrg> {
+  const hubOrg = await Org.create({ aliasOrUsername: hubAliasOrUsername });
+  const orgConfig = JSON.parse(await fs.readFile(options.definitionFile, 'utf-8')) as Record<string, unknown>;
+  const { username, scratchOrgInfo, authFields, warnings } = await scratchOrgCreate({
+    hubOrg,
+    orgConfig,
+    durationDays: options.durationDays,
+    wait: Duration.minutes(options.waitMinutes),
+    setDefault: options.setDefault ?? false,
+    tracksSource: true,
+  });
+  if (!scratchOrgInfo) {
+    throw new SfError('The scratch org did not return with any information');
+  }
+  // Round-trip through JSON so the result is exactly what the CLI serialized (dates as strings, no
+  // class instances), since callers persist it as SCRATCH_ORG_INFO.json.
+  return JSON.parse(
+    JSON.stringify({ username, scratchOrgInfo, authFields, warnings, orgId: authFields?.orgId }),
+  ) as CreatedScratchOrg;
+}
+
+/**
+ * Deletes a scratch org, as `sf org delete scratch --no-prompt` does: refuses a non-scratch org,
+ * treats an already-deleted org as success, and removes the local auth for one whose domain no
+ * longer resolves.
+ *
+ * @param aliasOrUsername - The scratch org. Omit to use the default target org.
+ * @returns The deleted org's username.
+ * @throws {SfError} If the org isn't a scratch org, or the Dev Hub rejects the delete.
+ */
+export async function deleteTargetScratchOrg(aliasOrUsername?: string): Promise<string> {
+  const org = await Org.create({ aliasOrUsername });
+  const username = org.getUsername() ?? '';
+  const { isScratch } = (await AuthInfo.create({ username })).getFields();
+  if (!isScratch) {
+    throw new SfError(`The target org (${username}) is not a scratch org.`, 'NotAScratchOrgError');
+  }
+  try {
+    await org.delete();
+  } catch (error) {
+    const name = (error as Error).name;
+    if (name === 'DomainNotFoundError') {
+      await (await AuthRemover.create()).removeAuth(username);
+    } else if (name === 'ScratchOrgNotFound') {
+      logger.info(`Scratch org ${username} was already deleted.`);
+    } else {
+      throw error;
+    }
+  }
+  return username;
 }

@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../src/logger.js';
 import {
   AssignmentError,
   assignPermissionSetLicenses,
   assignPermissionSets,
+  createScratchOrgOnHub,
+  deleteTargetScratchOrg,
   getOrgConnection,
   getOrgInstanceUrl,
   getRemainingDailyScratchOrgs,
@@ -31,8 +36,19 @@ const limitsMock = vi.hoisted(() => vi.fn());
 const singleRecordQueryMock = vi.hoisted(() => vi.fn());
 const createRecordMock = vi.hoisted(() => vi.fn());
 const userAssignMock = vi.hoisted(() => vi.fn());
+const scratchOrgCreateMock = vi.hoisted(() => vi.fn());
+const authInfoCreateMock = vi.hoisted(() => vi.fn());
+const removeAuthMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@salesforce/core', () => ({ Org: { create: orgCreateMock }, User: { create: userCreateMock } }));
+vi.mock('@salesforce/core', async (importOriginal) => ({
+  // SfError stays real.
+  ...(await importOriginal<typeof import('@salesforce/core')>()),
+  Org: { create: orgCreateMock },
+  User: { create: userCreateMock },
+  AuthInfo: { create: authInfoCreateMock },
+  AuthRemover: { create: async () => ({ removeAuth: removeAuthMock }) },
+  scratchOrgCreate: scratchOrgCreateMock,
+}));
 vi.mock('../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -169,6 +185,101 @@ describe('sfOrg', () => {
         { name: "o'brien@example.com", message: 'FIELD_INTEGRITY_EXCEPTION' },
         { name: "o'brien@example.com", message: 'PermissionSetLicense not found: Missing' },
       ]);
+    });
+  });
+
+  describe('createScratchOrgOnHub', () => {
+    it('creates from the definition file with the CLI defaults and returns the CLI result shape', async () => {
+      const definitionFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'scratch-def-')), 'def.json');
+      await fs.writeFile(definitionFile, JSON.stringify({ edition: 'Developer', features: ['Communities'] }));
+      const hubOrg = { getConnection: () => connection, getUsername: () => 'hub@example.com' };
+      orgCreateMock.mockResolvedValue(hubOrg);
+      scratchOrgCreateMock.mockResolvedValue({
+        username: 'test-abc@example.com',
+        scratchOrgInfo: { Id: '2SR000000000001', CreatedDate: new Date('2026-10-28T12:00:00.000Z') },
+        authFields: { orgId: '00D000000000002', refreshToken: 'refresh' },
+        authInfo: { not: 'serialized by the CLI' },
+        warnings: [],
+      });
+
+      const result = await createScratchOrgOnHub('hub@example.com', {
+        definitionFile,
+        durationDays: 7,
+        waitMinutes: 20,
+        setDefault: true,
+      });
+
+      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'hub@example.com' });
+      const options = scratchOrgCreateMock.mock.calls[0][0] as Record<string, unknown> & { wait: { minutes: number } };
+      expect(options).toMatchObject({
+        hubOrg,
+        orgConfig: { edition: 'Developer', features: ['Communities'] },
+        durationDays: 7,
+        setDefault: true,
+        tracksSource: true,
+      });
+      expect(options.wait.minutes).toBe(20);
+      expect(result).toEqual({
+        username: 'test-abc@example.com',
+        scratchOrgInfo: { Id: '2SR000000000001', CreatedDate: '2026-10-28T12:00:00.000Z' },
+        authFields: { orgId: '00D000000000002', refreshToken: 'refresh' },
+        warnings: [],
+        orgId: '00D000000000002',
+      });
+    });
+
+    it('throws when signup returns no scratch org info', async () => {
+      const definitionFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'scratch-def-')), 'def.json');
+      await fs.writeFile(definitionFile, '{}');
+      scratchOrgCreateMock.mockResolvedValue({ warnings: [] });
+
+      await expect(
+        createScratchOrgOnHub('hub@example.com', { definitionFile, durationDays: 1, waitMinutes: 20 }),
+      ).rejects.toThrow('The scratch org did not return with any information');
+    });
+  });
+
+  describe('deleteTargetScratchOrg', () => {
+    const deleteMock = vi.fn();
+
+    beforeEach(() => {
+      orgCreateMock.mockResolvedValue({ getUsername: () => 'scratch@example.com', delete: deleteMock });
+      authInfoCreateMock.mockResolvedValue({ getFields: () => ({ isScratch: true }) });
+      deleteMock.mockResolvedValue(undefined);
+    });
+
+    it('deletes the default target org when it is a scratch org', async () => {
+      expect(await deleteTargetScratchOrg()).toBe('scratch@example.com');
+      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: undefined });
+      expect(authInfoCreateMock).toHaveBeenCalledWith({ username: 'scratch@example.com' });
+      expect(deleteMock).toHaveBeenCalled();
+    });
+
+    it('refuses an org that is not a scratch org', async () => {
+      authInfoCreateMock.mockResolvedValue({ getFields: () => ({ isScratch: false }) });
+
+      await expect(deleteTargetScratchOrg('prod')).rejects.toMatchObject({ name: 'NotAScratchOrgError' });
+      expect(deleteMock).not.toHaveBeenCalled();
+    });
+
+    it('treats an already-deleted scratch org as success', async () => {
+      deleteMock.mockRejectedValue(Object.assign(new Error('gone'), { name: 'ScratchOrgNotFound' }));
+
+      await expect(deleteTargetScratchOrg()).resolves.toBe('scratch@example.com');
+      expect(removeAuthMock).not.toHaveBeenCalled();
+    });
+
+    it('removes the local auth for a scratch org whose domain no longer resolves', async () => {
+      deleteMock.mockRejectedValue(Object.assign(new Error('no domain'), { name: 'DomainNotFoundError' }));
+
+      await expect(deleteTargetScratchOrg()).resolves.toBe('scratch@example.com');
+      expect(removeAuthMock).toHaveBeenCalledWith('scratch@example.com');
+    });
+
+    it('rethrows any other delete failure', async () => {
+      deleteMock.mockRejectedValue(new Error('INSUFFICIENT_ACCESS'));
+
+      await expect(deleteTargetScratchOrg()).rejects.toThrow('INSUFFICIENT_ACCESS');
     });
   });
 });
