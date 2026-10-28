@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-permissions-core",
   "description": "Permission set generation, permission set XML, and permissions report rendering — the library layer behind @simplysf/simply-permissions, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -38,7 +38,7 @@
   "type": "module",
   "dependencies": {
     "@salesforce/source-deploy-retrieve": "^12.37.2",
-    "@simplysf/simply-core": "workspace:^1.6.11",
+    "@simplysf/simply-core": "workspace:^1.6.12",
     "@simplysf/simply-report": "workspace:^1.0.7",
     "fast-xml-parser": "^5.11.1",
     "xmlbuilder2": "^4.0.3",

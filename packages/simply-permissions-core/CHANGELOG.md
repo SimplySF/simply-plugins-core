@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.2](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.10.1...%40simplysf%2Fsimply-permissions-core%400.10.2) (2026-10-28)
+
+**Note:** Version bump only for package @simplysf/simply-permissions-core
+
 ## [0.10.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-permissions-core%400.10.0...%40simplysf%2Fsimply-permissions-core%400.10.1) (2026-10-22)
 
 ### Bug Fixes

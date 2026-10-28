@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-settings-core",
   "description": "State and Country/Territory picklist automation (create states via the Setup form, activate them via AddressSettings) — the library layer behind @simplysf/simply-settings, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -41,7 +41,7 @@
     "@salesforce/core": "^8.30.0",
     "@salesforce/kit": "^3.2.6",
     "@salesforce/source-deploy-retrieve": "^12.37.2",
-    "@simplysf/simply-core": "workspace:^1.6.11",
+    "@simplysf/simply-core": "workspace:^1.6.12",
     "fast-xml-parser": "^5.11.1",
     "undici": "^8.12.2"
   },
