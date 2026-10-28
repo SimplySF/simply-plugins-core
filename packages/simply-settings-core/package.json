@@ -43,7 +43,7 @@
     "@salesforce/source-deploy-retrieve": "^12.37.2",
     "@simplysf/simply-core": "workspace:^1.6.11",
     "fast-xml-parser": "^5.11.1",
-    "undici": "^8.11.0"
+    "undici": "^8.12.2"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
