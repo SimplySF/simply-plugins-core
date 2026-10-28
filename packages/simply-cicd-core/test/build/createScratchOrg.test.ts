@@ -15,7 +15,6 @@
  */
 
 import { promises as fsPromises } from 'node:fs';
-import { execa } from 'execa';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject } from '@simplysf/simply-core';
 import { logger } from '../../src/logger.js';
@@ -23,12 +22,12 @@ import { resolveDevHubs } from '../../src/build/devHubs.js';
 import {
   assignPermissionSetLicenses,
   assignPermissionSets,
+  createScratchOrgOnHub,
   getOrgConnection,
   getRemainingDailyScratchOrgs,
 } from '../../src/sfOrg.js';
 import { createScratchOrg } from '../../src/build/createScratchOrg.js';
 
-vi.mock('execa');
 vi.mock('@simplysf/simply-core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@simplysf/simply-core')>();
   return { ...actual, readSfdxProject: vi.fn() };
@@ -52,6 +51,7 @@ vi.mock('../../src/build/devHubs.js', () => ({ resolveDevHubs: vi.fn() }));
 vi.mock('../../src/sfOrg.js', () => ({
   assignPermissionSets: vi.fn(),
   assignPermissionSetLicenses: vi.fn(),
+  createScratchOrgOnHub: vi.fn(),
   getOrgConnection: vi.fn(),
   getRemainingDailyScratchOrgs: vi.fn(),
 }));
@@ -82,12 +82,7 @@ describe('createScratchOrg', () => {
     vi.mocked(getOrgConnection).mockResolvedValue(scratchConnection as never);
     scratchConnection.query.mockRejectedValue(new Error("No such column 'CountryCode' on entity 'User'"));
     mockSfdxProjectJson();
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
-        return { stdout: JSON.stringify({ result: createResult }) };
-      }
-      return { stdout: '' };
-    }) as never);
+    vi.mocked(createScratchOrgOnHub).mockResolvedValue(createResult as never);
   });
 
   it('should create a scratch org with the first Dev Hub that has capacity', async () => {
@@ -95,53 +90,39 @@ describe('createScratchOrg', () => {
 
     expect(resolveDevHubs).toHaveBeenCalledWith([hubA.alias, hubB.alias]);
     expect(result).toEqual(createResult);
-    expect(execa).toHaveBeenCalledWith(
-      'sf',
-      expect.arrayContaining([
-        'org',
-        'create',
-        'scratch',
-        '--target-dev-hub',
-        hubA.username,
-        '--duration-days',
-        '1',
-        '--definition-file',
-        'config/project-scratch-def.json',
-      ]),
-    );
+    expect(createScratchOrgOnHub).toHaveBeenCalledWith(hubA.username, {
+      definitionFile: 'config/project-scratch-def.json',
+      durationDays: 1,
+      waitMinutes: 20,
+      setDefault: true,
+    });
     expect(fsPromises.writeFile).toHaveBeenCalledWith('SCRATCH_ORG_INFO.json', JSON.stringify(createResult, null, 2));
     expect(logger.success).toHaveBeenCalledWith(`Scratch org created successfully using Dev Hub ${hubA.alias}.`);
   });
 
   it('should skip a Dev Hub with no remaining daily capacity and try the next one', async () => {
     vi.mocked(getRemainingDailyScratchOrgs).mockImplementation(async (hub) => (hub === hubA.username ? 0 : 5));
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
-        return { stdout: JSON.stringify({ result: createResult }) };
-      }
-      return { stdout: '' };
-    }) as never);
 
     const result = await createScratchOrg({}, [hubA.alias, hubB.alias]);
 
     expect(result).toEqual(createResult);
     expect(logger.warn).toHaveBeenCalledWith(`Dev Hub ${hubA.alias} has no remaining scratch orgs. Skipping.`);
-    expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--target-dev-hub', hubB.username]));
+    expect(createScratchOrgOnHub).toHaveBeenCalledWith(hubB.username, expect.anything());
   });
 
   it('should try the next Dev Hub when creation fails with a scratch org limit error', async () => {
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
-        if (args.includes(hubA.username)) {
-          const error = Object.assign(new Error('LIMIT_EXCEEDED'), {
-            stdout: JSON.stringify({ message: 'LIMIT_EXCEEDED' }),
-          });
-          return Promise.reject(error);
-        }
-        return { stdout: JSON.stringify({ result: createResult }) };
+    vi.mocked(createScratchOrgOnHub).mockImplementation(async (hub) => {
+      if (hub === hubA.username) {
+        // How the Dev Hub's API reports it: the code on the error, the sentence in the message.
+        throw Object.assign(
+          new Error(
+            'The signup request failed because this organization has reached its daily scratch org signup limit',
+          ),
+          { errorCode: 'LIMIT_EXCEEDED' },
+        );
       }
-      return { stdout: '' };
-    }) as never);
+      return createResult as never;
+    });
 
     const result = await createScratchOrg({}, [hubA.alias, hubB.alias]);
 
@@ -150,17 +131,12 @@ describe('createScratchOrg', () => {
   });
 
   it('should throw immediately on a non-recoverable creation error, without trying the next Dev Hub', async () => {
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
-        return Promise.reject(new Error('unexpected failure'));
-      }
-      return { stdout: '' };
-    }) as never);
+    vi.mocked(createScratchOrgOnHub).mockRejectedValue(new Error('unexpected failure'));
 
     await expect(createScratchOrg({}, [hubA.alias, hubB.alias])).rejects.toThrow(
       `Scratch org creation failed with a non-recoverable error using Dev Hub ${hubA.alias}.`,
     );
-    expect(execa).not.toHaveBeenCalledWith('sf', expect.arrayContaining(['--target-dev-hub', hubB.username]));
+    expect(createScratchOrgOnHub).not.toHaveBeenCalledWith(hubB.username, expect.anything());
   });
 
   it('should throw once every Dev Hub has been exhausted', async () => {
@@ -170,6 +146,22 @@ describe('createScratchOrg', () => {
       'Scratch org creation failed for all available Dev Hubs.',
     );
   });
+
+  it('should pass --scratch-duration-days through as a number of days', async () => {
+    await createScratchOrg({ scratchDurationDays: '7' }, [hubA.alias]);
+
+    expect(createScratchOrgOnHub).toHaveBeenCalledWith(hubA.username, expect.objectContaining({ durationDays: 7 }));
+  });
+
+  it.each(['0', '31', '1.5', 'week'])(
+    'should reject a duration of %j up front, as sf org create scratch did, before trying any Dev Hub',
+    async (scratchDurationDays) => {
+      await expect(createScratchOrg({ scratchDurationDays }, [hubA.alias])).rejects.toThrow(
+        `Scratch org duration must be a whole number of days from 1 to 30, got "${scratchDurationDays}".`,
+      );
+      expect(createScratchOrgOnHub).not.toHaveBeenCalled();
+    },
+  );
 
   it('should throw when no definitionFile is available anywhere', async () => {
     vi.mocked(readSfdxProject).mockResolvedValue({ packageDirectories: [{ default: true }] });
@@ -184,12 +176,6 @@ describe('createScratchOrg', () => {
       packageMetadataAccess: { permissionSets: ['MyPermSet'], permissionSetLicenses: ['MyLicense'] },
     });
     vi.mocked(resolveDevHubs).mockResolvedValue([hubA]);
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (cmd === 'sf' && args[0] === 'org' && args[1] === 'create' && args[2] === 'scratch') {
-        return { stdout: JSON.stringify({ result: createResult }) };
-      }
-      return { stdout: '' };
-    }) as never);
 
     await createScratchOrg({}, [hubA.alias]);
 

@@ -15,15 +15,15 @@
  */
 
 import { promises as fsPromises } from 'node:fs';
-import { execa } from 'execa';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../../src/logger.js';
 import { authenticateOrg } from '../../src/sfAuth.js';
+import { deleteTargetScratchOrg } from '../../src/sfOrg.js';
 import { resolveDevHubs } from '../../src/build/devHubs.js';
 import { ensureScratchOrgSession } from '../../src/build/scratchOrgAuth.js';
 import { deleteScratchOrg } from '../../src/build/deleteScratchOrg.js';
 
-vi.mock('execa');
+vi.mock('../../src/sfOrg.js', () => ({ deleteTargetScratchOrg: vi.fn() }));
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return { ...actual, promises: { ...actual.promises, readFile: vi.fn() } };
@@ -69,7 +69,7 @@ describe('deleteScratchOrg', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fsPromises.readFile).mockResolvedValue(JSON.stringify(mockScratchOrgInfo));
-    vi.mocked(execa).mockResolvedValue({ stdout: '' } as never);
+    vi.mocked(deleteTargetScratchOrg).mockResolvedValue('scratch@example.com');
   });
 
   it('re-authenticates a JWT-authenticated Dev Hub, ensures the scratch org session, then deletes it', async () => {
@@ -91,7 +91,7 @@ describe('deleteScratchOrg', () => {
       setDefault: true,
       debug: undefined,
     });
-    expect(execa).toHaveBeenCalledWith('sf', ['org', 'delete', 'scratch', '--no-prompt'], { stdio: 'inherit' });
+    expect(deleteTargetScratchOrg).toHaveBeenCalledWith();
     expect(logger.success).toHaveBeenCalledWith('Scratch org deleted.');
   });
 
@@ -106,7 +106,7 @@ describe('deleteScratchOrg', () => {
       setDefault: true,
       debug: undefined,
     });
-    expect(execa).toHaveBeenCalledWith('sf', ['org', 'delete', 'scratch', '--no-prompt'], { stdio: 'inherit' });
+    expect(deleteTargetScratchOrg).toHaveBeenCalledWith();
   });
 
   it('logs (not throws) when the given --dev-hub does not match the org that created the scratch org', async () => {
@@ -118,12 +118,12 @@ describe('deleteScratchOrg', () => {
       'Failed to delete scratch org. It may need to be deleted manually.',
       expect.stringContaining('does not match the Dev Hub that created this scratch org'),
     );
-    expect(execa).not.toHaveBeenCalled();
+    expect(deleteTargetScratchOrg).not.toHaveBeenCalled();
   });
 
   it('should log (not throw) when the delete command fails', async () => {
     vi.mocked(resolveDevHubs).mockResolvedValue([jwtHub]);
-    vi.mocked(execa).mockRejectedValue(new Error('delete failed'));
+    vi.mocked(deleteTargetScratchOrg).mockRejectedValue(new Error('delete failed'));
 
     await expect(deleteScratchOrg({ jwtKeyFile: 'key.file' }, 'main')).resolves.toBeUndefined();
 
