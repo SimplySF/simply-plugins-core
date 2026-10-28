@@ -92,7 +92,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0050](0050-permissions-config-record-access-names.md)               | Overrides use `viewAllRecords` / `modifyAllRecords`                                   | Implemented |
 | [0051](0051-permissions-config-metadata-names.md)                    | Override sections and keys match the PermissionSet metadata                           | Implemented |
 | [0052](0052-package-dependencies-clone.md)                           | `simply package dependencies clone`                                                   | In progress |
-| [0053](0053-simply-cicd-core-common.md)                              | Moving the rest of `simply-cicd`'s `common/` into `simply-cicd-core`                  | In progress |
+| [0053](0053-simply-cicd-core-common.md)                              | Moving the rest of `simply-cicd`'s `common/` into `simply-cicd-core`                  | Implemented |
 
 ## Template
 
