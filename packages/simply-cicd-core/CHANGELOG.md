@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.5.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.4.0...%40simplysf%2Fsimply-cicd-core%400.5.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** replace sf CLI record writes with library calls ([#258](https://github.com/SimplySF/simply-plugins-core/issues/258)) ([8513c5c](https://github.com/SimplySF/simply-plugins-core/commit/8513c5c7eb4c52c9f6467bfa1f63a7635bb9226f)), closes [User#assignPermissionSets](https://github.com/User/issues/assignPermissionSets)
+
 # [0.4.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.3.1...%40simplysf%2Fsimply-cicd-core%400.4.0) (2026-10-28)
 
 ### Features
