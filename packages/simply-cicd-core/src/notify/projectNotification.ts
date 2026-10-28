@@ -18,8 +18,8 @@ import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
 import { getDefaultPackageDirectory, isSubscriberPackageVersionId, readSfdxProject } from '@simplysf/simply-core';
 import { createAlmProvider, type AlmProviderKind } from '../alm/index.js';
-import { runSf, runSfJson } from '../exec/sfCli.js';
 import { logger } from '../logger.js';
+import { getPackageVersionReport, listInstalledPackages } from '../sfPackages.js';
 import { appendToEnvFile } from '../env.js';
 import { getCommitStories } from './getCommitStories.js';
 import { renderNotifyTemplate } from './renderTemplate.js';
@@ -73,10 +73,8 @@ export async function resolvePrevInstalledPackageVersion(params: PrevInstalledPa
     const packageName = getDefaultPackageDirectory(await readSfdxProject())?.package;
 
     logger.info(`Get installed package version from alias ${alias} for package ${packageName ?? 'unknown'}...`);
-    const installedList = await runSfJson<{
-      result: Array<{ SubscriberPackageName?: string; SubscriberPackageVersionNumber?: string }>;
-    }>(['package', 'installed', 'list', '--target-org', alias, '--json']);
-    const pkg = installedList.result.find((p) => p.SubscriberPackageName === packageName);
+    const installed = await listInstalledPackages(alias);
+    const pkg = installed.find((p) => p.SubscriberPackageName === packageName);
     return pkg?.SubscriberPackageVersionNumber ? `v${pkg.SubscriberPackageVersionNumber}` : 'N/A';
   } catch (error) {
     logger.warn(`Could not query installed package version: ${(error as Error).message}`);
@@ -104,18 +102,8 @@ export async function resolveTargetPackageVersionFromDevHub(
 
   try {
     logger.info(`Get latest package version for package version ID ${subscriberPackageVersionId}...`);
-    const { stdout } = await runSf([
-      'package',
-      'version',
-      'report',
-      '--package',
-      subscriberPackageVersionId,
-      '--target-dev-hub',
-      packagingDevhub,
-      '--json',
-    ]);
-    const versionReport = JSON.parse(stdout) as { result: { Version?: string } };
-    return versionReport.result.Version ? `v${versionReport.result.Version}` : undefined;
+    const versionReport = await getPackageVersionReport(subscriberPackageVersionId, packagingDevhub);
+    return versionReport.Version ? `v${versionReport.Version}` : undefined;
   } catch (error) {
     logger.warn(`Could not get target package version from DevHub: ${(error as Error).message}`);
     if (debug) {

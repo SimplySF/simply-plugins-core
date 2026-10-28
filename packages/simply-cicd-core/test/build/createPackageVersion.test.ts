@@ -20,6 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject } from '@simplysf/simply-core';
 import { addGitRemote } from '../../src/git.js';
 import { logger } from '../../src/logger.js';
+import { getPackageVersionReport } from '../../src/sfPackages.js';
 import { createPackageVersion } from '../../src/build/createPackageVersion.js';
 
 vi.mock('execa');
@@ -32,6 +33,7 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, promises: { ...actual.promises, readFile: vi.fn(), writeFile: vi.fn() } };
 });
 vi.mock('../../src/git.js', () => ({ addGitRemote: vi.fn() }));
+vi.mock('../../src/sfPackages.js', () => ({ getPackageVersionReport: vi.fn() }));
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -79,23 +81,22 @@ function mockHappyPath(overrides: { coverage?: number; version?: string } = {}):
     if (cmd === 'sf' && args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
       return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
     }
-    if (cmd === 'sf' && args[0] === 'package' && args[1] === 'version' && args[2] === 'report') {
-      return {
-        stdout: JSON.stringify({
-          result: {
-            Version: overrides.version ?? '1.0.0.1',
-            CodeCoverage: { apexCodeCoveragePercentage: overrides.coverage ?? 90 },
-          },
-        }),
-      };
-    }
     return { stdout: '' };
   }) as never);
+  mockReport({ Version: overrides.version ?? '1.0.0.1', coverage: overrides.coverage ?? 90 });
+}
+
+function mockReport({ Version, coverage }: { Version: string; coverage: number | null }): void {
+  vi.mocked(getPackageVersionReport).mockResolvedValue({
+    Version,
+    CodeCoverage: coverage === null ? null : { apexCodeCoveragePercentage: coverage },
+  } as Awaited<ReturnType<typeof getPackageVersionReport>>);
 }
 
 describe('createPackageVersion', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReport({ Version: '1.0.0.1', coverage: 90 });
   });
 
   it('should skip when the pipeline was triggered by a merge request', async () => {
@@ -210,11 +211,6 @@ describe('createPackageVersion', () => {
       if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
         return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
       }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'report') {
-        return {
-          stdout: JSON.stringify({ result: { Version: '1.0.0.1', CodeCoverage: { apexCodeCoveragePercentage: 90 } } }),
-        };
-      }
       return { stdout: '' };
     }) as never);
 
@@ -239,11 +235,6 @@ describe('createPackageVersion', () => {
       }
       if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
         return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
-      }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'report') {
-        return {
-          stdout: JSON.stringify({ result: { Version: '1.0.0.1', CodeCoverage: { apexCodeCoveragePercentage: 90 } } }),
-        };
       }
       return { stdout: '' };
     }) as never);
@@ -296,17 +287,28 @@ describe('createPackageVersion', () => {
       if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
         return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
       }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'report') {
-        return {
-          stdout: JSON.stringify({ result: { Version: '1.0.0.1', CodeCoverage: { apexCodeCoveragePercentage: 90 } } }),
-        };
-      }
       return { stdout: '' };
     }) as never);
 
     await expect(createPackageVersion({ ...baseOptions, codeCoverageMinimum: '75' })).rejects.toThrow(
       'Code coverage of 90% is less than the required minimum of 95%.',
     );
+  });
+
+  it('should not fail the coverage minimum when the Dev Hub reports no coverage (org-dependent package)', async () => {
+    mockHappyPath();
+    mockReport({ Version: '1.0.0.1', coverage: null });
+
+    await expect(createPackageVersion({ ...baseOptions, codeCoverageMinimum: '75' })).resolves.toBeUndefined();
+    expect(logger.info).toHaveBeenCalledWith('Actual code coverage: N/A%. Required minimum: 75%.');
+  });
+
+  it('should ask the packaging Dev Hub for the new version report', async () => {
+    mockHappyPath();
+
+    await createPackageVersion(baseOptions);
+
+    expect(getPackageVersionReport).toHaveBeenCalledWith('04t000000000001', baseOptions.packagingDevhub);
   });
 
   it('should throw when the default package directory is missing package or definitionFile', async () => {

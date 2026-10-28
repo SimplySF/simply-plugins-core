@@ -34,6 +34,7 @@ export * from './logger.js';
 export * from './sfApex.js';
 export * from './sfAuth.js';
 export * from './sfConfig.js';
+export * from './sfOrg.js';
 export * from './sfPackages.js';
 export * from './sfPlugins.js';
 

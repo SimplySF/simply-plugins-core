@@ -21,8 +21,8 @@ import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject, type SfdxProject } from '@simplysf/simply-core';
 import { appendToEnvFile } from '../../src/env.js';
-import { runSfJson } from '../../src/exec/sfCli.js';
 import { logger } from '../../src/logger.js';
+import { getPackageVersionReport } from '../../src/sfPackages.js';
 import { publishUtamPageObjects } from '../../src/build/publishUtamPageObjects.js';
 
 vi.mock('execa');
@@ -31,7 +31,7 @@ vi.mock('@simplysf/simply-core', async (importOriginal) => {
   return { ...actual, readSfdxProject: vi.fn() };
 });
 vi.mock('../../src/env.js', () => ({ appendToEnvFile: vi.fn() }));
-vi.mock('../../src/exec/sfCli.js', () => ({ runSf: vi.fn(), runSfJson: vi.fn() }));
+vi.mock('../../src/sfPackages.js', () => ({ getPackageVersionReport: vi.fn() }));
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -116,15 +116,12 @@ function mockExeca(options: { alreadyPublished?: boolean } = {}): void {
 }
 
 function mockReport(overrides: Record<string, unknown> = {}): void {
-  vi.mocked(runSfJson).mockResolvedValue({
-    result: {
-      Version: '1.2.3.4',
-      Tag: 'abc123',
-      Description: 'https://gitlab.example.com/pipelines/999',
-      Package2Name: 'MyPackage',
-      ...overrides,
-    },
-  });
+  vi.mocked(getPackageVersionReport).mockResolvedValue({
+    Version: '1.2.3.4',
+    Tag: 'abc123',
+    Description: 'https://gitlab.example.com/pipelines/999',
+    ...overrides,
+  } as Awaited<ReturnType<typeof getPackageVersionReport>>);
 }
 
 async function writePageObject(relative: string): Promise<void> {
@@ -187,7 +184,7 @@ describe('publishUtamPageObjects', () => {
 
       expect(await publishUtamPageObjects(baseOptions)).toEqual({ skipped: true, published: false });
       expect(execa).not.toHaveBeenCalled();
-      expect(runSfJson).not.toHaveBeenCalled();
+      expect(getPackageVersionReport).not.toHaveBeenCalled();
     });
 
     it('should skip when disabled', async () => {
@@ -215,7 +212,7 @@ describe('publishUtamPageObjects', () => {
       await fs.rm(path.join(packageDir, 'main'), { recursive: true, force: true });
 
       expect(await publishUtamPageObjects(baseOptions)).toEqual({ skipped: true, published: false });
-      expect(runSfJson).not.toHaveBeenCalled();
+      expect(getPackageVersionReport).not.toHaveBeenCalled();
       expect(execa).not.toHaveBeenCalled();
     });
 
@@ -360,16 +357,7 @@ describe('publishUtamPageObjects', () => {
     it('should ask the Dev Hub for the version report', async () => {
       await publishUtamPageObjects(baseOptions);
 
-      expect(runSfJson).toHaveBeenCalledWith([
-        'package',
-        'version',
-        'report',
-        '--package',
-        VALID_ID,
-        '--target-dev-hub',
-        'packaging-devhub',
-        '--json',
-      ]);
+      expect(getPackageVersionReport).toHaveBeenCalledWith(VALID_ID, 'packaging-devhub');
     });
 
     it('should throw when the compile fails', async () => {

@@ -20,6 +20,7 @@ import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addGitRemote } from '../../src/git.js';
 import { logger } from '../../src/logger.js';
+import { getOrgInstanceUrl } from '../../src/sfOrg.js';
 import {
   installPackageDependencies as installPackageDependenciesCommon,
   resolveUpgradedPackages,
@@ -55,6 +56,7 @@ vi.mock('../../src/logger.js', () => ({
     debug: vi.fn(),
   },
 }));
+vi.mock('../../src/sfOrg.js', () => ({ getOrgInstanceUrl: vi.fn() }));
 vi.mock('../../src/sfPlugins.js', () => ({ installDeploymentPlugins: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../src/sfPackages.js', () => ({
   installPackageDependencies: vi.fn().mockResolvedValue([]),
@@ -154,13 +156,7 @@ describe('deployHappySoup', () => {
     };
 
     beforeEach(() => {
-      const orgDisplayResult = { result: { instanceUrl: 'https://my-instance.salesforce.com' } };
-      vi.mocked(execa).mockImplementation((async (command: string, args: string[] = []) => {
-        if (command === 'sf' && args.includes('org') && args.includes('display')) {
-          return { stdout: JSON.stringify(orgDisplayResult) };
-        }
-        return { stdout: '' };
-      }) as never);
+      vi.mocked(getOrgInstanceUrl).mockResolvedValue('https://my-instance.salesforce.com');
 
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2023-10-27T10:00:00.000Z'));
@@ -173,7 +169,7 @@ describe('deployHappySoup', () => {
     it('should create a simple git tag', async () => {
       await deployHappySoup(baseTagOptions);
 
-      expect(execa).toHaveBeenCalledWith('sf', ['org', 'display', '--target-org', 'my-org', '--json']);
+      expect(getOrgInstanceUrl).toHaveBeenCalledWith('my-org');
       expect(execa).toHaveBeenCalledWith('git', [
         'tag',
         '-m',

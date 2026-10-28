@@ -21,6 +21,7 @@ import { createVcsProvider, type VcsProviderKind } from '../vcs/index.js';
 import { runSf } from '../exec/sfCli.js';
 import { addGitRemote } from '../git.js';
 import { logger } from '../logger.js';
+import { getPackageVersionReport } from '../sfPackages.js';
 import { VersionTagFormat } from './versionTagFormat.js';
 
 type PackageVersionCreateReport = { Status: string; Error?: string; SubscriberPackageVersionId?: string };
@@ -225,25 +226,13 @@ export async function createPackageVersion(options: CreatePackageVersionOptions)
   const subscriberPackageVersionId = await pollPackageVersionCreation(createRequestId, options.packagingDevhub);
   await fs.writeFile('subscriberPackageVersionId.env', `SUBSCRIBER_PACKAGE_VERSION_ID=${subscriberPackageVersionId}`);
 
-  const { stdout: versionReportStdout } = await runSf([
-    'package',
-    'version',
-    'report',
-    '--package',
-    subscriberPackageVersionId,
-    '--target-dev-hub',
-    options.packagingDevhub,
-    '--json',
-  ]);
-  const versionReport = (
-    JSON.parse(versionReportStdout) as {
-      result: { Version: string; CodeCoverage: { apexCodeCoveragePercentage: number } };
-    }
-  ).result;
-  const codeCoverage = versionReport.CodeCoverage.apexCodeCoveragePercentage;
+  const versionReport = await getPackageVersionReport(subscriberPackageVersionId, options.packagingDevhub);
+  // `null` for an org-dependent package, which the Dev Hub doesn't compute coverage for; the CLI
+  // reported that as 'N/A' and the minimum check below never failed it, so neither do we.
+  const codeCoverage = versionReport.CodeCoverage?.apexCodeCoveragePercentage;
   const minCoverage = resolveMinimumCoverage(options.codeCoverageMinimum, sfdxProjectJson);
-  logger.info(`Actual code coverage: ${codeCoverage}%. Required minimum: ${minCoverage}%.`);
-  if (codeCoverage < minCoverage) {
+  logger.info(`Actual code coverage: ${codeCoverage ?? 'N/A'}%. Required minimum: ${minCoverage}%.`);
+  if (codeCoverage !== undefined && codeCoverage < minCoverage) {
     throw new Error(`Code coverage of ${codeCoverage}% is less than the required minimum of ${minCoverage}%.`);
   }
 

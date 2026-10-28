@@ -18,6 +18,7 @@ import { promises as fs } from 'node:fs';
 import { getDefaultPackageDirectory, readSfdxProject, type SfdxProject } from '@simplysf/simply-core';
 import { runSf, runSfJson } from '../exec/sfCli.js';
 import { logger } from '../logger.js';
+import { getRemainingDailyScratchOrgs } from '../sfOrg.js';
 import { resolveDevHubs, type ResolvedDevHub } from './devHubs.js';
 
 type SfPermsetAssignResult = { status: number; failures?: unknown };
@@ -68,18 +69,6 @@ async function assignPermissions(sfdxProjectJson: SfdxProject): Promise<void> {
   await assignPermissionSetLicenses(access.permissionSetLicenses ?? []);
 }
 
-async function checkHubRemainingScratchOrgs(hubUsername: string): Promise<number | undefined> {
-  const limits = await runSfJson<{ result: Array<{ name: string; remaining: number }> }>([
-    'org',
-    'list',
-    'limits',
-    '--target-org',
-    hubUsername,
-    '--json',
-  ]);
-  return limits.result.find((l) => l.name === 'DailyScratchOrgs')?.remaining;
-}
-
 async function trySetDefaultCountry(): Promise<void> {
   try {
     await runSf(['data', 'query', '--query', 'SELECT CountryCode FROM User', '--json']);
@@ -108,7 +97,7 @@ async function attemptScratchOrgCreation(
   definitionFile: string,
   duration: string,
 ): Promise<ScratchOrgCreateResult | undefined> {
-  const remaining = await checkHubRemainingScratchOrgs(hub.username);
+  const remaining = await getRemainingDailyScratchOrgs(hub.username);
   if (remaining === undefined || remaining <= 0) {
     logger.warn(`Dev Hub ${hub.alias} has no remaining scratch orgs. Skipping.`);
     return undefined;
