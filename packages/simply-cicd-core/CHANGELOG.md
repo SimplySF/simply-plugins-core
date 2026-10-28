@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.8.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.7.0...%40simplysf%2Fsimply-cicd-core%400.8.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** create and install package versions in-process ([#261](https://github.com/SimplySF/simply-plugins-core/issues/261)) ([0ec8077](https://github.com/SimplySF/simply-plugins-core/commit/0ec8077223e8c45fa163ff34562970161c52d8c8))
+
 # [0.7.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.6.0...%40simplysf%2Fsimply-cicd-core%400.7.0) (2026-10-28)
 
 ### Features

@@ -160,7 +160,7 @@ importers:
         specifier: workspace:^1.6.12
         version: link:../simply-core
       '@simplysf/simply-package-core':
-        specifier: workspace:^0.4.2
+        specifier: workspace:^0.5.0
         version: link:../simply-package-core
       '@simplysf/simply-permissions-core':
         specifier: workspace:^0.10.2
