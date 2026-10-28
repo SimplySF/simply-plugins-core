@@ -1,7 +1,8 @@
 # 0053 — Moving the rest of `simply-cicd`'s `common/` into `simply-cicd-core`
 
-**Status:** In progress (implemented on `refactor/cicd-core-common` in both repos; awaiting publish of
-`@simplysf/simply-cicd-core@0.3.0`)
+**Status:** Implemented (`simply-plugins-core` PR #253, published as `@simplysf/simply-cicd-core@0.3.1`;
+`simply-plugins` PR #110). The `0.3.0` release failed to publish (npm provenance transparency-log
+conflict), so the next release shipped the same code as `0.3.1`.
 **Package:** `packages/simply-cicd-core` (grows, in `simply-plugins-core`); `packages/simply-cicd` (CLI,
 slimmed, in `simply-plugins`)
 **Date:** 2026-10-28
