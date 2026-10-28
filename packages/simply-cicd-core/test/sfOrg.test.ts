@@ -30,7 +30,7 @@ import {
   getRemainingDailyScratchOrgs,
 } from '../src/sfOrg.js';
 
-const orgCreateMock = vi.hoisted(() => vi.fn());
+const resolveOrgMock = vi.hoisted(() => vi.fn());
 const userCreateMock = vi.hoisted(() => vi.fn());
 const limitsMock = vi.hoisted(() => vi.fn());
 const singleRecordQueryMock = vi.hoisted(() => vi.fn());
@@ -40,10 +40,10 @@ const scratchOrgCreateMock = vi.hoisted(() => vi.fn());
 const authInfoCreateMock = vi.hoisted(() => vi.fn());
 const removeAuthMock = vi.hoisted(() => vi.fn());
 
+vi.mock('../src/resolveOrg.js', () => ({ resolveOrg: resolveOrgMock }));
 vi.mock('@salesforce/core', async (importOriginal) => ({
   // SfError stays real.
   ...(await importOriginal<typeof import('@salesforce/core')>()),
-  Org: { create: orgCreateMock },
   User: { create: userCreateMock },
   AuthInfo: { create: authInfoCreateMock },
   AuthRemover: { create: async () => ({ removeAuth: removeAuthMock }) },
@@ -71,7 +71,7 @@ const connection = {
 describe('sfOrg', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    orgCreateMock.mockResolvedValue({ getConnection: () => connection, getUsername: () => "o'brien@example.com" });
+    resolveOrgMock.mockResolvedValue({ getConnection: () => connection, getUsername: () => "o'brien@example.com" });
     userCreateMock.mockResolvedValue({ assignPermissionSets: userAssignMock });
     singleRecordQueryMock.mockImplementation(async (soql: string) =>
       soql.startsWith('SELECT Id FROM User') ? { Id: '005000000000001' } : { Id: '0PL000000000001' },
@@ -81,12 +81,12 @@ describe('sfOrg', () => {
   describe('getOrgInstanceUrl', () => {
     it("returns the org connection's instance URL", async () => {
       expect(await getOrgInstanceUrl('my-org')).toBe('https://acme.my.salesforce.com');
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'my-org' });
+      expect(resolveOrgMock).toHaveBeenCalledWith('my-org');
     });
 
-    it.each([undefined, ''])('falls back to the default target org for %j', async (alias) => {
+    it.each([undefined, ''])('leaves %j to resolveOrg, which means the default target org', async (alias) => {
       await getOrgInstanceUrl(alias);
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: undefined });
+      expect(resolveOrgMock).toHaveBeenCalledWith(alias);
     });
   });
 
@@ -95,7 +95,7 @@ describe('sfOrg', () => {
       limitsMock.mockResolvedValue({ DailyScratchOrgs: { Max: 200, Remaining: 37 }, DailyApiRequests: {} });
 
       expect(await getRemainingDailyScratchOrgs('hub@example.com')).toBe(37);
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'hub@example.com' });
+      expect(resolveOrgMock).toHaveBeenCalledWith('hub@example.com', { isDevHub: true });
     });
 
     it('returns undefined when the org does not report the limit', async () => {
@@ -108,10 +108,10 @@ describe('sfOrg', () => {
   describe('getOrgConnection', () => {
     it('connects to the given org, or the default target org when omitted', async () => {
       expect(await getOrgConnection('hub@example.com')).toBe(connection);
-      expect(orgCreateMock).toHaveBeenLastCalledWith({ aliasOrUsername: 'hub@example.com' });
+      expect(resolveOrgMock).toHaveBeenLastCalledWith('hub@example.com');
 
       await getOrgConnection();
-      expect(orgCreateMock).toHaveBeenLastCalledWith({ aliasOrUsername: undefined });
+      expect(resolveOrgMock).toHaveBeenLastCalledWith(undefined);
     });
   });
 
@@ -119,7 +119,7 @@ describe('sfOrg', () => {
     it("assigns each permission set to the org's own user, one at a time", async () => {
       await assignPermissionSets(['PermA', 'PermB']);
 
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: undefined });
+      expect(resolveOrgMock).toHaveBeenCalledWith(undefined);
       expect(singleRecordQueryMock).toHaveBeenCalledWith(
         "SELECT Id FROM User WHERE Username = 'o\\'brien@example.com'",
       );
@@ -150,7 +150,7 @@ describe('sfOrg', () => {
     it('looks each license up by developer name or label and assigns it to the org user', async () => {
       await assignPermissionSetLicenses(['MyLicense'], 'scratch');
 
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'scratch' });
+      expect(resolveOrgMock).toHaveBeenCalledWith('scratch');
       expect(singleRecordQueryMock).toHaveBeenCalledWith(
         "SELECT Id FROM PermissionSetLicense WHERE DeveloperName = 'MyLicense' OR MasterLabel = 'MyLicense'",
       );
@@ -193,7 +193,7 @@ describe('sfOrg', () => {
       const definitionFile = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'scratch-def-')), 'def.json');
       await fs.writeFile(definitionFile, JSON.stringify({ edition: 'Developer', features: ['Communities'] }));
       const hubOrg = { getConnection: () => connection, getUsername: () => 'hub@example.com' };
-      orgCreateMock.mockResolvedValue(hubOrg);
+      resolveOrgMock.mockResolvedValue(hubOrg);
       scratchOrgCreateMock.mockResolvedValue({
         username: 'test-abc@example.com',
         scratchOrgInfo: { Id: '2SR000000000001', CreatedDate: new Date('2026-10-28T12:00:00.000Z') },
@@ -209,7 +209,7 @@ describe('sfOrg', () => {
         setDefault: true,
       });
 
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'hub@example.com' });
+      expect(resolveOrgMock).toHaveBeenCalledWith('hub@example.com', { isDevHub: true });
       const options = scratchOrgCreateMock.mock.calls[0][0] as Record<string, unknown> & { wait: { minutes: number } };
       expect(options).toMatchObject({
         hubOrg,
@@ -243,14 +243,14 @@ describe('sfOrg', () => {
     const deleteMock = vi.fn();
 
     beforeEach(() => {
-      orgCreateMock.mockResolvedValue({ getUsername: () => 'scratch@example.com', delete: deleteMock });
+      resolveOrgMock.mockResolvedValue({ getUsername: () => 'scratch@example.com', delete: deleteMock });
       authInfoCreateMock.mockResolvedValue({ getFields: () => ({ isScratch: true }) });
       deleteMock.mockResolvedValue(undefined);
     });
 
     it('deletes the default target org when it is a scratch org', async () => {
       expect(await deleteTargetScratchOrg()).toBe('scratch@example.com');
-      expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: undefined });
+      expect(resolveOrgMock).toHaveBeenCalledWith(undefined);
       expect(authInfoCreateMock).toHaveBeenCalledWith({ username: 'scratch@example.com' });
       expect(deleteMock).toHaveBeenCalled();
     });

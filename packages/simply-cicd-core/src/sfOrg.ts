@@ -15,20 +15,20 @@
  */
 
 import { promises as fs } from 'node:fs';
-import { AuthInfo, AuthRemover, Org, scratchOrgCreate, SfError, User, type Connection } from '@salesforce/core';
+import { AuthInfo, AuthRemover, type Org, scratchOrgCreate, SfError, User, type Connection } from '@salesforce/core';
 import { Duration } from '@salesforce/kit';
 import { escapeSoqlLiteral } from '@simplysf/simply-core';
 import { logger } from './logger.js';
+import { resolveOrg } from './resolveOrg.js';
 
 /**
  * The org's instance URL, e.g. `https://my-domain.my.salesforce.com`.
  *
- * @param aliasOrUsername - The org to look up. Omit (or pass `''`) to use the default target org.
+ * @param aliasOrUsername - The org to look up: an alias or username of an existing auth. Omit (or
+ * pass `''`) to use the default target org.
  */
 export async function getOrgInstanceUrl(aliasOrUsername?: string): Promise<string> {
-  // Callers pass '' for "no --alias given", which `sf org display --target-org ''` treated as the
-  // default target org; Org.create only does that for undefined.
-  const org = await Org.create({ aliasOrUsername: aliasOrUsername === '' ? undefined : aliasOrUsername });
+  const org = await resolveOrg(aliasOrUsername);
   return org.getConnection().instanceUrl;
 }
 
@@ -41,7 +41,7 @@ type OrgLimits = Partial<Record<string, { Max: number; Remaining: number }>>;
  * @param hubAliasOrUsername - The Dev Hub. Must already be authenticated.
  */
 export async function getRemainingDailyScratchOrgs(hubAliasOrUsername: string): Promise<number | undefined> {
-  const org = await Org.create({ aliasOrUsername: hubAliasOrUsername });
+  const org = await resolveOrg(hubAliasOrUsername, { isDevHub: true });
   const limits = (await org.getConnection().limits()) as unknown as OrgLimits;
   return limits.DailyScratchOrgs?.Remaining;
 }
@@ -53,7 +53,7 @@ export async function getRemainingDailyScratchOrgs(hubAliasOrUsername: string): 
  * `--target-org` do.
  */
 export async function getOrgConnection(aliasOrUsername?: string): Promise<Connection> {
-  const org = await Org.create({ aliasOrUsername });
+  const org = await resolveOrg(aliasOrUsername);
   return org.getConnection();
 }
 
@@ -72,7 +72,7 @@ export class AssignmentError extends Error {
 }
 
 async function resolveOrgUser(aliasOrUsername?: string): Promise<{ org: Org; username: string; userId: string }> {
-  const org = await Org.create({ aliasOrUsername });
+  const org = await resolveOrg(aliasOrUsername);
   const username = org.getUsername() ?? '';
   const { Id: userId } = await org
     .getConnection()
@@ -180,7 +180,7 @@ export async function createScratchOrgOnHub(
   hubAliasOrUsername: string,
   options: CreateScratchOrgOnHubOptions,
 ): Promise<CreatedScratchOrg> {
-  const hubOrg = await Org.create({ aliasOrUsername: hubAliasOrUsername });
+  const hubOrg = await resolveOrg(hubAliasOrUsername, { isDevHub: true });
   const orgConfig = JSON.parse(await fs.readFile(options.definitionFile, 'utf-8')) as Record<string, unknown>;
   const { username, scratchOrgInfo, authFields, warnings } = await scratchOrgCreate({
     hubOrg,
@@ -210,7 +210,7 @@ export async function createScratchOrgOnHub(
  * @throws {SfError} If the org isn't a scratch org, or the Dev Hub rejects the delete.
  */
 export async function deleteTargetScratchOrg(aliasOrUsername?: string): Promise<string> {
-  const org = await Org.create({ aliasOrUsername });
+  const org = await resolveOrg(aliasOrUsername);
   const username = org.getUsername() ?? '';
   const { isScratch } = (await AuthInfo.create({ username })).getFields();
   if (!isScratch) {

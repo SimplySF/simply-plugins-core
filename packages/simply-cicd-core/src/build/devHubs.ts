@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { AuthInfo } from '@salesforce/core';
+import { resolveAuthInfo } from '../resolveOrg.js';
 
 export type ResolvedDevHub = {
   /** The alias (or username) the caller passed in. */
@@ -28,17 +28,17 @@ export type ResolvedDevHub = {
 };
 
 /**
- * Resolves a Dev Hub alias to its already-authenticated config. `simply-cicd` never authenticates
- * Dev Hubs itself — the alias must already be authenticated (by the calling pipeline, however it
- * chooses to do that: JWT, web, SFDX auth-url, or Client Credentials) before this runs.
+ * Resolves a Dev Hub alias or username to its already-authenticated config. `simply-cicd` never
+ * authenticates Dev Hubs itself — the alias must already be authenticated (by the calling pipeline,
+ * however it chooses to do that: JWT, web, SFDX auth-url, or Client Credentials) before this runs.
  *
  * `clientId`/`instanceUrl`/`privateKey` are all stored in plaintext in a Dev Hub's `AuthInfo` (only
  * token/password/secret-named fields are encrypted at rest), so no decryption is needed to read them.
  *
- * @throws {SfError} `NamedOrgNotFoundError` if the alias hasn't already been authenticated.
+ * @throws {SfError} `NamedOrgNotFoundError` if no auth exists for the alias or username.
  */
 async function resolveDevHub(alias: string): Promise<ResolvedDevHub> {
-  const authInfo = await AuthInfo.create({ username: alias });
+  const authInfo = await resolveAuthInfo(alias);
   const fields = authInfo.getFields();
 
   return {

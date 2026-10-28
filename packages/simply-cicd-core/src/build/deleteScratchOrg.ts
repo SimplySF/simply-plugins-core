@@ -65,8 +65,7 @@ export async function deleteScratchOrg(options: DeleteScratchOrgOptions, devHubA
       debug: options.debug,
     });
 
-    // ensureScratchOrgSession just made the scratch org the default target org.
-    await deleteTargetScratchOrg();
+    await deleteTargetScratchOrg(scratchOrgInfo.authFields.username);
     logger.success('Scratch org deleted.');
   } catch (e) {
     logger.error('Failed to delete scratch org. It may need to be deleted manually.', (e as Error).message);

@@ -27,13 +27,13 @@ import {
 } from '../sfOrg.js';
 import { resolveDevHubs, type ResolvedDevHub } from './devHubs.js';
 
-async function assignPermissionSets(permissionSets: string[]): Promise<void> {
+async function assignPermissionSets(permissionSets: string[], username: string | undefined): Promise<void> {
   if (permissionSets.length === 0) {
     return;
   }
   logger.info('Assigning permission sets...');
   try {
-    await assignPermissionSetsToOrgUser(permissionSets);
+    await assignPermissionSetsToOrgUser(permissionSets, username);
     logger.success('Permission sets assigned successfully.');
   } catch (e) {
     logger.error('Error assigning permission sets:', (e as Error).message);
@@ -41,13 +41,13 @@ async function assignPermissionSets(permissionSets: string[]): Promise<void> {
   }
 }
 
-async function assignPermissionSetLicenses(licenses: string[]): Promise<void> {
+async function assignPermissionSetLicenses(licenses: string[], username: string | undefined): Promise<void> {
   if (licenses.length === 0) {
     return;
   }
   logger.info('Assigning permission set licenses...');
   try {
-    await assignLicensesToOrgUser(licenses);
+    await assignLicensesToOrgUser(licenses, username);
     logger.success('Permission set licenses assigned successfully.');
   } catch (e) {
     logger.error('Error assigning permission set licenses:', (e as Error).message);
@@ -55,21 +55,21 @@ async function assignPermissionSetLicenses(licenses: string[]): Promise<void> {
   }
 }
 
-async function assignPermissions(sfdxProjectJson: SfdxProject): Promise<void> {
+async function assignPermissions(sfdxProjectJson: SfdxProject, username: string | undefined): Promise<void> {
   const defaultPackageDir = getDefaultPackageDirectory(sfdxProjectJson);
   const access = defaultPackageDir?.packageMetadataAccess;
   if (!access) {
     return;
   }
-  await assignPermissionSets(access.permissionSets ?? []);
-  await assignPermissionSetLicenses(access.permissionSetLicenses ?? []);
+  await assignPermissionSets(access.permissionSets ?? [], username);
+  await assignPermissionSetLicenses(access.permissionSetLicenses ?? [], username);
 }
 
-async function trySetDefaultCountry(): Promise<void> {
+async function trySetDefaultCountry(username: string | undefined): Promise<void> {
   try {
-    // Runs against the just-created scratch org (the default target org). CountryCode only exists
-    // with State and Country/Territory picklists enabled, so this query is the feature probe.
-    const connection = await getOrgConnection();
+    // Runs against the just-created scratch org. CountryCode only exists with State and
+    // Country/Territory picklists enabled, so this query is the feature probe.
+    const connection = await getOrgConnection(username);
     await connection.query('SELECT CountryCode FROM User LIMIT 1');
     logger.info('State/Country picklists detected. Setting default country for user...');
     const { Id } = await connection.singleRecordQuery<{ Id: string }>("SELECT Id FROM User WHERE Name = 'User User'");
@@ -166,9 +166,9 @@ export async function createScratchOrg(
         continue;
       }
       // eslint-disable-next-line no-await-in-loop
-      await trySetDefaultCountry();
+      await trySetDefaultCountry(createResult.username);
       // eslint-disable-next-line no-await-in-loop
-      await assignPermissions(sfdxProjectJson);
+      await assignPermissions(sfdxProjectJson, createResult.username);
       return createResult;
     } catch (error) {
       logger.error(`Scratch org creation failed with Dev Hub ${hub.alias}:`);

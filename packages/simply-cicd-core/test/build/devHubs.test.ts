@@ -20,10 +20,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveDevHubs } from '../../src/build/devHubs.js';
 
 const authInfoCreateMock = vi.hoisted(() => vi.fn());
+/** Aliases saved in the CLI's state, as `sf alias set` / `--alias` on a login would save them. */
+const savedAliases = vi.hoisted((): Record<string, string> => ({}));
 
 vi.mock('@salesforce/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@salesforce/core')>();
-  return { ...actual, AuthInfo: { create: authInfoCreateMock } };
+  return {
+    ...actual,
+    AuthInfo: { create: authInfoCreateMock },
+    StateAggregator: {
+      getInstance: async () => ({
+        aliases: { resolveUsername: (aliasOrUsername: string) => savedAliases[aliasOrUsername] ?? aliasOrUsername },
+      }),
+    },
+  };
 });
 
 function fakeAuthInfo(username: string, fields: Record<string, unknown>): AuthInfo {
@@ -75,6 +85,21 @@ describe('resolveDevHubs', () => {
     const [hub] = await resolveDevHubs(['hub']);
 
     expect(hub.privateKeyFile).toBeUndefined();
+  });
+
+  it("resolves an alias to its auth's username first, since AuthInfo.create only takes a username", async () => {
+    savedAliases['my-hub'] = 'hub@example.com';
+    authInfoCreateMock.mockImplementation(async ({ username }: { username: string }) =>
+      fakeAuthInfo(username, { instanceUrl: 'https://hub.my.salesforce.com' }),
+    );
+
+    const [byAlias, byUsername] = await resolveDevHubs(['my-hub', 'hub@example.com']);
+
+    expect(authInfoCreateMock).toHaveBeenCalledTimes(2);
+    expect(authInfoCreateMock).toHaveBeenNthCalledWith(1, { username: 'hub@example.com' });
+    expect(authInfoCreateMock).toHaveBeenNthCalledWith(2, { username: 'hub@example.com' });
+    expect(byAlias).toMatchObject({ alias: 'my-hub', username: 'hub@example.com' });
+    expect(byUsername).toMatchObject({ alias: 'hub@example.com', username: 'hub@example.com' });
   });
 
   it('returns an empty array for no aliases', async () => {

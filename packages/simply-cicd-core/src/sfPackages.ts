@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { Org, SfProject } from '@salesforce/core';
+import { SfProject } from '@salesforce/core';
 import { Duration } from '@salesforce/kit';
 import {
   installPackageDependencies as installPackageDependenciesCore,
@@ -30,6 +30,7 @@ import {
   type PackageVersionReportResult,
 } from '@salesforce/packaging';
 import { logger } from './logger.js';
+import { resolveOrg } from './resolveOrg.js';
 import type { UpgradedPackage } from './schemas/deployProgress.js';
 
 export type { PackageInstallUpgradeType, PackageToInstall };
@@ -88,7 +89,7 @@ export async function installPackageDependencies(
 
   logger.info('Installing packaged dependencies...');
   try {
-    const org = await Org.create({ aliasOrUsername: alias });
+    const org = await resolveOrg(alias);
     const project = await SfProject.resolve();
 
     const results = await installPackageDependenciesCore({
@@ -141,7 +142,7 @@ export async function getPackageVersionReport(
   packageVersionId: string,
   devHubAliasOrUsername: string,
 ): Promise<PackageVersionReportResult> {
-  const devHub = await Org.create({ aliasOrUsername: devHubAliasOrUsername });
+  const devHub = await resolveOrg(devHubAliasOrUsername, { isDevHub: true });
   const packageVersion = new PackageVersion({
     connection: devHub.getConnection(),
     project: undefined,
@@ -168,7 +169,7 @@ export type InstalledPackage = {
  * @param aliasOrUsername - The org to inspect. Must already be authenticated.
  */
 export async function listInstalledPackages(aliasOrUsername: string): Promise<InstalledPackage[]> {
-  const org = await Org.create({ aliasOrUsername });
+  const org = await resolveOrg(aliasOrUsername);
   const installed = await SubscriberPackageVersion.installedList(org.getConnection());
   return installed.map((row) => ({
     Id: row.Id,
@@ -218,7 +219,7 @@ export type RequestPackageVersionCreateOptions = {
 export async function requestPackageVersionCreate(
   options: RequestPackageVersionCreateOptions,
 ): Promise<PackageVersionCreateRequestResult> {
-  const devHub = await Org.create({ aliasOrUsername: options.devHubAliasOrUsername });
+  const devHub = await resolveOrg(options.devHubAliasOrUsername, { isDevHub: true });
   const project = await SfProject.resolve();
   const previous = process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT;
   process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT = 'true';
@@ -255,7 +256,7 @@ export async function getPackageVersionCreateStatus(
   createRequestId: string,
   devHubAliasOrUsername: string,
 ): Promise<PackageVersionCreateRequestResult> {
-  const devHub = await Org.create({ aliasOrUsername: devHubAliasOrUsername });
+  const devHub = await resolveOrg(devHubAliasOrUsername, { isDevHub: true });
   return PackageVersion.getCreateStatus(createRequestId, devHub.getConnection());
 }
 

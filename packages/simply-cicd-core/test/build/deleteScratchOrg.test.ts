@@ -91,7 +91,7 @@ describe('deleteScratchOrg', () => {
       setDefault: true,
       debug: undefined,
     });
-    expect(deleteTargetScratchOrg).toHaveBeenCalledWith();
+    expect(deleteTargetScratchOrg).toHaveBeenCalledWith('scratch@test');
     expect(logger.success).toHaveBeenCalledWith('Scratch org deleted.');
   });
 
@@ -106,7 +106,7 @@ describe('deleteScratchOrg', () => {
       setDefault: true,
       debug: undefined,
     });
-    expect(deleteTargetScratchOrg).toHaveBeenCalledWith();
+    expect(deleteTargetScratchOrg).toHaveBeenCalledWith('scratch@test');
   });
 
   it('logs (not throws) when the given --dev-hub does not match the org that created the scratch org', async () => {
