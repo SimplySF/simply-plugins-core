@@ -20,7 +20,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSfdxProject } from '@simplysf/simply-core';
 import { addGitRemote } from '../../src/git.js';
 import { logger } from '../../src/logger.js';
-import { getPackageVersionReport } from '../../src/sfPackages.js';
+import {
+  getPackageVersionCreateStatus,
+  getPackageVersionReport,
+  requestPackageVersionCreate,
+} from '../../src/sfPackages.js';
 import { createPackageVersion } from '../../src/build/createPackageVersion.js';
 
 vi.mock('execa');
@@ -33,7 +37,11 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, promises: { ...actual.promises, readFile: vi.fn(), writeFile: vi.fn() } };
 });
 vi.mock('../../src/git.js', () => ({ addGitRemote: vi.fn() }));
-vi.mock('../../src/sfPackages.js', () => ({ getPackageVersionReport: vi.fn() }));
+vi.mock('../../src/sfPackages.js', () => ({
+  getPackageVersionCreateStatus: vi.fn(),
+  getPackageVersionReport: vi.fn(),
+  requestPackageVersionCreate: vi.fn(),
+}));
 vi.mock('../../src/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -66,23 +74,6 @@ const sfdxProjectJson = {
 function mockHappyPath(overrides: { coverage?: number; version?: string } = {}): void {
   vi.mocked(readSfdxProject).mockResolvedValue(sfdxProjectJson);
   vi.mocked(addGitRemote).mockResolvedValue('origin-alias');
-  vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-    if (
-      cmd === 'sf' &&
-      args[0] === 'package' &&
-      args[1] === 'version' &&
-      args[2] === 'create' &&
-      args[3] === 'report'
-    ) {
-      return {
-        stdout: JSON.stringify({ result: [{ Status: 'Success', SubscriberPackageVersionId: '04t000000000001' }] }),
-      };
-    }
-    if (cmd === 'sf' && args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
-      return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
-    }
-    return { stdout: '' };
-  }) as never);
   mockReport({ Version: overrides.version ?? '1.0.0.1', coverage: overrides.coverage ?? 90 });
 }
 
@@ -96,6 +87,12 @@ function mockReport({ Version, coverage }: { Version: string; coverage: number |
 describe('createPackageVersion', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(execa).mockResolvedValue({ stdout: '' } as never);
+    vi.mocked(requestPackageVersionCreate).mockResolvedValue({ Id: '08c000000000001' } as never);
+    vi.mocked(getPackageVersionCreateStatus).mockResolvedValue({
+      Status: 'Success',
+      SubscriberPackageVersionId: '04t000000000001',
+    } as never);
     mockReport({ Version: '1.0.0.1', coverage: 90 });
   });
 
@@ -120,7 +117,9 @@ describe('createPackageVersion', () => {
 
     await createPackageVersion({ ...baseOptions, ciCommitRefName: 'feature/foo', alwaysCreatePackage: true });
 
-    expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--target-dev-hub', baseOptions.packagingDevhub]));
+    expect(requestPackageVersionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ devHubAliasOrUsername: baseOptions.packagingDevhub, branch: 'feature/foo' }),
+    );
     expect(execa).toHaveBeenCalledWith('git', ['tag', '-a', 'v1.0.0.1-feature/foo', '-m', '04t000000000001']);
   });
 
@@ -130,18 +129,15 @@ describe('createPackageVersion', () => {
     await createPackageVersion(baseOptions);
 
     expect(addGitRemote).toHaveBeenCalledWith('999', 'secret-token', 'group/project', expect.anything());
-    expect(execa).toHaveBeenCalledWith(
-      'sf',
-      expect.arrayContaining([
-        'package',
-        'version',
-        'create',
-        '--package',
-        'MyPackage',
-        '--definition-file',
-        'config/scratch-def.json',
-      ]),
-    );
+    expect(requestPackageVersionCreate).toHaveBeenCalledWith({
+      devHubAliasOrUsername: 'packaging-devhub',
+      packageId: 'MyPackage',
+      definitionFile: 'config/scratch-def.json',
+      versionDescription: baseOptions.ciPipelineUrl,
+      tag: baseOptions.ciCommitSha,
+      branch: undefined,
+    });
+    expect(getPackageVersionCreateStatus).toHaveBeenCalledWith('08c000000000001', 'packaging-devhub');
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'subscriberPackageVersionId.env',
       'SUBSCRIBER_PACKAGE_VERSION_ID=04t000000000001',
@@ -202,65 +198,48 @@ describe('createPackageVersion', () => {
       ],
     });
     vi.mocked(addGitRemote).mockResolvedValue('origin-alias');
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create' && args[3] === 'report') {
-        return {
-          stdout: JSON.stringify({ result: [{ Status: 'Success', SubscriberPackageVersionId: '04t000000000001' }] }),
-        };
-      }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
-        return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
-      }
-      return { stdout: '' };
-    }) as never);
 
     await createPackageVersion(baseOptions);
 
-    expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--branch', 'feature-branch']));
+    expect(requestPackageVersionCreate).toHaveBeenCalledWith(expect.objectContaining({ branch: 'feature-branch' }));
     expect(execa).toHaveBeenCalledWith('git', ['tag', '-a', 'v1.0.0.1-feature-branch', '-m', '04t000000000001']);
   });
 
   it('should poll until the report status is no longer InProgress', async () => {
     vi.mocked(readSfdxProject).mockResolvedValue(sfdxProjectJson);
     vi.mocked(addGitRemote).mockResolvedValue('origin-alias');
-    let reportCalls = 0;
     vi.useFakeTimers();
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create' && args[3] === 'report') {
-        reportCalls += 1;
-        if (reportCalls < 2) return { stdout: JSON.stringify({ result: [{ Status: 'InProgress' }] }) };
-        return {
-          stdout: JSON.stringify({ result: [{ Status: 'Success', SubscriberPackageVersionId: '04t000000000001' }] }),
-        };
-      }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
-        return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
-      }
-      return { stdout: '' };
-    }) as never);
+    vi.mocked(getPackageVersionCreateStatus)
+      .mockResolvedValueOnce({ Status: 'InProgress' } as never)
+      .mockResolvedValueOnce({ Status: 'Success', SubscriberPackageVersionId: '04t000000000001' } as never);
 
     const promise = createPackageVersion(baseOptions);
     await vi.runAllTimersAsync();
     await promise;
     vi.useRealTimers();
 
-    expect(reportCalls).toBe(2);
+    expect(getPackageVersionCreateStatus).toHaveBeenCalledTimes(2);
   });
 
   it('should throw when the package version creation report status is Error', async () => {
     vi.mocked(readSfdxProject).mockResolvedValue(sfdxProjectJson);
     vi.mocked(addGitRemote).mockResolvedValue('origin-alias');
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create' && args[3] === 'report') {
-        return { stdout: JSON.stringify({ result: [{ Status: 'Error', Error: 'boom' }] }) };
-      }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
-        return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
-      }
-      return { stdout: '' };
-    }) as never);
+    vi.mocked(getPackageVersionCreateStatus).mockResolvedValue({
+      Status: 'Error',
+      Error: ['Missing coverage', 'Apex compile failed'],
+    } as never);
 
-    await expect(createPackageVersion(baseOptions)).rejects.toThrow('Package creation failed: boom');
+    await expect(createPackageVersion(baseOptions)).rejects.toThrow(
+      'Package creation failed: Missing coverage,Apex compile failed',
+    );
+  });
+
+  it('should report an unknown error when an errored request carries no messages', async () => {
+    vi.mocked(readSfdxProject).mockResolvedValue(sfdxProjectJson);
+    vi.mocked(addGitRemote).mockResolvedValue('origin-alias');
+    vi.mocked(getPackageVersionCreateStatus).mockResolvedValue({ Status: 'Error', Error: [] } as never);
+
+    await expect(createPackageVersion(baseOptions)).rejects.toThrow('Package creation failed: unknown error');
   });
 
   it('should throw when code coverage is below the required minimum', async () => {
@@ -278,17 +257,6 @@ describe('createPackageVersion', () => {
       plugins: { simply: { coverageRequirement: { minimumCoverageRequired: '95' } } },
     });
     vi.mocked(addGitRemote).mockResolvedValue('origin-alias');
-    vi.mocked(execa).mockImplementation((async (cmd: string, args: readonly string[] = []) => {
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create' && args[3] === 'report') {
-        return {
-          stdout: JSON.stringify({ result: [{ Status: 'Success', SubscriberPackageVersionId: '04t000000000001' }] }),
-        };
-      }
-      if (args[0] === 'package' && args[1] === 'version' && args[2] === 'create') {
-        return { stdout: JSON.stringify({ result: { Id: '08c000000000001' } }) };
-      }
-      return { stdout: '' };
-    }) as never);
 
     await expect(createPackageVersion({ ...baseOptions, codeCoverageMinimum: '75' })).rejects.toThrow(
       'Code coverage of 90% is less than the required minimum of 95%.',
@@ -353,6 +321,6 @@ describe('createPackageVersion', () => {
     });
 
     await expect(createPackageVersion(baseOptions)).rejects.toThrow('{BUILD} must appear exactly once, found 0');
-    expect(execa).not.toHaveBeenCalledWith('sf', expect.arrayContaining(['create']));
+    expect(requestPackageVersionCreate).not.toHaveBeenCalled();
   });
 });

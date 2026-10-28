@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+import { Duration } from '@salesforce/kit';
 import { execa } from 'execa';
 import { isSubscriberPackageVersionId } from '@simplysf/simply-core';
+import { installPackageVersion } from '@simplysf/simply-package-core';
 import type { VcsProviderKind } from '../vcs/index.js';
 import { logger } from '../logger.js';
+import { getOrgConnection } from '../sfOrg.js';
 import { runDeployStage } from './runDeployStage.js';
 import {
   installDeployPackageDependencies,
@@ -35,25 +38,21 @@ async function installPackageById(
   alias: string | undefined,
   upgradeType: UpgradeType,
 ): Promise<void> {
-  await execa(
-    'sf',
-    [
-      'package',
-      'install',
-      '--apex-compile',
-      'package',
-      '--package',
-      packageId,
-      '--target-org',
-      alias ?? '',
-      '--wait',
-      '120',
-      '--upgrade-type',
-      upgradeType,
-      '--no-prompt',
-    ],
-    { stdio: 'inherit' },
-  );
+  // An empty alias means the default target org, as `sf package install --target-org ''` did.
+  const targetOrgConnection = await getOrgConnection(alias === '' ? undefined : alias);
+  const { status, request } = await installPackageVersion({
+    targetOrgConnection,
+    aliasOrId: packageId,
+    apexCompile: 'package',
+    upgradeType,
+    wait: Duration.minutes(120),
+  });
+  if (status === 'IN_PROGRESS') {
+    // `sf package install` reported this and exited 0, so the stage carried on; keep that, but say so.
+    logger.warn(
+      `Package ${packageId} is still installing after 120 minutes (request ${request.Id}). Continuing; check the install in the org.`,
+    );
+  }
 }
 
 async function installProjectPackageFromSubscriberId(

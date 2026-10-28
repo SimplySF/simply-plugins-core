@@ -17,6 +17,7 @@
 import { execa } from 'execa';
 import chalk from 'chalk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installPackageVersion } from '@simplysf/simply-package-core';
 import { logger } from '../../src/logger.js';
 import {
   installDeployPackageDependencies,
@@ -25,6 +26,7 @@ import {
   runDeploymentSteps,
 } from '../../src/deploy/deployCommon.js';
 import { deployProject } from '../../src/deploy/deployProject.js';
+import { getOrgConnection } from '../../src/sfOrg.js';
 
 chalk.level = 0;
 
@@ -40,6 +42,8 @@ vi.mock('../../src/logger.js', () => ({
     debug: vi.fn(),
   },
 }));
+vi.mock('@simplysf/simply-package-core', () => ({ installPackageVersion: vi.fn() }));
+vi.mock('../../src/sfOrg.js', () => ({ getOrgConnection: vi.fn() }));
 vi.mock('../../src/sfPlugins.js', () => ({ installDeploymentPlugins: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../src/deploy/deployCommon.js', () => ({
   installDeployPackageDependencies: vi.fn(),
@@ -49,11 +53,17 @@ vi.mock('../../src/deploy/deployCommon.js', () => ({
 }));
 
 const baseOptions = { ciJobToken: 'ci-token', vcsHost: 'gitlab.com', vcsProvider: 'gitlab' as const };
+const targetOrgConnection = { id: 'target-org-connection' };
 
 describe('deployProject', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(execa).mockResolvedValue({ stdout: '' } as never);
+    vi.mocked(getOrgConnection).mockResolvedValue(targetOrgConnection as never);
+    vi.mocked(installPackageVersion).mockResolvedValue({
+      status: 'SUCCESS',
+      request: { Id: '0Hf000000000001' },
+    } as never);
   });
 
   afterEach(() => {
@@ -99,7 +109,7 @@ describe('deployProject', () => {
     it('should install the project package with a Mixed upgrade type by default', async () => {
       await deployProject({ ...baseOptions, stage: 'install-packaged', subscriberPackageVersionId: '04t123abc' });
 
-      expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--upgrade-type', 'Mixed']), expect.any(Object));
+      expect(installPackageVersion).toHaveBeenCalledWith(expect.objectContaining({ upgradeType: 'Mixed' }));
     });
 
     it('should pass --upgrade-type to both the dependency and the project package installs', async () => {
@@ -113,17 +123,25 @@ describe('deployProject', () => {
       expect(installDeployPackageDependencies).toHaveBeenCalledWith(
         expect.objectContaining({ upgradeType: 'DeprecateOnly' }),
       );
-      expect(execa).toHaveBeenCalledWith(
-        'sf',
-        expect.arrayContaining(['--upgrade-type', 'DeprecateOnly']),
-        expect.any(Object),
-      );
+      expect(installPackageVersion).toHaveBeenCalledWith(expect.objectContaining({ upgradeType: 'DeprecateOnly' }));
     });
 
     it('should install from subscriberPackageVersionId if valid', async () => {
-      await deployProject({ ...baseOptions, stage: 'install-packaged', subscriberPackageVersionId: '04t123abc' });
+      await deployProject({
+        ...baseOptions,
+        stage: 'install-packaged',
+        alias: 'my-org',
+        subscriberPackageVersionId: '04t123abc',
+      });
 
-      expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--package', '04t123abc']), expect.any(Object));
+      expect(getOrgConnection).toHaveBeenCalledWith('my-org');
+      expect(installPackageVersion).toHaveBeenCalledWith({
+        targetOrgConnection,
+        aliasOrId: '04t123abc',
+        apexCompile: 'package',
+        upgradeType: 'Mixed',
+        wait: expect.objectContaining({ minutes: 120 }),
+      });
       expect(logger.info).toHaveBeenCalledWith(
         'Installing package version from --subscriber-package-version-id: 04t123abc',
       );
@@ -135,11 +153,7 @@ describe('deployProject', () => {
       await deployProject({ ...baseOptions, stage: 'install-packaged', subscriberPackageVersionId: 'invalid-id' });
 
       expect(logger.info).toHaveBeenCalledWith('Checking for package version in git tag...');
-      expect(execa).not.toHaveBeenCalledWith(
-        'sf',
-        expect.arrayContaining(['--package', 'invalid-id']),
-        expect.any(Object),
-      );
+      expect(installPackageVersion).not.toHaveBeenCalledWith(expect.objectContaining({ aliasOrId: 'invalid-id' }));
     });
 
     it('should install from git tag if subscriberPackageVersionId is not provided', async () => {
@@ -152,7 +166,7 @@ describe('deployProject', () => {
 
       expect(execa).toHaveBeenCalledWith('git', ['tag', '--points-at', 'HEAD']);
       expect(execa).toHaveBeenCalledWith('git', ['tag', '-l', '-n1', 'v1.2.3']);
-      expect(execa).toHaveBeenCalledWith('sf', expect.arrayContaining(['--package', '04t456def']), expect.any(Object));
+      expect(installPackageVersion).toHaveBeenCalledWith(expect.objectContaining({ aliasOrId: '04t456def' }));
       expect(logger.success).toHaveBeenCalledWith('Successfully installed package 04t456def from git tag.');
     });
 
@@ -162,7 +176,7 @@ describe('deployProject', () => {
       await deployProject({ ...baseOptions, stage: 'install-packaged' });
 
       expect(logger.info).toHaveBeenCalledWith('No git tag found at HEAD. Skipping main package installation.');
-      expect(execa).not.toHaveBeenCalledWith('sf', expect.arrayContaining(['--package']), expect.any(Object));
+      expect(installPackageVersion).not.toHaveBeenCalled();
     });
 
     it('should skip install if git tag has no annotation', async () => {
@@ -173,7 +187,7 @@ describe('deployProject', () => {
       await deployProject({ ...baseOptions, stage: 'install-packaged' });
 
       expect(logger.info).toHaveBeenCalledWith('Git tag v1.2.3 has no annotation. Skipping main package installation.');
-      expect(execa).not.toHaveBeenCalledWith('sf', expect.arrayContaining(['--package']), expect.any(Object));
+      expect(installPackageVersion).not.toHaveBeenCalled();
     });
 
     it('should skip install if git tag annotation has no packageId', async () => {
@@ -186,7 +200,38 @@ describe('deployProject', () => {
       expect(logger.info).toHaveBeenCalledWith(
         'No 04t package version found in git tag annotation. Skipping main package installation.',
       );
-      expect(execa).not.toHaveBeenCalledWith('sf', expect.arrayContaining(['--package']), expect.any(Object));
+      expect(installPackageVersion).not.toHaveBeenCalled();
+    });
+
+    it('should install into the default target org when no alias is given', async () => {
+      await deployProject({ ...baseOptions, stage: 'install-packaged', subscriberPackageVersionId: '04t123abc' });
+
+      expect(getOrgConnection).toHaveBeenCalledWith(undefined);
+    });
+
+    it('should warn, but carry on, when the install is still running after the wait', async () => {
+      vi.mocked(installPackageVersion).mockResolvedValue({
+        status: 'IN_PROGRESS',
+        request: { Id: '0Hf000000000002' },
+      } as never);
+
+      await deployProject({ ...baseOptions, stage: 'install-packaged', subscriberPackageVersionId: '04t123abc' });
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Package 04t123abc is still installing after 120 minutes (request 0Hf000000000002). Continuing; check the install in the org.',
+      );
+    });
+
+    it('should fail the stage when the install finishes with errors', async () => {
+      vi.mocked(installPackageVersion).mockRejectedValue(
+        Object.assign(new Error('Encountered errors installing the package! Installation errors: \n1) bad'), {
+          name: 'PackageInstallError',
+        }),
+      );
+
+      await expect(
+        deployProject({ ...baseOptions, stage: 'install-packaged', subscriberPackageVersionId: '04t123abc' }),
+      ).rejects.toThrow('Encountered errors installing the package!');
     });
 
     it('should warn and skip if git commands fail', async () => {

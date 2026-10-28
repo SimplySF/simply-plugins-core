@@ -19,9 +19,11 @@ import type { InstallPackageDependenciesOptions } from '@simplysf/simply-package
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../src/logger.js';
 import {
+  getPackageVersionCreateStatus,
   getPackageVersionReport,
   installPackageDependencies,
   listInstalledPackages,
+  requestPackageVersionCreate,
   resolveUpgradedPackages,
   type PackageToInstall,
 } from '../src/sfPackages.js';
@@ -32,9 +34,13 @@ const installPackageDependenciesCoreMock = vi.hoisted(() => vi.fn());
 const packageVersionCtorMock = vi.hoisted(() => vi.fn());
 const packageVersionReportMock = vi.hoisted(() => vi.fn());
 const installedListMock = vi.hoisted(() => vi.fn());
+const packageVersionCreateMock = vi.hoisted(() => vi.fn());
+const getCreateStatusMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@salesforce/packaging', () => ({
   PackageVersion: class {
+    public static create = packageVersionCreateMock;
+    public static getCreateStatus = getCreateStatusMock;
     private readonly idOrAlias: string;
     public constructor(options: { idOrAlias: string }) {
       packageVersionCtorMock(options);
@@ -178,6 +184,85 @@ describe('getPackageVersionReport', () => {
     orgCreateMock.mockRejectedValue(new Error('No authorization information found for packaging-devhub.'));
 
     await expect(getPackageVersionReport('04t1', 'packaging-devhub')).rejects.toThrow('No authorization information');
+  });
+});
+
+describe('requestPackageVersionCreate', () => {
+  const options = {
+    devHubAliasOrUsername: 'packaging-devhub',
+    packageId: 'MyPackage',
+    definitionFile: 'config/scratch-def.json',
+    versionDescription: 'https://ci.example.com/pipelines/1',
+    tag: 'abc123',
+    branch: 'feature-x',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+    sfProjectResolveMock.mockResolvedValue(project);
+    packageVersionCreateMock.mockResolvedValue({ Id: '08c000000000001', Status: 'Queued' });
+    delete process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT;
+  });
+
+  it('starts the create with the options sf package version create sends, without waiting', async () => {
+    const result = await requestPackageVersionCreate(options);
+
+    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    const [createOptions, polling] = packageVersionCreateMock.mock.calls[0] as [
+      Record<string, unknown>,
+      { timeout: Duration; frequency: Duration },
+    ];
+    expect(createOptions).toEqual({
+      connection,
+      project,
+      packageId: 'MyPackage',
+      definitionfile: 'config/scratch-def.json',
+      versiondescription: 'https://ci.example.com/pipelines/1',
+      tag: 'abc123',
+      branch: 'feature-x',
+      codecoverage: true,
+      installationkeybypass: true,
+    });
+    expect(polling.timeout.minutes).toBe(0);
+    expect(result).toEqual({ Id: '08c000000000001', Status: 'Queued' });
+  });
+
+  it('applies string replacements during the create only, as the CLI does', async () => {
+    packageVersionCreateMock.mockImplementation(async () => {
+      expect(process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT).toBe('true');
+      return { Id: '08c000000000001' };
+    });
+
+    await requestPackageVersionCreate(options);
+
+    expect(process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT).toBeUndefined();
+  });
+
+  it('restores a pre-existing replacements setting, even when the create fails', async () => {
+    process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT = 'false';
+    packageVersionCreateMock.mockRejectedValue(new Error('Package2 not found'));
+
+    await expect(requestPackageVersionCreate(options)).rejects.toThrow('Package2 not found');
+    expect(process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT).toBe('false');
+    delete process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT;
+  });
+});
+
+describe('getPackageVersionCreateStatus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    orgCreateMock.mockResolvedValue({ getConnection: () => connection });
+  });
+
+  it("returns the request's status from the Dev Hub", async () => {
+    getCreateStatusMock.mockResolvedValue({ Id: '08c000000000001', Status: 'InProgress', Error: [] });
+
+    const status = await getPackageVersionCreateStatus('08c000000000001', 'packaging-devhub');
+
+    expect(orgCreateMock).toHaveBeenCalledWith({ aliasOrUsername: 'packaging-devhub' });
+    expect(getCreateStatusMock).toHaveBeenCalledWith('08c000000000001', connection);
+    expect(status).toEqual({ Id: '08c000000000001', Status: 'InProgress', Error: [] });
   });
 });
 
