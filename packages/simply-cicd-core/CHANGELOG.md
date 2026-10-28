@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.3.1...%40simplysf%2Fsimply-cicd-core%400.4.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** replace read-only sf CLI calls with library calls ([#257](https://github.com/SimplySF/simply-plugins-core/issues/257)) ([0239e03](https://github.com/SimplySF/simply-plugins-core/commit/0239e03c8f5f626d23fbf5d69cd2e65d0ae84fb5)), closes [PackageVersion#report](https://github.com/PackageVersion/issues/report) [Connection#limits](https://github.com/Connection/issues/limits) [Connection#tooling](https://github.com/Connection/issues/tooling)
+
 ## [0.3.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.3.0...%40simplysf%2Fsimply-cicd-core%400.3.1) (2026-10-28)
 
 **Note:** Version bump only for package @simplysf/simply-cicd-core
