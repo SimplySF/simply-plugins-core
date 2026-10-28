@@ -1,6 +1,6 @@
 # 0055 — Checking a Dev Hub's active scratch org limit before a signup
 
-**Status:** Implemented (PR #N)
+**Status:** Implemented (PR #265)
 **Package:** `packages/simply-cicd-core`
 **Date:** 2026-10-28
 
