@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.10.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.9.1...%40simplysf%2Fsimply-cicd-core%400.10.0) (2026-10-28)
+
+### Features
+
+- **simply-cicd-core:** skip Dev Hubs at their active scratch org limit ([#265](https://github.com/SimplySF/simply-plugins-core/issues/265)) ([988a5d2](https://github.com/SimplySF/simply-plugins-core/commit/988a5d2dc896038d468d5871755ad58fab4790c4))
+
 ## [0.9.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.9.0...%40simplysf%2Fsimply-cicd-core%400.9.1) (2026-10-28)
 
 ### Bug Fixes
