@@ -18,6 +18,7 @@ import type { AuthInfo } from '@salesforce/core';
 import { SfError } from '@salesforce/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveDevHubs } from '../../src/build/devHubs.js';
+import { logger } from '../../src/logger.js';
 
 const authInfoCreateMock = vi.hoisted(() => vi.fn());
 /** Aliases saved in the CLI's state, as `sf alias set` / `--alias` on a login would save them. */
@@ -35,6 +36,8 @@ vi.mock('@salesforce/core', async (importOriginal) => {
     },
   };
 });
+
+vi.mock('../../src/logger.js', () => ({ logger: { warn: vi.fn() } }));
 
 function fakeAuthInfo(username: string, fields: Record<string, unknown>): AuthInfo {
   return { getUsername: () => username, getFields: () => fields } as unknown as AuthInfo;
@@ -100,6 +103,26 @@ describe('resolveDevHubs', () => {
     expect(authInfoCreateMock).toHaveBeenNthCalledWith(2, { username: 'hub@example.com' });
     expect(byAlias).toMatchObject({ alias: 'my-hub', username: 'hub@example.com' });
     expect(byUsername).toMatchObject({ alias: 'hub@example.com', username: 'hub@example.com' });
+  });
+
+  it('skips a blank value, as an unset CI variable gives, and warns about it', async () => {
+    authInfoCreateMock.mockImplementation(async ({ username }: { username: string }) => fakeAuthInfo(username, {}));
+
+    const hubs = await resolveDevHubs(['hub@example.com', '', '  \n']);
+
+    expect(hubs.map((hub) => hub.username)).toEqual(['hub@example.com']);
+    expect(authInfoCreateMock).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Ignoring 2 empty --dev-hub values (an unset CI variable passed as --dev-hub?).',
+    );
+  });
+
+  it('fails clearly, instead of with AuthInfoCreationError, when every value is blank', async () => {
+    await expect(resolveDevHubs(['', ' '])).rejects.toMatchObject({
+      name: 'NoDevHubGivenError',
+      message: expect.stringContaining('Every --dev-hub value is empty.') as unknown,
+    });
+    expect(authInfoCreateMock).not.toHaveBeenCalled();
   });
 
   it('returns an empty array for no aliases', async () => {
