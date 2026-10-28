@@ -18,13 +18,10 @@ import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
 import { getDefaultPackageDirectory, getPluginConfig, readSfdxProject, type SfdxProject } from '@simplysf/simply-core';
 import { createVcsProvider, type VcsProviderKind } from '../vcs/index.js';
-import { runSf } from '../exec/sfCli.js';
 import { addGitRemote } from '../git.js';
 import { logger } from '../logger.js';
-import { getPackageVersionReport } from '../sfPackages.js';
+import { getPackageVersionCreateStatus, getPackageVersionReport, requestPackageVersionCreate } from '../sfPackages.js';
 import { VersionTagFormat } from './versionTagFormat.js';
-
-type PackageVersionCreateReport = { Status: string; Error?: string; SubscriberPackageVersionId?: string };
 
 /**
  * Whether this build's ref is a release-branch build.
@@ -36,18 +33,18 @@ export function refIncludesPrefix(ciCommitRefName: string, packageReleaseBranchP
   return packageReleaseBranchPrefix !== undefined && ciCommitRefName.includes(packageReleaseBranchPrefix);
 }
 
-function determineBranchArgs(
+function determineBranch(
   branchAttribute: string | undefined,
   ciCommitRefName: string,
   packageReleaseBranchPrefix?: string,
-): string[] {
+): string | undefined {
   if (branchAttribute) {
-    return ['--branch', branchAttribute];
+    return branchAttribute;
   }
   if (!refIncludesPrefix(ciCommitRefName, packageReleaseBranchPrefix)) {
-    return ['--branch', ciCommitRefName];
+    return ciCommitRefName;
   }
-  return [];
+  return undefined;
 }
 
 /**
@@ -109,23 +106,15 @@ function logPackageId(sfdxProjectJson: SfdxProject): void {
 async function pollPackageVersionCreation(createRequestId: string, packagingDevhub: string): Promise<string> {
   for (;;) {
     // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous one's result before deciding to continue
-    const { stdout: reportStdout } = await runSf([
-      'package',
-      'version',
-      'create',
-      'report',
-      '--package-create-request-id',
-      createRequestId,
-      '--target-dev-hub',
-      packagingDevhub,
-      '--json',
-    ]);
-    const report = (JSON.parse(reportStdout) as { result: PackageVersionCreateReport[] }).result[0];
-    logger.info(`Polling package creation status: ${report.Status}`);
-    if (report.Status === 'Error') {
-      throw new Error(`Package creation failed: ${report.Error ?? 'unknown error'}`);
+    const report = await getPackageVersionCreateStatus(createRequestId, packagingDevhub);
+    // The library types this as an enum; its values are the plain status strings the API returns.
+    const status: string = report.Status;
+    logger.info(`Polling package creation status: ${status}`);
+    if (status === 'Error') {
+      const errors = (report.Error as unknown[] | undefined) ?? [];
+      throw new Error(`Package creation failed: ${errors.length ? errors.map(String).join(',') : 'unknown error'}`);
     }
-    if (report.Status === 'Success') {
+    if (status === 'Success') {
       const subscriberPackageVersionId = report.SubscriberPackageVersionId ?? '';
       logger.success(`Package version created successfully: ${subscriberPackageVersionId}`);
       return subscriberPackageVersionId;
@@ -198,29 +187,14 @@ export async function createPackageVersion(options: CreatePackageVersionOptions)
 
   logPackageId(sfdxProjectJson);
 
-  const branchArgs = determineBranchArgs(branchAttribute, options.ciCommitRefName, options.packageReleaseBranchPrefix);
-  const { stdout: createStdout } = await runSf([
-    'package',
-    'version',
-    'create',
-    '--code-coverage',
-    '--package',
-    packageAlias,
-    '--definition-file',
+  const { Id: createRequestId } = await requestPackageVersionCreate({
+    devHubAliasOrUsername: options.packagingDevhub,
+    packageId: packageAlias,
     definitionFile,
-    '--version-description',
-    options.ciPipelineUrl,
-    '--tag',
-    options.ciCommitSha,
-    '--target-dev-hub',
-    options.packagingDevhub,
-    ...branchArgs,
-    '--installation-key-bypass',
-    '--wait',
-    '0',
-    '--json',
-  ]);
-  const createRequestId = (JSON.parse(createStdout) as { result: { Id: string } }).result.Id;
+    versionDescription: options.ciPipelineUrl,
+    tag: options.ciCommitSha,
+    branch: determineBranch(branchAttribute, options.ciCommitRefName, options.packageReleaseBranchPrefix),
+  });
   logger.info(`Package version creation requested. Request ID: ${createRequestId}`);
 
   const subscriberPackageVersionId = await pollPackageVersionCreation(createRequestId, options.packagingDevhub);

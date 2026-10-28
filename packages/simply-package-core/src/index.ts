@@ -47,6 +47,11 @@ export {
 } from './packageVersionService.js';
 export { buildProjectService, type SfdxProjectService } from './sfdxProjectService.js';
 export {
+  installPackageVersion,
+  type InstallPackageVersionOptions,
+  type InstallPackageVersionResult,
+} from './packageVersionInstall.js';
+export {
   installPackageDependencies,
   type InstallPackageDependenciesOptions,
   type InstallPackageDependenciesProgress,

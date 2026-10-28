@@ -23,7 +23,12 @@ import {
   type PackageInstallUpgradeType,
   type PackageToInstall,
 } from '@simplysf/simply-package-core';
-import { PackageVersion, SubscriberPackageVersion, type PackageVersionReportResult } from '@salesforce/packaging';
+import {
+  PackageVersion,
+  SubscriberPackageVersion,
+  type PackageVersionCreateRequestResult,
+  type PackageVersionReportResult,
+} from '@salesforce/packaging';
 import { logger } from './logger.js';
 import type { UpgradedPackage } from './schemas/deployProgress.js';
 
@@ -187,6 +192,71 @@ export async function listInstalledPackages(aliasOrUsername: string): Promise<In
         }
       : {}),
   }));
+}
+
+export type { PackageVersionCreateRequestResult };
+
+export type RequestPackageVersionCreateOptions = {
+  /** The packaging Dev Hub. Must already be authenticated. */
+  devHubAliasOrUsername: string;
+  /** The package's alias in `packageAliases` (or its `0Ho` ID). */
+  packageId: string;
+  definitionFile: string;
+  versionDescription: string;
+  tag: string;
+  branch?: string;
+};
+
+/**
+ * Starts a package version create and returns its request (`08c`) without waiting: what
+ * `sf package version create --code-coverage --installation-key-bypass --wait 0` does, run from the
+ * SFDX project in the current directory. Poll it with {@link getPackageVersionCreateStatus}.
+ *
+ * Like the CLI, this applies `sfdx-project.json` string replacements while converting source
+ * (`SF_APPLY_REPLACEMENTS_ON_CONVERT`).
+ */
+export async function requestPackageVersionCreate(
+  options: RequestPackageVersionCreateOptions,
+): Promise<PackageVersionCreateRequestResult> {
+  const devHub = await Org.create({ aliasOrUsername: options.devHubAliasOrUsername });
+  const project = await SfProject.resolve();
+  const previous = process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT;
+  process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT = 'true';
+  try {
+    return await PackageVersion.create(
+      {
+        connection: devHub.getConnection(),
+        project,
+        packageId: options.packageId,
+        definitionfile: options.definitionFile,
+        versiondescription: options.versionDescription,
+        tag: options.tag,
+        branch: options.branch,
+        codecoverage: true,
+        installationkeybypass: true,
+      },
+      { timeout: Duration.minutes(0), frequency: Duration.seconds(30) },
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT;
+    } else {
+      process.env.SF_APPLY_REPLACEMENTS_ON_CONVERT = previous;
+    }
+  }
+}
+
+/**
+ * The current state of a package version create request: what
+ * `sf package version create report --package-create-request-id <08c> --json` returned (as its one
+ * array element). `Error` lists the request's error messages.
+ */
+export async function getPackageVersionCreateStatus(
+  createRequestId: string,
+  devHubAliasOrUsername: string,
+): Promise<PackageVersionCreateRequestResult> {
+  const devHub = await Org.create({ aliasOrUsername: devHubAliasOrUsername });
+  return PackageVersion.getCreateStatus(createRequestId, devHub.getConnection());
 }
 
 /** {@link getPackageVersionReport}, but warns and returns `undefined` on failure. */
