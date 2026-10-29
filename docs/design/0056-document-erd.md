@@ -48,12 +48,12 @@ sf simply document erd --directory force-app --output-file erd.md
 sf simply document erd --directory force-app --output-file erd.md --max-objects 25 --hub User --hub Account
 ```
 
-| Flag            | Notes                                                                                                                                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--directory`   | Required. Same meaning as `generate --directory`: the Salesforce DX source directory to scan.                                                                              |
-| `--output-file` | Required. The Markdown file to write. Overwritten if it exists, like `generate --output-file`.                                                                             |
-| `--max-objects` | Integer, default `40`, minimum `2`. If the whole model has this many objects or fewer, one diagram is written. Above it, the model is split (see [Splitting](#splitting)). |
-| `--hub`         | Repeatable, default `User`. Objects that don't join clusters together when splitting (see [Hub objects](#hub-objects)). Giving the flag replaces the default.              |
+| Flag            | Notes                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--directory`   | Required. Same meaning as `generate --directory`: the Salesforce DX source directory to scan.                                                                                                  |
+| `--output-file` | Required. The Markdown file to write. Overwritten if it exists, like `generate --output-file`.                                                                                                 |
+| `--max-objects` | Integer, default `40`, minimum `2`. If the model's connected in-project objects number this many or fewer, one diagram is written. Above it, the model is split (see [Splitting](#splitting)). |
+| `--hub`         | Repeatable, default `User`. Objects that don't join clusters together when splitting (see [Hub objects](#hub-objects)). Giving the flag replaces the default.                                  |
 
 ### What's in the diagram
 
@@ -72,7 +72,7 @@ Master-Detail field, and including them would only add boxes with no edges.
 
 Solid lines (`--`) mean Master-Detail, where the child can't exist without the parent. Dotted lines
 (`..`) mean Lookup. The parent is the field's `referenceTo`. For `Hierarchy` it's the object the field
-is on. A field that's a Lookup or Master-Detail with no `referenceTo` is skipped and reported in
+is on. A field that's a Lookup or Master-Detail with no `referenceTo` (missing, empty, or whitespace-only, including empty entries in an array) is skipped and reported in
 `skippedFields` (see [Output](#output)), not guessed at.
 
 Two fields between the same pair of objects produce two edges, each with its own label. That's
@@ -106,34 +106,41 @@ mistakes the diagram for a complete schema. A built-in table of common standard 
 
 ### Splitting
 
-If the connected model (excluding unrelated objects), counting in-project and external nodes, has `--max-objects` nodes or fewer, the file has
-one diagram named after the project's directory. Otherwise:
+If the number of connected **in-project** objects (excluding unrelated objects and external nodes) is
+`--max-objects` or fewer, the file has one diagram named after the project's directory. Otherwise:
 
 1. Take the relationships and drop every edge that touches a hub object.
 2. Find the connected components of what remains, treating edges as undirected. Each component with
-   at least one edge becomes a diagram. Each connected non-hub object absent from these components
-   seeds its own diagram, preserving objects whose relationships touch only hubs (including external
-   non-hub objects). These singleton seeds receive their hub edges in the next step.
-3. Add each hub back into every diagram that has an edge to it, along with those edges. A hub can
+   at least one edge becomes a diagram.
+3. Group **satellites**, the non-hub objects (in-project or external) whose only relationships are to
+   hubs, into one diagram per hub. A satellite connected to several hubs goes into the group of its
+   lexicographically first hub; its edges to the other hubs still appear in that diagram.
+4. Add each hub back into every diagram that has an edge to it, along with those edges. A hub can
    appear in several diagrams. That's the point: `User` belongs in the picture wherever something
    looks it up, but it shouldn't merge every cluster into one.
    Hub-to-hub edges belong to no component. Add them to each diagram already containing either
    endpoint after the initial hub attachment, including the other endpoint if needed. This is a
    single pass against the initially attached nodes, so hub chains do not make placement depend on
-   edge order. Objects connected only to hubs therefore appear in separate diagrams rather than
-   being merged through their shared hub or omitted from the output.
-4. Name each diagram after its **anchor**: the in-project object with the most edges inside that
-   diagram. Ties use ordinal string comparison (`a < b`), independent of locale.
-5. Sort diagrams by in-project object count, largest first, then by anchor name.
+   edge order.
+5. Any relationship still in no diagram (for example a `User.Manager__c` Hierarchy edge or a
+   hub-to-hub lookup when no other diagram contains those hubs) is placed by grouping the leftover
+   edges into connected components and emitting one diagram per group. Every relationship in the
+   model therefore appears in at least one diagram.
+6. Name each diagram after its **anchor**: the object with the most edges inside that diagram,
+   preferring in-project non-hub objects, then external non-hub objects, then hubs. Ties use ordinal
+   string comparison (`a < b`), independent of locale.
+7. Sort diagrams by in-project object count, largest first, then by anchor name.
 
 Splitting is deterministic. The same source always produces the same file, so the output can be
-committed and reviewed as a diff.
+committed and reviewed as a diff. The model arrays are sorted once, by `buildEntityRelationshipModel`;
+splitting preserves that order and does not re-sort them.
 
-A component whose **in-project node count** is still larger than `--max-objects` after splitting is written as one diagram and
-marked `oversized`. The command prints a warning naming it. Splitting it further (for example by
-Master-Detail trees) means choosing which relationships to cut, and that's a judgment call this doc
-leaves to the user. The initial threshold includes external nodes; oversized after splitting excludes
-external nodes, while heading counts always include them. They can add a hub to break it apart. See [Open questions](#open-questions).
+`--max-objects` counts in-project objects everywhere: for the initial threshold and for `oversized`.
+A component whose in-project object count is still larger than `--max-objects` after splitting is
+written as one diagram and marked `oversized`. The command prints a warning naming it. Splitting it
+further (for example by Master-Detail trees) means choosing which relationships to cut, and that's a
+judgment call this doc leaves to the user. External nodes never count toward the limit, though
+heading counts include them. They can add a hub to break it apart. See [Open questions](#open-questions).
 
 ### Hub objects
 
@@ -176,6 +183,10 @@ erDiagram
 
 Audit_Log\_\_c, Feature_Flag\_\_c
 ````
+
+The H1 is `# Data model` when no title is given and `# Data model: <title>` (Markdown-escaped) when
+one is. The "Generated by" paragraph is printed only when at least one diagram is written, so a
+project with objects but no relationships gets the H1 and the unrelated-objects section only.
 
 Within a diagram, edges are sorted by parent API name, then child, then field. That keeps the output
 stable, and Mermaid lays out the graph itself regardless of the order.
@@ -306,8 +317,8 @@ one edge per target.
 2. `packages/simply-document-core/src/entityRelationshipDiagram.ts` (new):
    - `buildEntityRelationshipModel`: iterate objects, then fields. Use a `Set` of in-project names to
      decide whether each parent is `external`. Collect `skippedFields`. Sort entities by name.
-   - `splitEntityRelationshipModel`: if node count ≤ `maxObjects` (default 40), return one diagram.
-     Otherwise run a union-find over non-hub edges, re-attach hubs, then choose anchors and sort as in
+   - `splitEntityRelationshipModel`: if connected in-project object count ≤ `maxObjects` (default 40), return one diagram.
+     Otherwise run a union-find over non-hub edges, group satellites per hub, re-attach hubs, place leftover edges, then choose anchors and sort as in
      [Splitting](#splitting). `unrelatedObjects` is in-project entities with no edges.
    - `renderMermaidErDiagram`: `erDiagram` header, then one line per relationship using the cardinality
      table. Indent two spaces, sort edges as described in [Output](#output), and always double-quote
@@ -347,24 +358,24 @@ one edge per target.
 
 ### `simply-document-core` unit tests (`entityRelationshipDiagram.test.ts`)
 
-| Case                                                       | Pins down                                                      |
-| ---------------------------------------------------------- | -------------------------------------------------------------- |
-| Master-Detail, required Lookup, optional Lookup, Hierarchy | Each renders the exact cardinality/line string from the table. |
-| Lookup with no `referenceTo`                               | No edge; appears in `skippedFields` as `Obj__c.Field__c`.      |
-| `fieldType` absent, raw `type: 'Lookup'`                   | Still produces an edge (external-caller path).                 |
-| Massaged `type: 'Lookup(Account)'` with no `fieldType`     | Not treated as a relationship: no display-string parsing.      |
-| Lookup to an object not in the input                       | Parent entity created with `external: true`.                   |
-| Two fields between the same pair                           | Two edges, two labels.                                         |
-| Object with no relationships                               | Not in any diagram; in `unrelatedObjects`.                     |
-| Model at exactly `maxObjects` nodes                        | One diagram (the boundary is inclusive).                       |
-| Two clusters joined only by `User`, above threshold        | Two diagrams, `User` in both, its edges in each.               |
-| Same with `hubs: []`                                       | One diagram.                                                   |
-| Component larger than `maxObjects` after splitting         | One diagram, `oversized: true`.                                |
-| Anchor tie                                                 | Alphabetically first API name wins.                            |
-| Input order shuffled                                       | Byte-identical Markdown (determinism).                         |
-| `referenceTo` as an array of two                           | Two edges.                                                     |
-| Headings with `__c`                                        | Escaped in headings and lists, unescaped inside the fence.     |
-| Empty input                                                | "No objects found", `diagrams: []`.                            |
+| Case                                                       | Pins down                                                       |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| Master-Detail, required Lookup, optional Lookup, Hierarchy | Each renders the exact cardinality/line string from the table.  |
+| Lookup with no `referenceTo`                               | No edge; appears in `skippedFields` as `Obj__c.Field__c`.       |
+| `fieldType` absent, raw `type: 'Lookup'`                   | Still produces an edge (external-caller path).                  |
+| Massaged `type: 'Lookup(Account)'` with no `fieldType`     | Not treated as a relationship: no display-string parsing.       |
+| Lookup to an object not in the input                       | Parent entity created with `external: true`.                    |
+| Two fields between the same pair                           | Two edges, two labels.                                          |
+| Object with no relationships                               | Not in any diagram; in `unrelatedObjects`.                      |
+| Model at exactly `maxObjects` in-project objects           | One diagram (the boundary is inclusive; externals don't count). |
+| Two clusters joined only by `User`, above threshold        | Two diagrams, `User` in both, its edges in each.                |
+| Same with `hubs: []`                                       | One diagram.                                                    |
+| Component larger than `maxObjects` after splitting         | One diagram, `oversized: true`.                                 |
+| Anchor tie                                                 | Alphabetically first API name wins.                             |
+| Input order shuffled                                       | Byte-identical Markdown (determinism).                          |
+| `referenceTo` as an array of two                           | Two edges.                                                      |
+| Headings with `__c`                                        | Escaped in headings and lists, unescaped inside the fence.      |
+| Empty input                                                | "No objects found", `diagrams: []`.                             |
 
 Also check that the rendered output of one fixture parses as Mermaid. Do this with `mermaid`'s
 `parse()` as a **devDependency** in the test only, if it runs under vitest without a DOM (confirm).

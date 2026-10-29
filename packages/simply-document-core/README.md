@@ -86,14 +86,14 @@ string such as `Lookup(Account)`. Raw `type: 'Lookup'` also works. `referenceTo`
 an array of target names. Hierarchy fields are self relationships. Standard relationships absent
 from DX metadata cannot be inferred.
 
-The default threshold is 40 connected nodes including external objects. Above it, splitting finds
-components with at least one non-hub edge, then reattaches hubs (`User` by default). `hubs: []`
-disables hub removal. Each non-hub object connected only to hubs seeds its own diagram with all
-its hub relationships, including when that non-hub object is external. Shared hubs do not merge
-these diagrams. These objects are not listed as unrelated.
-Hub-to-hub edges appear in every diagram already containing either endpoint. Split diagrams are
-marked `oversized` when their in-project node count exceeds the threshold; heading counts include
-external nodes. Unrelated in-project objects appear in a separate list. All output uses ordinal
+The default threshold is 40 connected in-project objects (`maxObjects` never counts external
+objects). Above it, splitting finds components with at least one non-hub edge, then reattaches hubs
+(`User` by default). `hubs: []` disables hub removal. Non-hub objects connected only to hubs
+(including external ones) share one diagram per hub, using their first hub alphabetically, so
+they stay visible and are not listed as unrelated. Hub-to-hub edges appear in every diagram already
+containing either endpoint, and any edge still unplaced gets a diagram of its own, so every
+relationship appears somewhere. Split diagrams are marked `oversized` when their in-project object
+count exceeds the threshold; heading counts include external nodes. Unrelated in-project objects appear in a separate list. All output uses ordinal
 sorting for repeatable diffs, with underscores escaped outside Mermaid blocks.
 
 ## Issues

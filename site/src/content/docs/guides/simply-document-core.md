@@ -87,10 +87,11 @@ Pass raw metadata in `fieldType` (or `type` if it hasn't been formatted for disp
 from DX source aren't inferred. External parents are listed beside each diagram; unrelated objects
 are listed at the end.
 
-Above 40 connected nodes (including external parents), diagrams split by connected components after
-removing hub edges, then reattach hubs. Set `hubs: []` to disable hub removal. Each connected
-non-hub object outside those components seeds its own diagram with its hub relationships, including
-external non-hub objects, so hub-only connections remain visible. Hub-to-hub edges join diagrams
-already containing either endpoint. `oversized` counts in-project nodes after splitting, while
-Markdown heading counts include external nodes. Use `buildEntityRelationshipModel`,
+Above 40 connected in-project objects (`maxObjects`; external parents don't count), diagrams split by
+connected components after removing hub edges, then reattach hubs. Set `hubs: []` to disable hub
+removal. Non-hub objects connected only to hubs (including external ones) share one diagram per hub
+(their first hub alphabetically), and hub-to-hub edges join diagrams already containing either
+endpoint; any edge still unplaced gets its own diagram so every relationship appears somewhere.
+`oversized` counts in-project objects after splitting, while Markdown heading counts include
+external nodes. Use `buildEntityRelationshipModel`,
 `splitEntityRelationshipModel`, and `renderMermaidErDiagram` separately for other output workflows.
