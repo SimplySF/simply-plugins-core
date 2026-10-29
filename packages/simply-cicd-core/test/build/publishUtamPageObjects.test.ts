@@ -100,7 +100,18 @@ async function fakeCompile(configPath: string, writesProfiles: boolean): Promise
   await emit(config.extensionsOutputDir, '.utam.js', ['js', 'cjs']);
   const outputDir = path.join(config.pageObjectsRootDir, config.pageObjectsOutputDir);
   if (writesProfiles) {
-    await fs.writeFile(path.join(outputDir, '..', `${config.module}.config.json`), '{"platform":{}}\n');
+    // As utam@3 writes it on Windows: the implementation specifier built with `path.join`.
+    const profiles = {
+      platform: {
+        web: [
+          {
+            interface: `${config.module}/pageObjects/navigation`,
+            implementation: `${config.module}/pageObjects/navigationWeb`.replaceAll('/', '\\'),
+          },
+        ],
+      },
+    };
+    await fs.writeFile(path.join(outputDir, '..', `${config.module}.config.json`), JSON.stringify(profiles));
   }
 }
 
@@ -492,7 +503,17 @@ describe('publishUtamPageObjects', () => {
 
       await publishUtamPageObjects({ ...baseOptions, debug: true });
 
-      await expect(readStaged('profiles.config.json')).resolves.toBe('{"platform":{}}\n');
+      // With every specifier in `/` form, whatever separator the compiler used.
+      expect(JSON.parse(await readStaged('profiles.config.json'))).toEqual({
+        platform: {
+          web: [
+            {
+              interface: '@acme/my-package-pageobjects/pageObjects/navigation',
+              implementation: '@acme/my-package-pageobjects/pageObjects/navigationWeb',
+            },
+          ],
+        },
+      });
       // Nor the scope folder the compiler needed to write it, which would be empty.
       await expect(fs.access(path.join(lastStagingDir(), '@acme'))).rejects.toThrow();
     });

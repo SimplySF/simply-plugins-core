@@ -195,16 +195,28 @@ async function findMissingOutput(outputDir: string, sources: string[], extension
  *
  * The compiler writes it as `<module>.config.json` beside the output, so the scope folder of a
  * scoped name has to exist before it runs; `prepareProfilesConfig` makes sure it does.
+ *
+ * The compiler also builds each implementation specifier with `path.join`, which on Windows writes
+ * `@scope\pkg\pageObjects\name`: not a specifier any module resolver accepts. Every value in this
+ * file is a module specifier, never a filesystem path, so backslashes are rewritten to `/`.
  */
 async function publishProfilesConfig(stagingDir: string, npmPackageName: string): Promise<void> {
   const written = path.join(stagingDir, `${npmPackageName}.config.json`);
+  let content;
   try {
-    await fs.rename(written, path.join(stagingDir, PROFILES_CONFIG_FILE));
+    content = await fs.readFile(written, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
     }
+    throw error;
   }
+
+  const profiles = JSON.parse(content, (_key, value: unknown) =>
+    typeof value === 'string' ? value.replaceAll('\\', '/') : value,
+  ) as unknown;
+  await fs.writeFile(path.join(stagingDir, PROFILES_CONFIG_FILE), `${JSON.stringify(profiles, null, 4)}\n`);
+  await fs.rm(written);
 
   // The `@scope/` folder `prepareProfilesConfig` made is empty now; leave staging as it'll be packed.
   const scopeDir = path.dirname(written);
