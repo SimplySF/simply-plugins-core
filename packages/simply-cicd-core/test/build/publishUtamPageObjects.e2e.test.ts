@@ -153,7 +153,9 @@ describe('publishUtamPageObjects, end to end', () => {
 
     extractedDir = path.join(projectDir, 'extracted');
     await fs.mkdir(extractedDir);
-    await execa('tar', ['-xzf', result.tarball as string, '-C', extractedDir]);
+    // Run from the destination with a relative archive path: GNU tar, which Windows can resolve
+    // `tar` to, reads an absolute `C:\…` argument as a remote `host:path` archive.
+    await execa('tar', ['-xzf', path.relative(extractedDir, result.tarball as string)], { cwd: extractedDir });
     packed = await listFiles(path.join(extractedDir, 'package'));
   }, 120_000);
 

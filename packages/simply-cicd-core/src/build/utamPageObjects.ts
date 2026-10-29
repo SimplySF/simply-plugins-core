@@ -297,14 +297,16 @@ export async function findUtilitySources(rootDir: string): Promise<string[]> {
  * Sources that would compile to the same output file.
  *
  * The compiler's output is flat — one file per source, named after it, whatever folder it came
- * from — so two sources with one name silently leave one of them out of the package.
+ * from — so two sources with one name silently leave one of them out of the package. Names are
+ * compared ignoring case, because the staging directory is usually on a case-insensitive
+ * filesystem (macOS, Windows), where `Modal.js` and `modal.js` are the same file.
  *
  * @returns One message per clashing name, naming every source behind it. Empty when none clash.
  */
 export function findOutputNameClashes(sources: string[], extension: string, rootDir: string): string[] {
   const byName = new Map<string, string[]>();
   for (const source of sources) {
-    const name = path.basename(source, extension);
+    const name = path.basename(source, extension).toLowerCase();
     byName.set(name, [...(byName.get(name) ?? []), path.relative(rootDir, source)]);
   }
 

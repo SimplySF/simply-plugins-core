@@ -163,23 +163,31 @@ async function stageSources(sources: string[], pageObjectsRootDir: string, stagi
 }
 
 /**
- * Fail unless the compiler wrote every page object into the staged package.
+ * Fail unless the compiler wrote every page object and utility into the staged package.
  *
  * The compiler exits cleanly even when its output lands somewhere else, and `npm publish` would
  * then ship the source JSON alone — a package every test pinned to this version fails to import.
  */
-async function assertCompiledOutput(stagingDir: string, pageObjectSources: string[]): Promise<void> {
-  const outputDir = path.join(stagingDir, 'pageObjects');
-  const compiled = new Set(await fs.readdir(outputDir).catch(() => [] as string[]));
-  const missing = pageObjectSources
-    .map((source) => path.basename(source, '.utam.json'))
-    .filter((name) => !compiled.has(`${name}.js`));
+async function assertCompiledOutput(stagingDir: string, target: PublishTarget): Promise<void> {
+  const missing = [
+    ...(await findMissingOutput(path.join(stagingDir, 'pageObjects'), target.sources, '.utam.json')),
+    ...(await findMissingOutput(path.join(stagingDir, 'utils'), target.utilitySources, '.utam.js')),
+  ];
 
   if (missing.length > 0) {
     throw new Error(
-      `The UTAM compiler produced no page object for ${missing.join(', ')} in ${outputDir}. Refusing to publish without them.`,
+      `The UTAM compiler produced no output for ${missing.join(', ')}. Refusing to publish without them.`,
     );
   }
+}
+
+/** @returns `<outputDir>/<name>.js` for every source whose compiled `.js` isn't there. */
+async function findMissingOutput(outputDir: string, sources: string[], extension: string): Promise<string[]> {
+  const compiled = new Set(await fs.readdir(outputDir).catch(() => [] as string[]));
+  return sources
+    .map((source) => `${path.basename(source, extension)}.js`)
+    .filter((file) => !compiled.has(file))
+    .map((file) => path.join(outputDir, file));
 }
 
 /**
@@ -196,6 +204,12 @@ async function publishProfilesConfig(stagingDir: string, npmPackageName: string)
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       throw error;
     }
+  }
+
+  // The `@scope/` folder `prepareProfilesConfig` made is empty now; leave staging as it'll be packed.
+  const scopeDir = path.dirname(written);
+  if (scopeDir !== stagingDir) {
+    await fs.rmdir(scopeDir).catch(() => undefined);
   }
 }
 
@@ -365,7 +379,7 @@ async function buildStagedPackage(
     cwd: stagingDir,
     stdio: options.debug ? 'inherit' : 'pipe',
   });
-  await assertCompiledOutput(stagingDir, target.sources);
+  await assertCompiledOutput(stagingDir, target);
   await publishProfilesConfig(stagingDir, target.npmPackageName);
 
   await fs.writeFile(

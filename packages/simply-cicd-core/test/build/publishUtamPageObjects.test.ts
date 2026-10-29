@@ -69,7 +69,7 @@ function project(overrides: Partial<SfdxProject> = {}): SfdxProject {
 
 /**
  * Stand in for the UTAM compiler: write the four files it emits for every `.utam.json` under its
- * root, and optionally the profiles config.
+ * root, the two it emits for every `.utam.js` utility, and optionally the profiles config.
  *
  * Resolves paths exactly as `utam@3` does — output as `path.join(pageObjectsRootDir, outputDir)`,
  * which appends rather than honours an absolute output directory, and the profiles config as
@@ -81,20 +81,24 @@ async function fakeCompile(configPath: string, writesProfiles: boolean): Promise
   const config = JSON.parse(await fs.readFile(configPath, 'utf8')) as {
     pageObjectsRootDir: string;
     pageObjectsOutputDir: string;
+    extensionsOutputDir: string;
     module: string;
   };
-  const outputDir = path.join(config.pageObjectsRootDir, config.pageObjectsOutputDir);
   const entries = await fs.readdir(config.pageObjectsRootDir, { recursive: true }).catch(() => [] as string[]);
-  const names = entries
-    .filter((entry) => entry.endsWith('.utam.json'))
-    .map((entry) => path.basename(entry, '.utam.json'));
+  const emit = async (outputKey: string, extension: string, outputExts: string[]): Promise<void> => {
+    const outputDir = path.join(config.pageObjectsRootDir, outputKey);
+    const names = entries.filter((entry) => entry.endsWith(extension)).map((entry) => path.basename(entry, extension));
+    await fs.mkdir(outputDir, { recursive: true });
+    await Promise.all(
+      names.flatMap((name) =>
+        outputExts.map((ext) => fs.writeFile(path.join(outputDir, `${name}.${ext}`), `// ${name}\n`)),
+      ),
+    );
+  };
 
-  await fs.mkdir(outputDir, { recursive: true });
-  await Promise.all(
-    names.flatMap((name) =>
-      ['js', 'cjs', 'd.ts', 'd.cts'].map((ext) => fs.writeFile(path.join(outputDir, `${name}.${ext}`), `// ${name}\n`)),
-    ),
-  );
+  await emit(config.pageObjectsOutputDir, '.utam.json', ['js', 'cjs', 'd.ts', 'd.cts']);
+  await emit(config.extensionsOutputDir, '.utam.js', ['js', 'cjs']);
+  const outputDir = path.join(config.pageObjectsRootDir, config.pageObjectsOutputDir);
   if (writesProfiles) {
     await fs.writeFile(path.join(outputDir, '..', `${config.module}.config.json`), '{"platform":{}}\n');
   }
@@ -489,9 +493,8 @@ describe('publishUtamPageObjects', () => {
       await publishUtamPageObjects({ ...baseOptions, debug: true });
 
       await expect(readStaged('profiles.config.json')).resolves.toBe('{"platform":{}}\n');
-      await expect(
-        fs.access(path.join(lastStagingDir(), '@acme', 'my-package-pageobjects.config.json')),
-      ).rejects.toThrow();
+      // Nor the scope folder the compiler needed to write it, which would be empty.
+      await expect(fs.access(path.join(lastStagingDir(), '@acme'))).rejects.toThrow();
     });
 
     it('should throw before asking the Dev Hub when two page objects would compile to one file', async () => {
@@ -522,10 +525,31 @@ describe('publishUtamPageObjects', () => {
       mockExeca({ compilesNothing: true });
 
       await expect(publishUtamPageObjects(baseOptions)).rejects.toThrow(
-        'The UTAM compiler produced no page object for hello',
+        /produced no output for \S*pageObjects[\\/]hello\.js/,
       );
       expect(execaCall('npm', 'publish')).toBeUndefined();
       expect(appendToEnvFile).not.toHaveBeenCalled();
+    });
+
+    it('should throw, without publishing, when a utility is missing from the output', async () => {
+      await fs.writeFile(
+        path.join(packageDir, 'main', 'default', 'lwc', 'hello', '__utam__', 'helper.utam.js'),
+        'export const helper = 1;\n',
+      );
+      const passthrough = vi.mocked(execa).getMockImplementation();
+      vi.mocked(execa).mockImplementation((async (file: string, args: readonly string[] = [], opts?: unknown) => {
+        const result = await (passthrough as (...a: unknown[]) => Promise<unknown>)(file, args, opts);
+        if (file === process.execPath) {
+          // The page objects compiled, but the utility never reached `utils/`.
+          await fs.rm(path.join(lastStagingDir(), 'utils'), { recursive: true, force: true });
+        }
+        return result;
+      }) as never);
+
+      await expect(publishUtamPageObjects(baseOptions)).rejects.toThrow(
+        /produced no output for \S*utils[\\/]helper\.js/,
+      );
+      expect(execaCall('npm', 'publish')).toBeUndefined();
     });
 
     it('should merge a project-owned compiler config underneath its own keys', async () => {

@@ -320,6 +320,18 @@ describe('findOutputNameClashes', () => {
     ]);
   });
 
+  it('should treat names that differ only by case as clashing, as a case-insensitive filesystem does', () => {
+    const clashes = findOutputNameClashes(
+      [source('dialogA', '__utam__', 'Modal.utam.json'), source('dialogB', '__utam__', 'modal.utam.json')],
+      '.utam.json',
+      root,
+    );
+
+    expect(clashes).toEqual([
+      `"modal" (${path.join('lwc', 'dialogA', '__utam__', 'Modal.utam.json')}, ${path.join('lwc', 'dialogB', '__utam__', 'modal.utam.json')})`,
+    ]);
+  });
+
   it('should report nothing when every name is unique', () => {
     expect(
       findOutputNameClashes(
