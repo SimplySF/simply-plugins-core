@@ -53,3 +53,16 @@ export {
   type ValidationRuleItem,
   type VisualforcePageItem,
 } from './technicalDesignDocumentTemplate.js';
+
+export {
+  buildEntityRelationshipModel,
+  splitEntityRelationshipModel,
+  renderMermaidErDiagram,
+  buildEntityRelationshipDiagramMarkdown,
+  type EntityRelationshipModel,
+  type ErdEntity,
+  type ErdRelationship,
+  type ErdRelationshipKind,
+  type ErdDiagram,
+  type ErdOptions,
+} from './entityRelationshipDiagram.js';

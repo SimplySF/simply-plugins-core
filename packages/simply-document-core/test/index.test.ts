@@ -27,5 +27,12 @@ import * as api from '../src/index.js';
  * renamed key is the signal to treat the change as breaking (see `src/index.ts`'s header comment).
  */
 it('exports the expected set of runtime values', () => {
-  expect(Object.keys(api).sort()).toStrictEqual(['buildChangeReportHtml', 'buildTechnicalDesignDocumentHtml']);
+  expect(Object.keys(api).sort()).toStrictEqual([
+    'buildChangeReportHtml',
+    'buildEntityRelationshipDiagramMarkdown',
+    'buildEntityRelationshipModel',
+    'buildTechnicalDesignDocumentHtml',
+    'renderMermaidErDiagram',
+    'splitEntityRelationshipModel',
+  ]);
 });

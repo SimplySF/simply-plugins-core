@@ -3,7 +3,7 @@ title: simply-document-core
 description: Usage examples for @simplysf/simply-document-core.
 ---
 
-Confluence-storage-format change report and technical design document rendering. Full signatures and
+Confluence-storage-format change report and technical design document rendering, plus Mermaid entity relationship diagrams. Full signatures and
 types are in the [API reference](/api/simply-document-core/readme/).
 
 ```sh
@@ -59,3 +59,39 @@ override the built-in layout entirely:
 ```ts
 const html = buildChangeReportHtml(changes, myCustomTemplateSource);
 ```
+
+## Entity relationship diagrams
+
+Build Mermaid Markdown directly from scanned objects:
+
+```ts
+import { buildEntityRelationshipDiagramMarkdown, type ObjectItem } from '@simplysf/simply-document-core';
+
+const objects: ObjectItem[] = [
+  {
+    name: 'Invoice__c',
+    customFields: [{ fullName: 'Account__c', fieldType: 'Lookup', referenceTo: 'Account', required: 'true' }],
+  },
+];
+const { markdown, model, diagrams, unrelatedObjects } = buildEntityRelationshipDiagramMarkdown(objects, {
+  title: 'Billing',
+  maxObjects: 40,
+  hubs: ['User'],
+});
+```
+
+Save `markdown` to a file, or paste each Mermaid block into Gliffy using **Create from code → Mermaid**.
+The diagram shows objects and Lookup, Master-Detail, and Hierarchy fields without field attributes.
+Pass raw metadata in `fieldType` (or `type` if it hasn't been formatted for display) and parents in
+`referenceTo`. Missing parents are reported in `model.skippedFields`. Standard relationships absent
+from DX source aren't inferred. External parents are listed beside each diagram; unrelated objects
+are listed at the end.
+
+Above 40 connected in-project objects (`maxObjects`; external parents don't count), diagrams split by
+connected components after removing hub edges, then reattach hubs. Set `hubs: []` to disable hub
+removal. Non-hub objects connected only to hubs (including external ones) share one diagram per hub
+(their first hub alphabetically), and hub-to-hub edges join diagrams already containing either
+endpoint; any edge still unplaced gets its own diagram so every relationship appears somewhere.
+`oversized` counts in-project objects after splitting, while Markdown heading counts include
+external nodes. Use `buildEntityRelationshipModel`,
+`splitEntityRelationshipModel`, and `renderMermaidErDiagram` separately for other output workflows.
