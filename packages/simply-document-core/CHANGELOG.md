@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-document-core%400.2.5...%40simplysf%2Fsimply-document-core%400.3.0) (2026-10-29)
+
+### Features
+
+- **simply-document-core:** entity relationship diagram model and Mermaid renderer ([#268](https://github.com/SimplySF/simply-plugins-core/issues/268)) ([1478cc7](https://github.com/SimplySF/simply-plugins-core/commit/1478cc7c2f8ccf2cef3272308439348fcfac5946))
+
 ## [0.2.5](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-document-core%400.2.4...%40simplysf%2Fsimply-document-core%400.2.5) (2026-10-13)
 
 ### Bug Fixes
