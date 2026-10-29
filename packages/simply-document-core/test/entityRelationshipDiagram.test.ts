@@ -44,7 +44,7 @@ const clusters: ObjectItem[] = [
   { name: 'Case_Note__c', customFields: [lookup('Case__c', 'Case__c')] },
 ];
 
-function split(objects: ObjectItem[], options: ErdOptions = { maxObjects: 4 }) {
+function split(objects: ObjectItem[], options: ErdOptions = { maxObjects: 2 }) {
   return splitEntityRelationshipModel(buildEntityRelationshipModel(objects), options);
 }
 
@@ -73,6 +73,32 @@ describe('buildEntityRelationshipModel', () => {
     ]);
     expect(model.relationships.map((edge) => edge.field)).toEqual(['Raw__c', 'Typed__c']);
     expect(model.skippedFields).toEqual(['Invoice__c.A__c', 'Invoice__c.Z__c']);
+  });
+
+  it('skips empty or whitespace referenceTo in string and array forms', () => {
+    const model = buildEntityRelationshipModel([
+      {
+        name: 'Child',
+        customFields: [
+          lookup('Blank__c', ''),
+          lookup('Spaces__c', '   '),
+          lookup('Arr__c', ['', ' ']),
+          lookup('Mixed__c', [' Parent ', '']),
+        ],
+      },
+    ]);
+    expect(model.skippedFields).toEqual(['Child.Arr__c', 'Child.Blank__c', 'Child.Spaces__c']);
+    expect(model.entities.map((entity) => entity.name)).toEqual(['Child', 'Parent']);
+    expect(model.relationships.map((edge) => [edge.parent, edge.field])).toEqual([['Parent', 'Mixed__c']]);
+  });
+
+  it('dedupes duplicate objects by parent, child, and field, keeping the first sorted', () => {
+    const model = buildEntityRelationshipModel([
+      { name: 'Child', customFields: [lookup('F__c', 'Parent', 'true')] },
+      { name: 'Child', customFields: [lookup('F__c', 'Parent')] },
+    ]);
+    expect(model.relationships).toHaveLength(1);
+    expect(model.relationships[0].required).toBe(false);
   });
 
   it('keeps multiple fields per pair and expands polymorphic referenceTo', () => {
@@ -145,10 +171,12 @@ describe('splitEntityRelationshipModel', () => {
     expect(result.diagrams[0].entities).toHaveLength(5);
   });
 
-  it('uses an inclusive threshold counting external nodes and excluding unrelated objects', () => {
-    const result = split([...clusters, { name: 'Unrelated' }], { maxObjects: 5, title: 'All' });
+  it('uses an inclusive threshold counting only in-project objects, not externals or unrelated ones', () => {
+    const result = split([...clusters, { name: 'Unrelated' }], { maxObjects: 4, title: 'All' });
     expect(result.diagrams).toHaveLength(1);
     expect(result.diagrams[0]).toMatchObject({ name: 'All', oversized: false });
+    expect(result.diagrams[0].entities).toHaveLength(5);
+    expect(split(clusters, { maxObjects: 3 }).diagrams).toHaveLength(2);
   });
 
   it('splits clusters joined only through User and uses ordinal anchors for ties', () => {
@@ -193,27 +221,105 @@ describe('splitEntityRelationshipModel', () => {
     }
   });
 
-  it('seeds separate diagrams for objects connected only to hubs', () => {
+  it('groups satellites connected only to hubs into one diagram per hub', () => {
     const objects = [
       { name: 'A', customFields: [lookup('Owner', 'User'), lookup('Reviewer', 'User')] },
       { name: 'B', customFields: [lookup('Owner', 'User')] },
+      { name: 'C', customFields: [lookup('Owner', 'User')] },
     ];
     const { diagrams, unrelatedObjects, markdown } = buildEntityRelationshipDiagramMarkdown(objects, { maxObjects: 2 });
     expect(
       diagrams.map(({ name, entities, relationships, oversized }) => ({
         name,
         names: entities.map((entity) => entity.name),
-        fields: relationships.map((edge) => edge.field),
+        fields: relationships.map((edge) => `${edge.child}.${edge.field}`),
         oversized,
       })),
     ).toEqual([
-      { name: 'A', names: ['A', 'User'], fields: ['Owner', 'Reviewer'], oversized: false },
-      { name: 'B', names: ['B', 'User'], fields: ['Owner'], oversized: false },
+      {
+        name: 'A',
+        names: ['A', 'B', 'C', 'User'],
+        fields: ['A.Owner', 'A.Reviewer', 'B.Owner', 'C.Owner'],
+        oversized: true,
+      },
     ]);
     expect(unrelatedObjects).toEqual([]);
-    expect(markdown).toContain('User |o..o{ A : "Owner"');
-    expect(markdown).toContain('User |o..o{ A : "Reviewer"');
-    expect(markdown).toContain('User |o..o{ B : "Owner"');
+    expect(markdown).toContain('User |o..o{ C : "Owner"');
+  });
+
+  it('puts a satellite of several hubs in its first hub group and keeps its other hub edges', () => {
+    const objects = [
+      { name: 'A', customFields: [lookup('Owner', 'User'), lookup('Acct', 'Account')] },
+      { name: 'B', customFields: [lookup('Acct', 'Account')] },
+      ...clusters,
+    ];
+    const { diagrams } = split(objects, { maxObjects: 2, hubs: ['User', 'Account'] });
+    const group = diagrams.find((diagram) => diagram.relationships.some((edge) => edge.child === 'B'));
+    expect(group?.relationships.map((edge) => `${edge.child}.${edge.field}`)).toEqual([
+      'A.Acct',
+      'B.Acct',
+      'A.Owner',
+    ]);
+    expect(diagrams.filter((diagram) => diagram.relationships.some((edge) => edge.child === 'A'))).toHaveLength(1);
+  });
+
+  it('never picks a hub as anchor while an in-project non-hub exists', () => {
+    const objects = [
+      ...clusters,
+      { name: 'User', customFields: [lookup('A__c', 'Z_Ext'), lookup('B__c', 'Z_Ext'), lookup('C__c', 'Z_Ext')] },
+    ];
+    const names = split(objects).diagrams.map((diagram) => diagram.name);
+    expect(names).not.toContain('User');
+    expect(names).toEqual(['Case__c', 'Invoice__c', 'Z_Ext']);
+  });
+
+  it('places hub-only edges that no other diagram contains, and every relationship appears somewhere', () => {
+    const objects: ObjectItem[] = [
+      ...clusters,
+      { name: 'Sat__c', customFields: [lookup('Owner', 'User')] },
+      {
+        name: 'User',
+        customFields: [{ fullName: 'Manager__c', type: 'Hierarchy' }, lookup('Org__c', 'Org')],
+      },
+      { name: 'Org', customFields: [lookup('Parent__c', 'Parent_Org')] },
+      { name: 'Parent_Org' },
+      { name: 'Lone_Hub_Child', customFields: [{ fullName: 'Self', type: 'Hierarchy' }] },
+    ];
+    for (const hubs of [['User'], ['User', 'Org'], ['User', 'Org', 'Parent_Org'], ['Lone_Hub_Child']]) {
+      const result = buildEntityRelationshipDiagramMarkdown(objects, { maxObjects: 2, hubs });
+      const included = new Set(result.diagrams.flatMap((diagram) => diagram.relationships));
+      for (const edge of result.model.relationships) expect(included.has(edge)).toBe(true);
+    }
+    const only: ObjectItem[] = [
+      ...clusters,
+      { name: 'User', customFields: [{ fullName: 'Manager__c', type: 'Hierarchy' }] },
+      { name: 'Org', customFields: [lookup('Owner__c', 'Org2')] },
+      { name: 'Org2', customFields: [lookup('X__c', 'User2')] },
+    ];
+    const { diagrams } = split(only, { maxObjects: 2, hubs: ['Org', 'Org2', 'User2'] });
+    expect(diagrams.some((diagram) => diagram.relationships.some((edge) => edge.field === 'Owner__c'))).toBe(true);
+    const hubOnly = split(
+      [...clusters, { name: 'User', customFields: [{ fullName: 'Manager__c', type: 'Hierarchy' }] }],
+      { maxObjects: 3, hubs: ['User'] },
+    );
+    expect(hubOnly.diagrams.flatMap((diagram) => diagram.relationships.map((edge) => edge.field))).toContain(
+      'Manager__c',
+    );
+  });
+
+  it('emits a diagram for hub-only edges when no diagram contains the hubs', () => {
+    const objects: ObjectItem[] = [
+      { name: 'P', customFields: [lookup('Q__c', 'Q')] },
+      { name: 'Q', customFields: [lookup('R__c', 'R')] },
+      { name: 'Hub1', customFields: [lookup('Hub2__c', 'Hub2'), { fullName: 'Self__c', type: 'Hierarchy' }] },
+      { name: 'Hub2' },
+    ];
+    const { diagrams, unrelatedObjects } = split(objects, { maxObjects: 2, hubs: ['Hub1', 'Hub2'] });
+    expect(unrelatedObjects).toEqual([]);
+    expect(diagrams.map((diagram) => [diagram.name, diagram.relationships.length])).toEqual([
+      ['Hub1', 2],
+      ['Q', 2],
+    ]);
   });
 
   it('preserves hub-only objects alongside clusters, including external non-hub endpoints', () => {
@@ -224,7 +330,7 @@ describe('splitEntityRelationshipModel', () => {
       { name: 'Unrelated' },
     ];
     const result = buildEntityRelationshipDiagramMarkdown(objects, { maxObjects: 2 });
-    expect(result.diagrams).toHaveLength(4);
+    expect(result.diagrams).toHaveLength(3);
     expect(result.unrelatedObjects).toEqual(['Unrelated']);
     expect(result.diagrams.flatMap((diagram) => diagram.relationships)).toEqual(
       expect.arrayContaining(result.model.relationships),
@@ -234,15 +340,28 @@ describe('splitEntityRelationshipModel', () => {
     expect(buildEntityRelationshipDiagramMarkdown([...objects].reverse(), { maxObjects: 2 })).toEqual(result);
   });
 
-  it('falls back to the first entity name when a caller supplies only external nodes', () => {
+  it('falls back to a hub, then the first entity name, when a diagram has no other candidates', () => {
     const entities: ErdEntity[] = [
+      { name: 'P', external: false },
+      { name: 'Q', external: false },
+      { name: 'R', external: false },
       { name: 'B', external: true },
       { name: 'A', external: true },
     ];
     const kind: ErdRelationshipKind = 'Lookup';
-    const edge: ErdRelationship = { parent: 'A', child: 'B', field: 'A__c', kind, required: false };
-    const model: EntityRelationshipModel = { entities, relationships: [edge], skippedFields: [] };
-    const diagram: ErdDiagram = splitEntityRelationshipModel(model, { maxObjects: 1 }).diagrams[0];
+    const edge = (parent: string, child: string): ErdRelationship => ({
+      parent,
+      child,
+      field: `${parent}__c`,
+      kind,
+      required: false,
+    });
+    const model: EntityRelationshipModel = {
+      entities,
+      relationships: [edge('A', 'B'), edge('P', 'Q'), edge('Q', 'R')],
+      skippedFields: [],
+    };
+    const diagram: ErdDiagram = splitEntityRelationshipModel(model, { maxObjects: 2, hubs: ['A', 'B'] }).diagrams[1];
     expect(diagram).toMatchObject({ name: 'A', oversized: false });
   });
 });
@@ -285,7 +404,7 @@ describe('buildEntityRelationshipDiagramMarkdown', () => {
 
   it('handles empty input and projects with no edges', () => {
     expect(buildEntityRelationshipDiagramMarkdown([])).toMatchObject({
-      markdown: '# Data model: Data model\n\nNo objects found.\n',
+      markdown: '# Data model\n\nNo objects found.\n',
       diagrams: [],
       unrelatedObjects: [],
     });
@@ -293,6 +412,12 @@ describe('buildEntityRelationshipDiagramMarkdown', () => {
     expect(result.diagrams).toEqual([]);
     expect(result.markdown).toContain('## Objects with no relationships\n\nUnrelated\n');
     expect(result.markdown).not.toContain('```mermaid');
+  });
+
+  it('uses a bare H1 without a title and omits the intro when nothing is related', () => {
+    expect(buildEntityRelationshipDiagramMarkdown([{ name: 'Unrelated' }]).markdown).toBe(
+      '# Data model\n\n## Objects with no relationships\n\nUnrelated\n',
+    );
   });
 
   it('is byte-identical under object, field, and target shuffling without mutating input', () => {

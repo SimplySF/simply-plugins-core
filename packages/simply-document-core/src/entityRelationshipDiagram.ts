@@ -28,7 +28,7 @@ export type ErdRelationship = {
   kind: ErdRelationshipKind;
   required: boolean;
 };
-/** Sorted entities, relationships, and qualified fields skipped for missing referenceTo. */
+/** Sorted (by name; relationships by parent, child, field) entities, relationships, and fields skipped for missing referenceTo. */
 export type EntityRelationshipModel = {
   entities: ErdEntity[];
   relationships: ErdRelationship[];
@@ -41,7 +41,7 @@ export type ErdDiagram = {
   relationships: ErdRelationship[];
   oversized: boolean;
 };
-/** Defaults: 40 connected nodes, User as the sole hub, and Data model as the title. */
+/** Defaults: 40 in-project objects (maxObjects counts connected in-project objects only), User as the sole hub, and no title. */
 export type ErdOptions = { maxObjects?: number; hubs?: string[]; title?: string };
 
 function compareNames(a: string, b: string): number {
@@ -71,7 +71,9 @@ export function buildEntityRelationshipModel(objects: ObjectItem[]): EntityRelat
       if (kind !== 'MasterDetail' && kind !== 'Lookup' && kind !== 'Hierarchy') continue;
       const name = field.fullName.slice(field.fullName.lastIndexOf('.') + 1);
       const targets = kind === 'Hierarchy' ? [object.name] : field.referenceTo;
-      const parents = typeof targets === 'string' ? [targets] : (targets ?? []);
+      const parents = [...new Set([targets ?? []].flat().map((target) => (typeof target === 'string' ? target.trim() : '')))]
+        .filter(Boolean)
+        .sort(compareNames);
       if (parents.length === 0) skippedFields.push(`${object.name}.${name}`);
       for (const parent of parents) {
         if (!entities.has(parent)) entities.set(parent, { name: parent, external: true });
@@ -85,10 +87,14 @@ export function buildEntityRelationshipModel(objects: ObjectItem[]): EntityRelat
       }
     }
   }
+  const seen = new Set<string>();
   return {
     entities: [...entities.values()].sort((a, b) => compareNames(a.name, b.name)),
-    relationships: relationships.sort(compareRelationships),
-    skippedFields: skippedFields.sort(compareNames),
+    relationships: relationships.sort(compareRelationships).filter((edge) => {
+      const key = JSON.stringify([edge.parent, edge.child, edge.field]);
+      return !seen.has(key) && seen.add(key);
+    }),
+    skippedFields: [...new Set(skippedFields)].sort(compareNames),
   };
 }
 
@@ -124,21 +130,37 @@ function inProjectCount(diagram: ErdDiagram): number {
   return diagram.entities.filter((entity) => !entity.external).length;
 }
 
-function anchorName(entities: ErdEntity[], relationships: ErdRelationship[]): string {
+function anchorName(entities: ErdEntity[], relationships: ErdRelationship[], hubs: Set<string>): string {
   const degrees = new Map<string, number>();
   for (const edge of relationships) {
     for (const name of new Set([edge.parent, edge.child])) degrees.set(name, (degrees.get(name) ?? 0) + 1);
   }
-  const candidates = entities.filter((entity) => !entity.external);
-  candidates.sort((a, b) => (degrees.get(b.name) ?? 0) - (degrees.get(a.name) ?? 0) || compareNames(a.name, b.name));
-  return candidates[0]?.name ?? entities[0].name;
+  const tier = (entity: ErdEntity): number => (hubs.has(entity.name) ? 2 : entity.external ? 1 : 0);
+  const candidates = [...entities].sort(
+    (a, b) =>
+      tier(a) - tier(b) || (degrees.get(b.name) ?? 0) - (degrees.get(a.name) ?? 0) || compareNames(a.name, b.name),
+  );
+  return candidates[0].name;
 }
 
-/** Split above maxObjects, excluding hub edges when finding connected components.
+function indexByEndpoint(relationships: ErdRelationship[]): Map<string, ErdRelationship[]> {
+  const index = new Map<string, ErdRelationship[]>();
+  for (const edge of relationships) {
+    for (const name of new Set([edge.parent, edge.child])) {
+      const edges = index.get(name) ?? [];
+      edges.push(edge);
+      index.set(name, edges);
+    }
+  }
+  return index;
+}
+
+/** Split when connected in-project objects exceed maxObjects, excluding hub edges when finding components.
  *
+ * Expects a model from buildEntityRelationshipModel (sorted arrays) and preserves its order.
  * Unrelated in-project objects are listed separately. Non-hub objects connected only to hubs
- * each seed a separate diagram so their relationships survive splitting.
- * Hub-to-hub edges are attached to diagrams already containing either hub.
+ * ("satellites") share one diagram per hub (their lexicographically first hub). Hub-to-hub edges
+ * attach to diagrams containing either hub; any edge still unplaced forms diagrams by connectivity.
  */
 export function splitEntityRelationshipModel(
   model: EntityRelationshipModel,
@@ -146,40 +168,61 @@ export function splitEntityRelationshipModel(
 ): { diagrams: ErdDiagram[]; unrelatedObjects: string[] } {
   const maxObjects = options?.maxObjects ?? 40;
   const hubs = new Set(options?.hubs ?? ['User']);
-  const relationships = [...model.relationships].sort(compareRelationships);
+  const { relationships } = model;
   const names = endpointNames(relationships);
-  const connected = model.entities
-    .filter((entity) => names.has(entity.name))
-    .sort((a, b) => compareNames(a.name, b.name));
+  const connected = model.entities.filter((entity) => names.has(entity.name));
   const unrelatedObjects = model.entities
     .filter((entity) => !entity.external && !names.has(entity.name))
-    .map((entity) => entity.name)
-    .sort(compareNames);
+    .map((entity) => entity.name);
   if (connected.length === 0) return { diagrams: [], unrelatedObjects };
-  if (connected.length <= maxObjects) {
+  if (connected.filter((entity) => !entity.external).length <= maxObjects) {
     return {
       diagrams: [{ name: options?.title ?? 'Data model', entities: connected, relationships, oversized: false }],
       unrelatedObjects,
     };
   }
+  const order = new Map(relationships.map((edge, index) => [edge, index]));
+  const index = indexByEndpoint(relationships);
+  const isHubEdge = (edge: ErdRelationship): boolean => hubs.has(edge.parent) && hubs.has(edge.child);
   const nonHubEdges = relationships.filter((edge) => !hubs.has(edge.parent) && !hubs.has(edge.child));
-  const hubEdges = relationships.filter((edge) => hubs.has(edge.parent) && hubs.has(edge.child));
-  const components = connectedComponents(nonHubEdges);
   const nonHubNames = endpointNames(nonHubEdges);
-  for (const entity of connected) {
-    if (!hubs.has(entity.name) && !nonHubNames.has(entity.name)) components.push(new Set([entity.name]));
+  const groups = connectedComponents(nonHubEdges);
+  const satellites = new Map<string, Set<string>>();
+  for (const { name } of connected) {
+    if (hubs.has(name) || nonHubNames.has(name)) continue;
+    const hub = (index.get(name) ?? [])
+      .map((edge) => (edge.parent === name ? edge.child : edge.parent))
+      .sort(compareNames)[0];
+    satellites.set(hub, (satellites.get(hub) ?? new Set<string>()).add(name));
   }
-  const diagrams = components.map((component): ErdDiagram => {
-    const edges = relationships.filter((edge) => component.has(edge.parent) || component.has(edge.child));
-    const attachedNames = endpointNames(edges);
-    edges.push(...hubEdges.filter((edge) => attachedNames.has(edge.parent) || attachedNames.has(edge.child)));
-    edges.sort(compareRelationships);
+  groups.push(...satellites.values());
+  const placed = new Set<ErdRelationship>();
+  const build = (edgeSet: Set<ErdRelationship>): ErdDiagram => {
+    const edges = [...edgeSet].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
     const diagramNames = endpointNames(edges);
     const entities = connected.filter((entity) => diagramNames.has(entity.name));
-    const diagram = { name: anchorName(entities, edges), entities, relationships: edges, oversized: false };
+    for (const edge of edges) placed.add(edge);
+    const diagram = {
+      name: anchorName(entities, edges, hubs),
+      entities,
+      relationships: edges,
+      oversized: false,
+    };
     diagram.oversized = inProjectCount(diagram) > maxObjects;
     return diagram;
+  };
+  const diagrams = groups.map((group) => {
+    const edges = new Set([...group].flatMap((name) => index.get(name) ?? []));
+    for (const name of endpointNames([...edges])) {
+      for (const edge of index.get(name) ?? []) if (isHubEdge(edge)) edges.add(edge);
+    }
+    return build(edges);
   });
+  const leftover = relationships.filter((edge) => !placed.has(edge));
+  const leftoverIndex = indexByEndpoint(leftover);
+  for (const group of connectedComponents(leftover)) {
+    diagrams.push(build(new Set([...group].flatMap((name) => leftoverIndex.get(name) ?? []))));
+  }
   diagrams.sort((a, b) => inProjectCount(b) - inProjectCount(a) || compareNames(a.name, b.name));
   return { diagrams, unrelatedObjects };
 }
@@ -205,14 +248,16 @@ export function buildEntityRelationshipDiagramMarkdown(
 ): { markdown: string; model: EntityRelationshipModel; diagrams: ErdDiagram[]; unrelatedObjects: string[] } {
   const model = buildEntityRelationshipModel(objects);
   const { diagrams, unrelatedObjects } = splitEntityRelationshipModel(model, options);
-  const sections = [`# Data model: ${escapeMarkdown(options?.title ?? 'Data model')}`];
+  const sections = [options?.title === undefined ? '# Data model' : `# Data model: ${escapeMarkdown(options.title)}`];
   if (objects.length === 0) {
     sections.push('No objects found.');
   } else {
-    sections.push(
-      'Generated by `sf simply document erd`. Paste each block into Gliffy via Create from code → Mermaid.\n' +
-        "Standard relationships (such as Contact → Account) aren't in DX source and aren't shown.",
-    );
+    if (diagrams.length > 0) {
+      sections.push(
+        'Generated by `sf simply document erd`. Paste each block into Gliffy via Create from code → Mermaid.\n' +
+          "Standard relationships (such as Contact → Account) aren't in DX source and aren't shown.",
+      );
+    }
     for (const [index, diagram] of diagrams.entries()) {
       const count = diagram.entities.length;
       const edgeCount = diagram.relationships.length;
