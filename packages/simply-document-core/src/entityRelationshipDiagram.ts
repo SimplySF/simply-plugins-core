@@ -136,7 +136,8 @@ function anchorName(entities: ErdEntity[], relationships: ErdRelationship[]): st
 
 /** Split above maxObjects, excluding hub edges when finding connected components.
  *
- * Unrelated in-project objects are listed separately. Components require a non-hub edge.
+ * Unrelated in-project objects are listed separately. Non-hub objects connected only to hubs
+ * each seed a separate diagram so their relationships survive splitting.
  * Hub-to-hub edges are attached to diagrams already containing either hub.
  */
 export function splitEntityRelationshipModel(
@@ -163,7 +164,12 @@ export function splitEntityRelationshipModel(
   }
   const nonHubEdges = relationships.filter((edge) => !hubs.has(edge.parent) && !hubs.has(edge.child));
   const hubEdges = relationships.filter((edge) => hubs.has(edge.parent) && hubs.has(edge.child));
-  const diagrams = connectedComponents(nonHubEdges).map((component): ErdDiagram => {
+  const components = connectedComponents(nonHubEdges);
+  const nonHubNames = endpointNames(nonHubEdges);
+  for (const entity of connected) {
+    if (!hubs.has(entity.name) && !nonHubNames.has(entity.name)) components.push(new Set([entity.name]));
+  }
+  const diagrams = components.map((component): ErdDiagram => {
     const edges = relationships.filter((edge) => component.has(edge.parent) || component.has(edge.child));
     const attachedNames = endpointNames(edges);
     edges.push(...hubEdges.filter((edge) => attachedNames.has(edge.parent) || attachedNames.has(edge.child)));

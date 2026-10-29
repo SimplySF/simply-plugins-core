@@ -111,15 +111,17 @@ one diagram named after the project's directory. Otherwise:
 
 1. Take the relationships and drop every edge that touches a hub object.
 2. Find the connected components of what remains, treating edges as undirected. Each component with
-   at least one edge becomes a diagram.
+   at least one edge becomes a diagram. Each connected non-hub object absent from these components
+   seeds its own diagram, preserving objects whose relationships touch only hubs (including external
+   non-hub objects). These singleton seeds receive their hub edges in the next step.
 3. Add each hub back into every diagram that has an edge to it, along with those edges. A hub can
    appear in several diagrams. That's the point: `User` belongs in the picture wherever something
    looks it up, but it shouldn't merge every cluster into one.
    Hub-to-hub edges belong to no component. Add them to each diagram already containing either
    endpoint after the initial hub attachment, including the other endpoint if needed. This is a
    single pass against the initially attached nodes, so hub chains do not make placement depend on
-   edge order. Objects connected only to hubs do not seed a diagram: if no non-hub edges remain,
-   splitting returns no diagrams, even though these objects are not unrelated.
+   edge order. Objects connected only to hubs therefore appear in separate diagrams rather than
+   being merged through their shared hub or omitted from the output.
 4. Name each diagram after its **anchor**: the in-project object with the most edges inside that
    diagram. Ties use ordinal string comparison (`a < b`), independent of locale.
 5. Sort diagrams by in-project object count, largest first, then by anchor name.

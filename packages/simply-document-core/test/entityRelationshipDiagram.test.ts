@@ -193,16 +193,45 @@ describe('splitEntityRelationshipModel', () => {
     }
   });
 
-  it('requires at least one non-hub edge per split component', () => {
+  it('seeds separate diagrams for objects connected only to hubs', () => {
+    const objects = [
+      { name: 'A', customFields: [lookup('Owner', 'User'), lookup('Reviewer', 'User')] },
+      { name: 'B', customFields: [lookup('Owner', 'User')] },
+    ];
+    const { diagrams, unrelatedObjects, markdown } = buildEntityRelationshipDiagramMarkdown(objects, { maxObjects: 2 });
     expect(
-      split(
-        [
-          { name: 'A', customFields: [lookup('Owner', 'User')] },
-          { name: 'B', customFields: [lookup('Owner', 'User')] },
-        ],
-        { maxObjects: 2 },
-      ).diagrams,
-    ).toEqual([]);
+      diagrams.map(({ name, entities, relationships, oversized }) => ({
+        name,
+        names: entities.map((entity) => entity.name),
+        fields: relationships.map((edge) => edge.field),
+        oversized,
+      })),
+    ).toEqual([
+      { name: 'A', names: ['A', 'User'], fields: ['Owner', 'Reviewer'], oversized: false },
+      { name: 'B', names: ['B', 'User'], fields: ['Owner'], oversized: false },
+    ]);
+    expect(unrelatedObjects).toEqual([]);
+    expect(markdown).toContain('User |o..o{ A : "Owner"');
+    expect(markdown).toContain('User |o..o{ A : "Reviewer"');
+    expect(markdown).toContain('User |o..o{ B : "Owner"');
+  });
+
+  it('preserves hub-only objects alongside clusters, including external non-hub endpoints', () => {
+    const objects: ObjectItem[] = [
+      ...clusters,
+      { name: 'Solo__c', customFields: [lookup('Owner', 'User')] },
+      { name: 'User', customFields: [lookup('External', 'Outside'), { fullName: 'Manager', type: 'Hierarchy' }] },
+      { name: 'Unrelated' },
+    ];
+    const result = buildEntityRelationshipDiagramMarkdown(objects, { maxObjects: 2 });
+    expect(result.diagrams).toHaveLength(4);
+    expect(result.unrelatedObjects).toEqual(['Unrelated']);
+    expect(result.diagrams.flatMap((diagram) => diagram.relationships)).toEqual(
+      expect.arrayContaining(result.model.relationships),
+    );
+    expect(result.markdown).toContain('User |o..o{ Solo__c : "Owner"');
+    expect(result.markdown).toContain('Outside |o..o{ User : "External"');
+    expect(buildEntityRelationshipDiagramMarkdown([...objects].reverse(), { maxObjects: 2 })).toEqual(result);
   });
 
   it('falls back to the first entity name when a caller supplies only external nodes', () => {

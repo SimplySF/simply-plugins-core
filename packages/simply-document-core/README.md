@@ -88,7 +88,9 @@ from DX metadata cannot be inferred.
 
 The default threshold is 40 connected nodes including external objects. Above it, splitting finds
 components with at least one non-hub edge, then reattaches hubs (`User` by default). `hubs: []`
-disables hub removal. Objects connected only to hubs do not seed a diagram after splitting.
+disables hub removal. Each non-hub object connected only to hubs seeds its own diagram with all
+its hub relationships, including when that non-hub object is external. Shared hubs do not merge
+these diagrams. These objects are not listed as unrelated.
 Hub-to-hub edges appear in every diagram already containing either endpoint. Split diagrams are
 marked `oversized` when their in-project node count exceeds the threshold; heading counts include
 external nodes. Unrelated in-project objects appear in a separate list. All output uses ordinal
