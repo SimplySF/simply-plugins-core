@@ -68,13 +68,48 @@ function project(overrides: Partial<SfdxProject> = {}): SfdxProject {
 }
 
 /**
+ * Stand in for the UTAM compiler: write the four files it emits for every `.utam.json` under its
+ * root, and optionally the profiles config.
+ *
+ * Resolves paths exactly as `utam@3` does — output as `path.join(pageObjectsRootDir, outputDir)`,
+ * which appends rather than honours an absolute output directory, and the profiles config as
+ * `<root>/<outputDir>/../<module>.config.json` without creating its folder — so a config that only
+ * works on paper fails where the real compiler would. It compiles only what it finds under its
+ * root, so a run that hasn't staged the sources first compiles nothing.
+ */
+async function fakeCompile(configPath: string, writesProfiles: boolean): Promise<void> {
+  const config = JSON.parse(await fs.readFile(configPath, 'utf8')) as {
+    pageObjectsRootDir: string;
+    pageObjectsOutputDir: string;
+    module: string;
+  };
+  const outputDir = path.join(config.pageObjectsRootDir, config.pageObjectsOutputDir);
+  const entries = await fs.readdir(config.pageObjectsRootDir, { recursive: true }).catch(() => [] as string[]);
+  const names = entries
+    .filter((entry) => entry.endsWith('.utam.json'))
+    .map((entry) => path.basename(entry, '.utam.json'));
+
+  await fs.mkdir(outputDir, { recursive: true });
+  await Promise.all(
+    names.flatMap((name) =>
+      ['js', 'cjs', 'd.ts', 'd.cts'].map((ext) => fs.writeFile(path.join(outputDir, `${name}.${ext}`), `// ${name}\n`)),
+    ),
+  );
+  if (writesProfiles) {
+    await fs.writeFile(path.join(outputDir, '..', `${config.module}.config.json`), '{"platform":{}}\n');
+  }
+}
+
+/**
  * Stand in for every `npm`/compiler process the run shells out to.
  *
  * `npm install` writes the compiler manifest the real code reads back for its version and bin
- * entry, and `npm pack` writes the tarball it copies — so the module's own filesystem plumbing
- * runs for real and only the processes are faked.
+ * entry, the compiler writes its output, and `npm pack` writes the tarball it copies — so the
+ * module's own filesystem plumbing runs for real and only the processes are faked.
  */
-function mockExeca(options: { alreadyPublished?: boolean } = {}): void {
+function mockExeca(
+  options: { alreadyPublished?: boolean; compilesNothing?: boolean; writesProfiles?: boolean } = {},
+): void {
   vi.mocked(execa).mockImplementation((async (
     file: string,
     args: readonly string[] = [],
@@ -106,6 +141,10 @@ function mockExeca(options: { alreadyPublished?: boolean } = {}): void {
       const filename = 'acme-my-package-pageobjects-1.2.3-4.tgz';
       await fs.writeFile(path.join(cwd, filename), 'tarball');
       return { stdout: JSON.stringify([{ filename }]) };
+    }
+
+    if (file === process.execPath && !options.compilesNothing) {
+      await fakeCompile(args[2], options.writesProfiles ?? false);
     }
 
     if (!stagingDirs.includes(cwd) && cwd !== process.cwd()) {
@@ -160,7 +199,8 @@ describe('publishUtamPageObjects', () => {
     delete process.env.PACKAGE_CHANGED;
 
     originalCwd = process.cwd();
-    projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'utam-project-'));
+    // Resolved, so it matches `process.cwd()` once chdir'd into — macOS's tmpdir is a symlink.
+    projectDir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'utam-project-')));
     packageDir = path.join(projectDir, 'force-app');
     await fs.mkdir(packageDir, { recursive: true });
     // A dry run copies its tarball into the working directory; keep that out of the repo.
@@ -420,15 +460,72 @@ describe('publishUtamPageObjects', () => {
       });
     });
 
-    it('should write a compiler config pointing at the project and the staging directory', async () => {
+    it('should write a compiler config pointing at the staged sources, not the project', async () => {
       await publishUtamPageObjects({ ...baseOptions, debug: true });
 
       const config = JSON.parse(await readStaged('utam.config.json')) as Record<string, unknown>;
 
-      expect(config.pageObjectsRootDir).toBe(packageDir);
+      expect(config.pageObjectsRootDir).toBe(path.join(lastStagingDir(), 'source'));
       expect(config.module).toBe('@acme/my-package-pageobjects');
       expect(config.version).toBe('1.2.3-4');
-      expect(config.pageObjectsOutputDir).toBe(path.join(lastStagingDir(), 'pageObjects'));
+      // Relative, because the compiler joins it onto the root: an absolute path would be appended.
+      expect(path.join(config.pageObjectsRootDir as string, config.pageObjectsOutputDir as string)).toBe(
+        path.join(lastStagingDir(), 'pageObjects'),
+      );
+    });
+
+    it('should stage utilities alongside the page objects, for the compiler to find', async () => {
+      const utility = path.join('main', 'default', 'lwc', 'hello', '__utam__', 'helper.utam.js');
+      await fs.writeFile(path.join(packageDir, utility), 'export const helper = 1;\n');
+
+      await publishUtamPageObjects({ ...baseOptions, debug: true });
+
+      await expect(readStaged(path.join('source', utility))).resolves.toBe('export const helper = 1;\n');
+    });
+
+    it('should publish the profiles config under its fixed name, even for a scoped package', async () => {
+      mockExeca({ writesProfiles: true });
+
+      await publishUtamPageObjects({ ...baseOptions, debug: true });
+
+      await expect(readStaged('profiles.config.json')).resolves.toBe('{"platform":{}}\n');
+      await expect(
+        fs.access(path.join(lastStagingDir(), '@acme', 'my-package-pageobjects.config.json')),
+      ).rejects.toThrow();
+    });
+
+    it('should throw before asking the Dev Hub when two page objects would compile to one file', async () => {
+      await writePageObject(path.join('main', 'default', 'lwc', 'other', '__utam__', 'hello.utam.json'));
+
+      await expect(publishUtamPageObjects(baseOptions)).rejects.toThrow(/would overwrite each other: "hello"/);
+      expect(getPackageVersionReport).not.toHaveBeenCalled();
+      expect(execa).not.toHaveBeenCalled();
+    });
+
+    it('should compile into the staged package, where npm will pack it', async () => {
+      await publishUtamPageObjects({ ...baseOptions, debug: true });
+
+      const compiled = await fs.readdir(path.join(lastStagingDir(), 'pageObjects'));
+
+      expect(compiled.sort()).toEqual(['hello.cjs', 'hello.d.cts', 'hello.d.ts', 'hello.js']);
+    });
+
+    it('should leave no compiled output in the project', async () => {
+      await publishUtamPageObjects(baseOptions);
+
+      const entries = await fs.readdir(packageDir, { recursive: true });
+
+      expect(entries.filter((entry) => !entry.startsWith('main'))).toEqual([]);
+    });
+
+    it('should throw, without publishing, when the compiler emits no page objects', async () => {
+      mockExeca({ compilesNothing: true });
+
+      await expect(publishUtamPageObjects(baseOptions)).rejects.toThrow(
+        'The UTAM compiler produced no page object for hello',
+      );
+      expect(execaCall('npm', 'publish')).toBeUndefined();
+      expect(appendToEnvFile).not.toHaveBeenCalled();
     });
 
     it('should merge a project-owned compiler config underneath its own keys', async () => {

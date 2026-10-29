@@ -22,7 +22,9 @@ import {
   buildCompilerConfig,
   buildPackageManifest,
   buildProvenanceLine,
+  findOutputNameClashes,
   findPageObjectSources,
+  findUtilitySources,
   readEnvFileValue,
   readUtamPluginConfig,
   resolveSubscriberPackageVersionId,
@@ -172,11 +174,16 @@ describe('buildPackageManifest', () => {
   it('should address page objects by path, with types for both module systems', () => {
     expect(buildPackageManifest(baseOptions).exports).toEqual({
       './package.json': './package.json',
+      './profiles.config.json': './profiles.config.json',
       './*': {
         import: { types: './*.d.ts', default: './*.js' },
         require: { types: './*.d.cts', default: './*.cjs' },
       },
     });
+  });
+
+  it('should publish the compiled output, the sources, and the profiles config', () => {
+    expect(buildPackageManifest(baseOptions).files).toEqual(['pageObjects', 'utils', 'source', 'profiles.config.json']);
   });
 
   it('should declare @utam/core as a peer and merge the project’s own peers', () => {
@@ -218,12 +225,45 @@ describe('buildPackageManifest', () => {
 
 describe('buildCompilerConfig', () => {
   const baseOptions = {
-    pageObjectsRootDir: path.join(path.sep, 'repo', 'force-app'),
     stagingDir: path.join(path.sep, 'tmp', 'staging'),
     npmPackageName: '@acme/my-package-pageobjects',
     version: '1.2.3-4',
     copyright: 'UTAM page objects for MyPackage 1.2.3.4 (04t…)',
   };
+  const stagedSource = path.join(baseOptions.stagingDir, 'source');
+  // utam@3 resolves every output path as `path.join(pageObjectsRootDir, outputDir)`.
+  const resolveOutput = (config: Record<string, unknown>, key: string): string =>
+    path.join(config.pageObjectsRootDir as string, config[key] as string);
+
+  it('should point the compiler at the staged copy of the sources, never the repo', () => {
+    const config = buildCompilerConfig(baseOptions);
+
+    expect(config.pageObjectsRootDir).toBe(stagedSource);
+    expect(config.pageObjectsFileMask).toEqual(['**/__utam__/**/*.utam.json']);
+    expect(config.extensionsFileMask).toEqual(['**/__utam__/**/*.utam.js']);
+  });
+
+  it('should write output beside the staged sources, as the compiler resolves it', () => {
+    const config = buildCompilerConfig(baseOptions);
+
+    expect(resolveOutput(config, 'pageObjectsOutputDir')).toBe(path.join(baseOptions.stagingDir, 'pageObjects'));
+    expect(resolveOutput(config, 'extensionsOutputDir')).toBe(path.join(baseOptions.stagingDir, 'utils'));
+  });
+
+  it('should keep the lint report in the staging directory, out of the published source', () => {
+    expect(buildCompilerConfig(baseOptions).lint).toEqual({
+      lintingOutputFile: path.join(baseOptions.stagingDir, 'utam-lint.sarif'),
+    });
+  });
+
+  it('should resolve the project’s own lint report path against the working directory', () => {
+    const config = buildCompilerConfig({
+      ...baseOptions,
+      baseConfig: { lint: { throwError: true, lintingOutputFile: path.join('reports', 'utam.sarif') } },
+    });
+
+    expect(config.lint).toEqual({ throwError: true, lintingOutputFile: path.resolve('reports', 'utam.sarif') });
+  });
 
   it('should name the module after the npm package, so sibling references resolve once installed', () => {
     expect(buildCompilerConfig(baseOptions).module).toBe('@acme/my-package-pageobjects');
@@ -234,15 +274,6 @@ describe('buildCompilerConfig', () => {
 
     expect(config.version).toBe('1.2.3-4');
     expect(config.copyright).toEqual(['UTAM page objects for MyPackage 1.2.3.4 (04t…)']);
-  });
-
-  it('should write output under the staging directory', () => {
-    const config = buildCompilerConfig(baseOptions);
-
-    expect(config.pageObjectsOutputDir).toBe(path.join(baseOptions.stagingDir, 'pageObjects'));
-    expect(config.extensionsOutputDir).toBe(path.join(baseOptions.stagingDir, 'utils'));
-    expect(config.pageObjectsRootDir).toBe(baseOptions.pageObjectsRootDir);
-    expect(config.pageObjectsFileMask).toEqual(['**/__utam__/**/*.utam.json']);
   });
 
   it('should pass the project’s type aliases through', () => {
@@ -258,14 +289,45 @@ describe('buildCompilerConfig', () => {
         profiles: [{ name: 'platform', values: ['web'] }],
         interruptCompilerOnError: false,
         version: 'whatever-the-project-said',
+        pageObjectsRootDir: 'force-app',
         pageObjectsOutputDir: 'somewhere-else',
+        extensionsFileMask: ['**/*.js'],
       },
     });
 
     expect(config.profiles).toEqual([{ name: 'platform', values: ['web'] }]);
     expect(config.interruptCompilerOnError).toBe(false);
     expect(config.version).toBe('1.2.3-4');
-    expect(config.pageObjectsOutputDir).toBe(path.join(baseOptions.stagingDir, 'pageObjects'));
+    expect(config.pageObjectsRootDir).toBe(stagedSource);
+    expect(config.extensionsFileMask).toEqual(['**/__utam__/**/*.utam.js']);
+    expect(resolveOutput(config, 'pageObjectsOutputDir')).toBe(path.join(baseOptions.stagingDir, 'pageObjects'));
+  });
+});
+
+describe('findOutputNameClashes', () => {
+  const root = path.join(path.sep, 'repo', 'force-app');
+  const source = (...segments: string[]): string => path.join(root, 'lwc', ...segments);
+
+  it('should report every source behind a name that compiles to the same file', () => {
+    const clashes = findOutputNameClashes(
+      [source('dialogA', '__utam__', 'modal.utam.json'), source('dialogB', '__utam__', 'modal.utam.json')],
+      '.utam.json',
+      root,
+    );
+
+    expect(clashes).toEqual([
+      `"modal" (${path.join('lwc', 'dialogA', '__utam__', 'modal.utam.json')}, ${path.join('lwc', 'dialogB', '__utam__', 'modal.utam.json')})`,
+    ]);
+  });
+
+  it('should report nothing when every name is unique', () => {
+    expect(
+      findOutputNameClashes(
+        [source('a', '__utam__', 'a.utam.json'), source('b', '__utam__', 'b.utam.json')],
+        '.utam.json',
+        root,
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -308,6 +370,15 @@ describe('findPageObjectSources', () => {
 
   it('should treat a missing package directory as no page objects', async () => {
     expect(await findPageObjectSources(path.join(rootDir, 'nope'))).toEqual([]);
+  });
+
+  it('should find utilities separately from page objects', async () => {
+    const pageObject = await write(path.join('lwc', 'hello', '__utam__', 'hello.utam.json'));
+    const utility = await write(path.join('lwc', 'hello', '__utam__', 'helper.utam.js'));
+    await write(path.join('lwc', 'hello', 'helper.utam.js'));
+
+    expect(await findPageObjectSources(rootDir)).toEqual([pageObject]);
+    expect(await findUtilitySources(rootDir)).toEqual([utility]);
   });
 });
 
