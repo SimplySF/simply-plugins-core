@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
+    "utam": "^3.3.0",
     "vitest": "^4.1.10"
   },
   "publishConfig": {

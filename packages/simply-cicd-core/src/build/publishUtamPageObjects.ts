@@ -29,13 +29,17 @@ import {
   buildCompilerConfig,
   buildPackageManifest,
   buildProvenanceLine,
+  findOutputNameClashes,
   findPageObjectSources,
+  findUtilitySources,
+  PROFILES_CONFIG_FILE,
   readUtamPluginConfig,
   resolveSubscriberPackageVersionId,
   toDistTag,
   toNpmVersion,
   toUtamCoreRange,
   toVersionTag,
+  STAGED_SOURCE_DIR,
   UTAM_PACKAGE_KEY,
   UTAM_VERSION_KEY,
   type UtamPluginConfig,
@@ -142,14 +146,105 @@ async function installCompiler(
   return { version: manifest.version, entry: path.join(moduleDir, binRelative) };
 }
 
-/** Copy each `.utam.json` into the staged package, preserving its path under the package directory. */
+/**
+ * Copy each source into the staged package, preserving its path under the package directory.
+ *
+ * Done before compiling, because the staged copy is what the compiler reads: rooted there, nothing
+ * it writes can land in the repo.
+ */
 async function stageSources(sources: string[], pageObjectsRootDir: string, stagingDir: string): Promise<void> {
   for (const source of sources) {
-    const destination = path.join(stagingDir, 'source', path.relative(pageObjectsRootDir, source));
+    const destination = path.join(stagingDir, STAGED_SOURCE_DIR, path.relative(pageObjectsRootDir, source));
     // eslint-disable-next-line no-await-in-loop -- a handful of small files; ordering keeps the log readable
     await fs.mkdir(path.dirname(destination), { recursive: true });
     // eslint-disable-next-line no-await-in-loop -- as above
     await fs.copyFile(source, destination);
+  }
+}
+
+/**
+ * Fail unless the compiler wrote every page object and utility into the staged package.
+ *
+ * The compiler exits cleanly even when its output lands somewhere else, and `npm publish` would
+ * then ship the source JSON alone — a package every test pinned to this version fails to import.
+ */
+async function assertCompiledOutput(stagingDir: string, target: PublishTarget): Promise<void> {
+  const missing = [
+    ...(await findMissingOutput(path.join(stagingDir, 'pageObjects'), target.sources, '.utam.json')),
+    ...(await findMissingOutput(path.join(stagingDir, 'utils'), target.utilitySources, '.utam.js')),
+  ];
+
+  if (missing.length > 0) {
+    throw new Error(
+      `The UTAM compiler produced no output for ${missing.join(', ')}. Refusing to publish without them.`,
+    );
+  }
+}
+
+/** @returns `<outputDir>/<name>.js` for every source whose compiled `.js` isn't there. */
+async function findMissingOutput(outputDir: string, sources: string[], extension: string): Promise<string[]> {
+  const compiled = new Set(await fs.readdir(outputDir).catch(() => [] as string[]));
+  return sources
+    .map((source) => `${path.basename(source, extension)}.js`)
+    .filter((file) => !compiled.has(file))
+    .map((file) => path.join(outputDir, file));
+}
+
+/**
+ * Move the compiler's profiles config, if it wrote one, to the fixed name the package publishes.
+ *
+ * The compiler writes it as `<module>.config.json` beside the output, so the scope folder of a
+ * scoped name has to exist before it runs; `prepareProfilesConfig` makes sure it does.
+ *
+ * The compiler also builds each implementation specifier with `path.join`, which on Windows writes
+ * `@scope\pkg\pageObjects\name`: not a specifier any module resolver accepts. Every value in this
+ * file is a module specifier, never a filesystem path, so backslashes are rewritten to `/`.
+ */
+async function publishProfilesConfig(stagingDir: string, npmPackageName: string): Promise<void> {
+  const written = path.join(stagingDir, `${npmPackageName}.config.json`);
+  let content;
+  try {
+    content = await fs.readFile(written, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+
+  const profiles = JSON.parse(content, (_key, value: unknown) =>
+    typeof value === 'string' ? value.replaceAll('\\', '/') : value,
+  ) as unknown;
+  await fs.writeFile(path.join(stagingDir, PROFILES_CONFIG_FILE), `${JSON.stringify(profiles, null, 4)}\n`);
+  await fs.rm(written);
+
+  // The `@scope/` folder `prepareProfilesConfig` made is empty now; leave staging as it'll be packed.
+  const scopeDir = path.dirname(written);
+  if (scopeDir !== stagingDir) {
+    await fs.rmdir(scopeDir).catch(() => undefined);
+  }
+}
+
+/** Create the folder the compiler writes `<module>.config.json` into — `@scope/` for a scoped name. */
+async function prepareProfilesConfig(stagingDir: string, npmPackageName: string): Promise<void> {
+  await fs.mkdir(path.dirname(path.join(stagingDir, `${npmPackageName}.config.json`)), { recursive: true });
+}
+
+/**
+ * Fail, before anything is compiled, when two sources would compile to the same output file.
+ *
+ * @throws {Error} Naming every clashing source, since the fix is renaming one of them.
+ */
+function assertNoOutputNameClashes(sources: string[], utilitySources: string[], rootDir: string): void {
+  const clashes = [
+    ...findOutputNameClashes(sources, '.utam.json', rootDir),
+    ...findOutputNameClashes(utilitySources, '.utam.js', rootDir),
+  ];
+
+  if (clashes.length > 0) {
+    throw new Error(
+      `UTAM compiles every page object and utility to a file named after its source, so these would overwrite each other: ${clashes.join('; ')}. Rename all but one.`,
+    );
   }
 }
 
@@ -160,6 +255,8 @@ type PublishTarget = {
   pageObjectsRootDir: string;
   /** Absolute paths of every `.utam.json` to compile. */
   sources: string[];
+  /** Absolute paths of every `.utam.js` utility to compile alongside them. */
+  utilitySources: string[];
   utamPluginConfig: UtamPluginConfig;
   npmPackageName: string;
   salesforcePackageName: string;
@@ -208,6 +305,8 @@ async function resolveTarget(options: PublishUtamPageObjectsOptions): Promise<Pu
     return undefined;
   }
   logger.info(`Found ${sources.length} UTAM page object(s) under ${defaultPackageDir.path}.`);
+  const utilitySources = await findUtilitySources(pageObjectsRootDir);
+  assertNoOutputNameClashes(sources, utilitySources, pageObjectsRootDir);
 
   const versionTagFormat = VersionTagFormat.fromProject(sfdxProjectJson);
   const utamPluginConfig = readUtamPluginConfig(sfdxProjectJson);
@@ -235,6 +334,7 @@ async function resolveTarget(options: PublishUtamPageObjectsOptions): Promise<Pu
     subscriberPackageVersionId,
     pageObjectsRootDir,
     sources,
+    utilitySources,
     utamPluginConfig,
     npmPackageName,
     salesforcePackageName: defaultPackageDir.package ?? 'package',
@@ -257,6 +357,8 @@ async function buildStagedPackage(
   options: PublishUtamPageObjectsOptions,
 ): Promise<void> {
   const compiler = await installCompiler(stagingDir, options.utamVersion ?? '^3', options.debug ?? false);
+  await stageSources([...target.sources, ...target.utilitySources], target.pageObjectsRootDir, stagingDir);
+  await prepareProfilesConfig(stagingDir, target.npmPackageName);
 
   const baseConfig = target.utamPluginConfig.compilerConfig
     ? (JSON.parse(await fs.readFile(target.utamPluginConfig.compilerConfig, 'utf8')) as Record<string, unknown>)
@@ -266,7 +368,6 @@ async function buildStagedPackage(
     compilerConfigPath,
     JSON.stringify(
       buildCompilerConfig({
-        pageObjectsRootDir: target.pageObjectsRootDir,
         stagingDir,
         npmPackageName: target.npmPackageName,
         version: target.version,
@@ -290,8 +391,9 @@ async function buildStagedPackage(
     cwd: stagingDir,
     stdio: options.debug ? 'inherit' : 'pipe',
   });
+  await assertCompiledOutput(stagingDir, target);
+  await publishProfilesConfig(stagingDir, target.npmPackageName);
 
-  await stageSources(target.sources, target.pageObjectsRootDir, stagingDir);
   await fs.writeFile(
     path.join(stagingDir, 'package.json'),
     `${JSON.stringify(
