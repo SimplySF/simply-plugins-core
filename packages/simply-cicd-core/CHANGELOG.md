@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.11.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.10.1...%40simplysf%2Fsimply-cicd-core%400.11.0) (2026-10-29)
+
+- fix(simply-cicd-core)!: compile UTAM page objects from the staged sources (#269) ([e4d085a](https://github.com/SimplySF/simply-plugins-core/commit/e4d085a4ef161174ce124db3a0b0bebe9dd68700)), closes [#269](https://github.com/SimplySF/simply-plugins-core/issues/269)
+
+### BREAKING CHANGES
+
+- `buildCompilerConfig` no longer takes `pageObjectsRootDir`;
+  the compiler is always rooted at `<stagingDir>/source`. New exports:
+  `findUtilitySources`, `findOutputNameClashes`, `EXTENSIONS_FILE_MASK`,
+  `STAGED_SOURCE_DIR`, `PROFILES_CONFIG_FILE`.
+
 ## [0.10.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.10.0...%40simplysf%2Fsimply-cicd-core%400.10.1) (2026-10-28)
 
 ### Bug Fixes
