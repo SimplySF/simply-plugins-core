@@ -3,7 +3,7 @@ title: simply-document-core
 description: Usage examples for @simplysf/simply-document-core.
 ---
 
-Confluence-storage-format change report and technical design document rendering. Full signatures and
+Confluence-storage-format change report and technical design document rendering, plus Mermaid entity relationship diagrams. Full signatures and
 types are in the [API reference](/api/simply-document-core/readme/).
 
 ```sh

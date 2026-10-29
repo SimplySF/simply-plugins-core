@@ -2,7 +2,7 @@
 
 [![NPM](https://img.shields.io/npm/v/@simplysf/simply-document-core?label=@simplysf/simply-document-core)](https://npmjs.com/@simplysf/simply-document-core) [![Downloads/week](https://img.shields.io/npm/dw/@simplysf/simply-document-core.svg)](https://npmjs.com/@simplysf/simply-document-core) [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://raw.githubusercontent.com/SimplySF/simply-plugins-core/main/LICENSE.txt)
 
-Confluence-storage-format change report and technical design document rendering. This is not a Salesforce CLI plugin — it's the library layer behind [`@simplysf/simply-document`](https://github.com/SimplySF/simply-plugins/tree/main/packages/simply-document)'s `sf simply document diff`/`generate` commands, published separately so it can be imported directly by anything that wants the same rendering (an editor extension, a CI job, a script) without pulling in the CLI framework.
+Confluence-storage-format change report and technical design document rendering, plus Markdown with Mermaid entity relationship diagrams (ERDs) of a project's data model. This is not a Salesforce CLI plugin — it's the library layer behind [`@simplysf/simply-document`](https://github.com/SimplySF/simply-plugins/tree/main/packages/simply-document)'s `sf simply document diff`/`generate` commands, published separately so it can be imported directly by anything that wants the same rendering (an editor extension, a CI job, a script) without pulling in the CLI framework.
 
 Unlike the other internal libraries in this monorepo (`@simplysf/simply-core`, `@simplysf/simply-plugin-kit`, `@simplysf/simply-report`), this package is meant to be depended on by projects outside this repo, not only by other `simply-*` packages.
 
