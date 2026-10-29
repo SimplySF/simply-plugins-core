@@ -25,7 +25,15 @@ Everything below is exported from the package root. Removing or renaming an expo
 | `ChangeEntry`, `ChangesByComponentType`                         | Types for `buildChangeReportHtml`'s input.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `TechnicalDesignDocumentData`                                   | The full data model `buildTechnicalDesignDocumentHtml` renders, plus its 28 supporting item types: `ApexClassItem`, `ApexTriggerItem`, `ApprovalProcessItem`, `AuraComponentItem`, `CustomApplicationItem`, `CustomFieldItem`, `CustomLabelItem`, `CustomMetadataItem`, `DashboardItem`, `DigitalExperienceBundleItem`, `EmailTemplateItem`, `ExperienceBundleItem`, `FieldSetItem`, `FlexipageItem`, `FlowItem`, `GroupItem`, `LayoutItem`, `LightningComponentItem`, `ObjectItem`, `PermissionSetGroupItem`, `PermissionSetItem`, `QueueItem`, `RecordTypeItem`, `ReportItem`, `SharingRuleItem`, `StaticResourceItem`, `ValidationRuleItem`, `VisualforcePageItem`. |
 
-Both functions accept an optional second `customTemplateSource` argument: a caller-supplied Handlebars template string, compiled against the same `Handlebars` instance as the built-in template (so it can use the same partials/helpers — `changeTable` for the change report, `loud` for the technical design document).
+| ERD export                                                                                                   | Description                                                                                      |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `buildEntityRelationshipModel(objects)`                                                                      | Builds sorted entities, relationship edges, and `skippedFields` from `ObjectItem[]`.             |
+| `splitEntityRelationshipModel(model, options?)`                                                              | Returns `{ diagrams, unrelatedObjects }`, splitting connected clusters above the size threshold. |
+| `renderMermaidErDiagram(diagram)`                                                                            | Renders sorted Mermaid `erDiagram` source without a code fence or trailing newline.              |
+| `buildEntityRelationshipDiagramMarkdown(objects, options?)`                                                  | Returns `{ markdown, model, diagrams, unrelatedObjects }`, ready to save as Markdown.            |
+| `EntityRelationshipModel`, `ErdEntity`, `ErdRelationship`, `ErdRelationshipKind`, `ErdDiagram`, `ErdOptions` | Types for graph construction, splitting, and rendering.                                          |
+
+The two HTML rendering functions accept an optional second `customTemplateSource` argument: a caller-supplied Handlebars template string, compiled against the same `Handlebars` instance as the built-in template (so it can use the same partials/helpers — `changeTable` for the change report, `loud` for the technical design document).
 
 ```ts
 import { buildChangeReportHtml, type ChangesByComponentType } from '@simplysf/simply-document-core';
@@ -51,6 +59,40 @@ import { buildTechnicalDesignDocumentHtml, type TechnicalDesignDocumentData } fr
 
 const html = buildTechnicalDesignDocumentHtml(scannedProjectData);
 ```
+
+## Entity relationship diagrams
+
+```ts
+import { buildEntityRelationshipDiagramMarkdown, type ObjectItem } from '@simplysf/simply-document-core';
+
+const objects: ObjectItem[] = [
+  {
+    name: 'Invoice__c',
+    customFields: [{ fullName: 'Account__c', fieldType: 'Lookup', referenceTo: 'Account', required: 'true' }],
+  },
+];
+const { markdown, model, diagrams } = buildEntityRelationshipDiagramMarkdown(objects, {
+  title: 'Billing',
+  maxObjects: 40,
+  hubs: ['User'],
+});
+// Save markdown; paste each Mermaid block into Gliffy via Create from code → Mermaid.
+// model.skippedFields reports relationship fields missing referenceTo.
+```
+
+Only raw `Lookup`, `MasterDetail`, and `Hierarchy` types become edges; nodes have no field
+attributes. `CustomFieldItem.fieldType` preserves the raw metadata type when `type` is a display
+string such as `Lookup(Account)`. Raw `type: 'Lookup'` also works. `referenceTo` accepts a string or
+an array of target names. Hierarchy fields are self relationships. Standard relationships absent
+from DX metadata cannot be inferred.
+
+The default threshold is 40 connected nodes including external objects. Above it, splitting finds
+components with at least one non-hub edge, then reattaches hubs (`User` by default). `hubs: []`
+disables hub removal. Objects connected only to hubs do not seed a diagram after splitting.
+Hub-to-hub edges appear in every diagram already containing either endpoint. Split diagrams are
+marked `oversized` when their in-project node count exceeds the threshold; heading counts include
+external nodes. Unrelated in-project objects appear in a separate list. All output uses ordinal
+sorting for repeatable diffs, with underscores escaped outside Mermaid blocks.
 
 ## Issues
 

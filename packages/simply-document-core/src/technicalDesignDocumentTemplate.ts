@@ -34,6 +34,10 @@ export type CustomFieldItem = {
   fullName: string;
   label?: string;
   type?: string;
+  /** Raw parent object(s) of a Lookup or MasterDetail field. */
+  referenceTo?: string | string[];
+  /** Raw metadata type; `type` can instead hold a formatted display string. */
+  fieldType?: string;
   required?: string;
   externalId?: string;
   unique?: string;

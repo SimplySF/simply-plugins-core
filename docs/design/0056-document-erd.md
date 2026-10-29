@@ -1,6 +1,6 @@
 # 0056 — `simply document erd`: Mermaid ERDs of a project's data model
 
-**Status:** Draft
+**Status:** Accepted — core implemented (simply-document-core 0.3.0); CLI pending
 **Package:** `packages/simply-document-core` (library); `packages/simply-document` (CLI, in
 `simply-plugins`, where this doc is duplicated as its 0057)
 **Date:** 2026-10-29
@@ -106,7 +106,7 @@ mistakes the diagram for a complete schema. A built-in table of common standard 
 
 ### Splitting
 
-If the model, counting in-project and external nodes, has `--max-objects` nodes or fewer, the file has
+If the connected model (excluding unrelated objects), counting in-project and external nodes, has `--max-objects` nodes or fewer, the file has
 one diagram named after the project's directory. Otherwise:
 
 1. Take the relationships and drop every edge that touches a hub object.
@@ -115,17 +115,23 @@ one diagram named after the project's directory. Otherwise:
 3. Add each hub back into every diagram that has an edge to it, along with those edges. A hub can
    appear in several diagrams. That's the point: `User` belongs in the picture wherever something
    looks it up, but it shouldn't merge every cluster into one.
+   Hub-to-hub edges belong to no component. Add them to each diagram already containing either
+   endpoint after the initial hub attachment, including the other endpoint if needed. This is a
+   single pass against the initially attached nodes, so hub chains do not make placement depend on
+   edge order. Objects connected only to hubs do not seed a diagram: if no non-hub edges remain,
+   splitting returns no diagrams, even though these objects are not unrelated.
 4. Name each diagram after its **anchor**: the in-project object with the most edges inside that
-   diagram. Ties go to the alphabetically first API name.
+   diagram. Ties use ordinal string comparison (`a < b`), independent of locale.
 5. Sort diagrams by in-project object count, largest first, then by anchor name.
 
 Splitting is deterministic. The same source always produces the same file, so the output can be
 committed and reviewed as a diff.
 
-A component that is still larger than `--max-objects` after splitting is written as one diagram and
+A component whose **in-project node count** is still larger than `--max-objects` after splitting is written as one diagram and
 marked `oversized`. The command prints a warning naming it. Splitting it further (for example by
 Master-Detail trees) means choosing which relationships to cut, and that's a judgment call this doc
-leaves to the user. They can add a hub to break it apart. See [Open questions](#open-questions).
+leaves to the user. The initial threshold includes external nodes; oversized after splitting excludes
+external nodes, while heading counts always include them. They can add a hub to break it apart. See [Open questions](#open-questions).
 
 ### Hub objects
 
@@ -184,7 +190,7 @@ Human output: a table with columns `#`, `DIAGRAM`, `OBJECTS`, `RELATIONSHIPS`, t
 {
   "outputFile": "erd.md",
   "diagrams": [
-    { "name": "Invoice__c", "objectCount": 5, "relationshipCount": 4, "oversized": true },
+    { "name": "Invoice__c", "objectCount": 5, "relationshipCount": 4, "oversized": false },
     { "name": "Case_Note__c", "objectCount": 2, "relationshipCount": 1, "oversized": false }
   ],
   "objectCount": 8,
