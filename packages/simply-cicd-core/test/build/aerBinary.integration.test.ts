@@ -39,12 +39,16 @@ describe.skipIf(!aerBin)('aer package create (real binary)', () => {
     await fs.writeFile(path.join(classes, `${name}.cls`), body);
   }
 
-  function create(output: string, ...args: string[]): ReturnType<typeof execa> {
-    return execa(aerBin as string, ['package', 'create', '-o', path.join(root, output), ...args], {
+  async function create(
+    output: string,
+    ...args: string[]
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    const result = await execa(aerBin as string, ['package', 'create', '-o', path.join(root, output), ...args], {
       cwd: root,
       env,
       reject: false,
     });
+    return { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
   }
 
   beforeAll(async () => {
@@ -91,6 +95,6 @@ describe.skipIf(!aerBin)('aer package create (real binary)', () => {
 
     const unqualified = await create('App2@app.pkg', '--package', dependency, path.join(root, 'unqualified'));
     expect(unqualified.exitCode).not.toBe(0);
-    expect(`${String(unqualified.stderr)}${String(unqualified.stdout)}`).toMatch(/type check/i);
+    expect(`${unqualified.stderr}${unqualified.stdout}`).toMatch(/type check/i);
   });
 });
