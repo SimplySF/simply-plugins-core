@@ -244,7 +244,7 @@ function assertValidMessage(message: string): void {
   if (!message.trim()) {
     throw new Error('The commit message is empty.');
   }
-  const unknown = (message.match(/\{[^}]*\}/g) ?? []).filter((token) => !['{SOURCE}', '{TARGET}'].includes(token));
+  const unknown = (message.match(/\{[^{}]*\}/g) ?? []).filter((token) => !['{SOURCE}', '{TARGET}'].includes(token));
   if (unknown.length > 0) {
     throw new Error(`The commit message has unknown placeholders: ${unknown.join(', ')}. Use {SOURCE} and {TARGET}.`);
   }
