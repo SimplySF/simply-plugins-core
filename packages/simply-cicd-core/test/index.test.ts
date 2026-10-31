@@ -160,6 +160,7 @@ it('exports the expected set of runtime values', () => {
     'resolveTargetPackageVersionFromDevHub',
     'resolveTargetPackageVersionFromGitTag',
     'resolveUpgradedPackages',
+    'rollForward',
     'runApexTests',
     'runCheckPermissionSets',
     'runDelta',
