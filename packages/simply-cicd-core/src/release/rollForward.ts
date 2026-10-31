@@ -38,10 +38,13 @@ import {
 
 const PROJECT_FILE = 'sfdx-project.json';
 
+/** Git's own merge wording, which commitlint's default rules ignore. */
+const DEFAULT_MESSAGE = "Merge branch '{SOURCE}' into {TARGET}";
+
 type JsonObject = Record<string, unknown>;
 
 export type RollForwardHopStatus =
-  'Rolled' | 'Up to date' | 'Conflict' | 'Merged, not pushed' | 'Would roll' | 'Not started';
+  'Rolled' | 'Up to date' | 'Conflict' | 'Commit rejected' | 'Merged, not pushed' | 'Would roll' | 'Not started';
 
 export type RollForwardHop = {
   source: string;
@@ -54,6 +57,8 @@ export type RollForwardHop = {
   mergeCommit?: string;
   /** Files needing the lead's attention, when `status` is `Conflict`. */
   conflictedFiles?: string[];
+  /** The hook's output, when `status` is `Commit rejected`. */
+  commitError?: string;
 };
 
 export type RollForwardResult = {
@@ -72,6 +77,8 @@ export type RollForwardOptions = {
   dryRun?: boolean;
   /** Stop after the merge, leaving the roll branch for a merge request. */
   noPush?: boolean;
+  /** Commit message template, with optional `{SOURCE}` and `{TARGET}` placeholders. Defaults to git's merge wording. */
+  message?: string;
   /** Asked once before anything is changed, with the hops that will be rolled. */
   confirm?: (hops: RollForwardHop[]) => Promise<boolean>;
   cwd?: string;
@@ -232,8 +239,29 @@ async function resolveProjectFile(cwd: string, hop: Hop, conflicted: boolean): P
   return stillConflicted;
 }
 
-/** Merges on a new roll branch. Returns the files the lead must resolve, or an empty list once committed. */
-async function mergeHop(cwd: string, hop: Hop): Promise<string[]> {
+/** Refuses a blank message or a mistyped placeholder, which would otherwise end up in the commit. */
+function assertValidMessage(message: string): void {
+  if (!message.trim()) {
+    throw new Error('The commit message is empty.');
+  }
+  const unknown = (message.match(/\{[^}]*\}/g) ?? []).filter((token) => !['{SOURCE}', '{TARGET}'].includes(token));
+  if (unknown.length > 0) {
+    throw new Error(`The commit message has unknown placeholders: ${unknown.join(', ')}. Use {SOURCE} and {TARGET}.`);
+  }
+}
+
+const renderMessage = (message: string, hop: Hop): string =>
+  message.replaceAll('{SOURCE}', () => hop.source).replaceAll('{TARGET}', () => hop.target);
+
+/**
+ * Merges on a new roll branch and commits, running the repository's hooks. Reports what stopped the
+ * merge, if anything: the files the lead must resolve, or the output of a hook that rejected the commit.
+ */
+async function mergeHop(
+  cwd: string,
+  hop: Hop,
+  message: string,
+): Promise<{ conflictedFiles?: string[]; commitError?: string }> {
   await runGit(cwd, ['switch', '--no-track', '-c', hop.rollBranch, hop.remoteTarget]);
   const merge = await execa('git', ['merge', '--no-ff', '--no-commit', hop.remoteSource], { cwd, reject: false });
 
@@ -248,10 +276,10 @@ async function mergeHop(cwd: string, hop: Hop): Promise<string[]> {
     remaining.unshift(PROJECT_FILE);
   }
   if (remaining.length > 0) {
-    return remaining;
+    return { conflictedFiles: remaining };
   }
-  await runGit(cwd, ['commit', '-m', `chore(release): roll ${hop.source} forward into ${hop.target}`]);
-  return [];
+  const commit = await execa('git', ['commit', '-m', renderMessage(message, hop)], { cwd, reject: false, all: true });
+  return commit.exitCode === 0 ? {} : { commitError: commit.all ?? '' };
 }
 
 /** Confirms a finished merge really has the promised shape before it can be pushed. */
@@ -291,7 +319,13 @@ async function leaveRollBranch(cwd: string, hop: Hop, returnTo: string): Promise
 }
 
 /** Runs one hop. Returns false when the chain must stop here. */
-async function runHop(cwd: string, remote: string, hop: Hop, noPush: boolean | undefined): Promise<boolean> {
+async function runHop(
+  cwd: string,
+  remote: string,
+  hop: Hop,
+  message: string,
+  noPush: boolean | undefined,
+): Promise<boolean> {
   const resumed = await gitSucceeds(cwd, ['show-ref', '--verify', '-q', `refs/heads/${hop.rollBranch}`]);
   if (resumed) {
     if (!(await holdsFinishedMerge(cwd, hop))) {
@@ -301,8 +335,15 @@ async function runHop(cwd: string, remote: string, hop: Hop, noPush: boolean | u
     }
     await runGit(cwd, ['switch', hop.rollBranch]);
   } else {
-    const conflictedFiles = await mergeHop(cwd, hop);
-    if (conflictedFiles.length > 0) {
+    const { conflictedFiles, commitError } = await mergeHop(cwd, hop, message);
+    if (commitError !== undefined) {
+      Object.assign(hop, { status: 'Commit rejected', commitError });
+      logger.warn(
+        `A hook rejected the commit on ${hop.rollBranch}, and the merge is still in progress. Run \`git commit\` with a message your repository accepts, then re-run this command.\n${commitError}`,
+      );
+      return false;
+    }
+    if (conflictedFiles) {
       Object.assign(hop, { status: 'Conflict', conflictedFiles });
       logger.warn(`${unfinishedMergeMessage(hop.rollBranch)} Conflicted: ${conflictedFiles.join(', ')}`);
       return false;
@@ -351,6 +392,8 @@ const toResult = (hops: Hop[], declined = false): RollForwardResult => ({
  */
 export async function rollForward(options: RollForwardOptions = {}): Promise<RollForwardResult> {
   const remote = options.remote ?? 'origin';
+  const message = options.message ?? DEFAULT_MESSAGE;
+  assertValidMessage(message);
   const prefix = options.packageReleaseBranchPrefix ?? 'release/';
   const cwd = await runGit(options.cwd ?? process.cwd(), ['rev-parse', '--show-toplevel']);
 
@@ -383,8 +426,8 @@ export async function rollForward(options: RollForwardOptions = {}): Promise<Rol
   const startCommit = await runGit(cwd, ['rev-parse', 'HEAD']);
 
   for (const hop of pending) {
-    if (!(await runHop(cwd, remote, hop, options.noPush))) {
-      if (hop.status === 'Conflict') {
+    if (!(await runHop(cwd, remote, hop, message, options.noPush))) {
+      if (hop.status === 'Conflict' || hop.status === 'Commit rejected') {
         return toResult(hops);
       }
       break;

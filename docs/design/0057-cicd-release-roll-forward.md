@@ -41,15 +41,16 @@ logic goes in `simply-cicd-core` (`src/release/rollForward.ts`), per
 
 ### Flags
 
-| Flag                              | Default    | Meaning                                                            |
-| --------------------------------- | ---------- | ------------------------------------------------------------------ |
-| `--source`                        | see below  | Oldest release branch to roll from.                                |
-| `--target`                        | see below  | Newest release branch to roll into.                                |
-| `--package-release-branch-prefix` | `release/` | Same name and meaning as on `create-package-version`.              |
-| `--remote`                        | `origin`   | Remote holding the release branches.                               |
-| `--dry-run`                       | off        | Print the plan and the tags each hop would bring in, then stop.    |
-| `--no-push`                       | off        | Stop after the merge, leaving the roll branch for a merge request. |
-| `--no-prompt`                     | off        | Skip the confirmation before pushing.                              |
+| Flag                              | Default    | Meaning                                                               |
+| --------------------------------- | ---------- | --------------------------------------------------------------------- |
+| `--source`                        | see below  | Oldest release branch to roll from.                                   |
+| `--target`                        | see below  | Newest release branch to roll into.                                   |
+| `--package-release-branch-prefix` | `release/` | Same name and meaning as on `create-package-version`.                 |
+| `--remote`                        | `origin`   | Remote holding the release branches.                                  |
+| `--dry-run`                       | off        | Print the plan and the tags each hop would bring in, then stop.       |
+| `--no-push`                       | off        | Stop after the merge, leaving the roll branch for a merge request.    |
+| `--no-prompt`                     | off        | Skip the confirmation before pushing.                                 |
+| `--message`                       | see below  | Commit message template, with `{SOURCE}` and `{TARGET}` placeholders. |
 
 ### Choosing the hops
 
@@ -78,7 +79,7 @@ everything before it.
 3. Run `git merge --no-ff --no-commit <remote>/<source>`, so the target is the first parent and
    `git log --first-parent` reads as the target's own timeline.
 4. Resolve `sfdx-project.json` (below). If anything else conflicts, stop.
-5. Commit with the message `chore(release): roll release/v1.1.0 forward into release/v1.2.0`.
+5. Commit with the message from `--message`, running the repository's hooks (below).
 6. Verify the source tip is an ancestor of `HEAD` and that the target's identity fields are unchanged.
 7. Push with `git push <remote> HEAD:refs/heads/release/v1.2.0`, then delete the roll branch.
 
@@ -100,6 +101,21 @@ The first three rows apply even when git merged cleanly, so a wrong identity can
 without a conflict. Before merging, the command also checks that each branch's `versionNumber` agrees
 with its name, and refuses if not, since a mismatch means the plan is built on a wrong assumption.
 
+### Commit messages and hooks
+
+Repositories can have their own commit rules, such as commitlint, so the command doesn't impose a
+commit convention. The default message is git's own wording, `Merge branch 'release/v1.1.0' into
+release/v1.2.0`, which commitlint's default rules ignore. `--message` covers stricter rules, such as a
+required ticket number, and its placeholders let one template work across a whole chain. A blank
+message or an unknown placeholder is refused before anything changes.
+
+Hooks always run. There is no `--no-verify` and no flag to add it, because a repository's commit rules
+belong to its team, and skipping a local hook can still fail in CI or server-side push rules. If a hook
+rejects the commit, the hop reports `Commit rejected` with the hook's output, and the command exits
+non-zero with the merge still in progress. The lead runs `git commit` with an accepted message and
+re-runs the command. Pre-commit hooks that rewrite files can add changes to the merge commit, which is
+left to the team's hook configuration.
+
 ### Conflicts and re-running
 
 The command has no saved state. On a conflict it stops with the merge in progress on the roll branch,
@@ -116,10 +132,10 @@ final until that merge lands.
 
 ### Output
 
-For each hop, the result reports source, target, status (`Rolled`, `Up to date`, `Conflict`, `Merged,
+For each hop, the result reports source, target, status (`Rolled`, `Up to date`, `Conflict`, `Commit rejected`, `Merged,
 not pushed`, `Would roll`, `Not started`), merge commit, and the tags it brought in, from
 `git tag --merged <source> --no-merged <target>`. Those tags are unfiltered, so fallback and
-feature-suffixed tags appear too. `--json` returns the same data. A conflict exits non-zero.
+feature-suffixed tags appear too. `--json` returns the same data. A conflict or a rejected commit exits non-zero.
 
 ### Pipeline effects
 
@@ -142,6 +158,11 @@ says how many branches will be pushed for this reason.
   done. `--source` and `--target` can still limit a run to one hop.
 - **Pushing source tags or re-tagging the merge commit.** Unnecessary, since ancestry is what makes
   the tags visible. A new tag on the merge commit would also falsely imply a package version.
+- **A fixed conventional commit message.** The first version used `chore(release): roll ...`. A
+  stricter repository would reject it, and release tooling could mistake it for a publish commit,
+  which uses the same type and scope in this monorepo.
+- **Bypassing hooks with `--no-verify`.** It would make the command succeed by overriding a team's
+  rules, and a server-side rule could still reject the push.
 - **A pipeline job that rolls automatically.** Conflicts need a person, and an unattended job would
   spend package versions. A pipeline can still run this command later with `--no-prompt`.
 

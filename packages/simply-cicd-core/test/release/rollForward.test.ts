@@ -217,6 +217,49 @@ describe('rollForward', () => {
     expect(merged.packageAliases).toEqual({ Pkg: '0Ho', 'Pkg@1.1.0-13': '04t' });
   });
 
+  it('uses a merge message by default, and a message template when given', async () => {
+    await rollForward({ cwd: lead });
+    expect(git(remote, 'log', '-1', '--format=%s', 'release/v1.2.0')).toBe(
+      "Merge branch 'release/v1.1.0' into release/v1.2.0",
+    );
+
+    git(lead, 'switch', '-q', 'release/v1.1.0');
+    git(lead, 'pull', '-q', 'origin', 'release/v1.1.0');
+    commit(lead, 'fix.txt', 'fix');
+    git(lead, 'push', '-q', 'origin', 'release/v1.1.0');
+    await rollForward({ cwd: lead, message: 'chore: PROJ-1 $& {SOURCE} into {TARGET}' });
+    expect(git(remote, 'log', '-1', '--format=%s', 'release/v1.2.0')).toBe(
+      'chore: PROJ-1 $& release/v1.1.0 into release/v1.2.0',
+    );
+  });
+
+  it('refuses a blank message or an unknown placeholder before changing anything', async () => {
+    await expect(rollForward({ cwd: lead, message: '  ' })).rejects.toThrow(/empty/);
+    await expect(rollForward({ cwd: lead, message: 'roll {SORCE}' })).rejects.toThrow(/\{SORCE\}/);
+    expect(git(lead, 'branch', '--list', 'roll-forward/*')).toBe('');
+  });
+
+  it('reports a hook rejecting the commit, and finishes after the lead commits by hand', async () => {
+    const target = git(remote, 'rev-parse', 'release/v1.2.0');
+    const hook = path.join(lead, '.git', 'hooks', 'commit-msg');
+    fs.mkdirSync(path.dirname(hook), { recursive: true });
+    fs.writeFileSync(hook, '#!/bin/sh\ngrep -q PROJ- "$1" || { echo "needs a ticket"; exit 1; }\n', { mode: 0o755 });
+
+    const { hops } = await rollForward({ cwd: lead });
+
+    const rejected = hops.at(-1);
+    expect(rejected?.status).toBe('Commit rejected');
+    expect(rejected?.commitError).toContain('needs a ticket');
+    expect(git(remote, 'rev-parse', 'release/v1.2.0')).toBe(target);
+    await expect(rollForward({ cwd: lead })).rejects.toThrow(/merge is still in progress/);
+
+    git(lead, 'commit', '-qm', 'chore: PROJ-1 roll');
+
+    const finished = await rollForward({ cwd: lead });
+    expect(finished.hops.at(-1)?.status).toBe('Rolled');
+    expect(git(remote, 'log', '-1', '--format=%s', 'release/v1.2.0')).toBe('chore: PROJ-1 roll');
+  });
+
   it('never publishes a local-only tag', async () => {
     git(lead, 'tag', 'stray');
 
