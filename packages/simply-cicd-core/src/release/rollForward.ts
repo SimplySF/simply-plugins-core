@@ -98,6 +98,14 @@ async function readProjectAt(cwd: string, ref: string): Promise<string> {
 const unfinishedMergeMessage = (rollBranch: string): string =>
   `A merge is still in progress on ${rollBranch}. Resolve the conflicts and run \`git commit\`, then re-run this command, or run \`git merge --abort\` to give up on it.`;
 
+/** Only a configured remote is accepted, because git would run an option-like value such as `--upload-pack=...`. */
+async function assertKnownRemote(cwd: string, remote: string): Promise<void> {
+  const remotes = (await runGit(cwd, ['remote'])).split(/\r?\n/);
+  if (!remotes.includes(remote)) {
+    throw new Error(`${remote} is not a configured remote of this repository.`);
+  }
+}
+
 async function assertWorkingTreeReady(cwd: string): Promise<void> {
   if ((await runGit(cwd, ['rev-parse', '--is-shallow-repository'])) === 'true') {
     throw new Error('This is a shallow clone, so its tag history is incomplete. Run `git fetch --unshallow` first.');
@@ -273,8 +281,8 @@ async function holdsFinishedMerge(cwd: string, hop: Hop): Promise<boolean> {
 }
 
 async function pushHop(cwd: string, remote: string, hop: Hop): Promise<void> {
-  await runGit(cwd, ['push', remote, `HEAD:refs/heads/${hop.target}`]);
-  await runGit(cwd, ['fetch', remote, `+refs/heads/${hop.target}:refs/remotes/${remote}/${hop.target}`]);
+  await runGit(cwd, ['push', '--', remote, `HEAD:refs/heads/${hop.target}`]);
+  await runGit(cwd, ['fetch', '--', remote, `+refs/heads/${hop.target}:refs/remotes/${remote}/${hop.target}`]);
 }
 
 async function leaveRollBranch(cwd: string, hop: Hop, returnTo: string): Promise<void> {
@@ -346,8 +354,9 @@ export async function rollForward(options: RollForwardOptions = {}): Promise<Rol
   const prefix = options.packageReleaseBranchPrefix ?? 'release/';
   const cwd = await runGit(options.cwd ?? process.cwd(), ['rev-parse', '--show-toplevel']);
 
+  await assertKnownRemote(cwd, remote);
   await assertWorkingTreeReady(cwd);
-  await runGit(cwd, ['fetch', remote, '--tags', '--prune', `+refs/heads/*:refs/remotes/${remote}/*`]);
+  await runGit(cwd, ['fetch', '--tags', '--prune', '--', remote, `+refs/heads/*:refs/remotes/${remote}/*`]);
 
   const branches = await listReleaseBranches(cwd, remote, prefix);
   const pairs = selectReleasePairs(branches, options.source, options.target);

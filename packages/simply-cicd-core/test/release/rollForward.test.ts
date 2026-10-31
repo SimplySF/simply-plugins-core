@@ -278,6 +278,14 @@ describe('rollForward', () => {
     expect(later.hops.at(-1)?.status).toBe('Rolled');
   });
 
+  it('refuses a remote that is not configured, including one that looks like an option', async () => {
+    await expect(rollForward({ cwd: lead, remote: 'upstream' })).rejects.toThrow(/not a configured remote/);
+    await expect(rollForward({ cwd: lead, remote: '--upload-pack=touch pwned' })).rejects.toThrow(
+      /not a configured remote/,
+    );
+    expect(fs.existsSync(path.join(lead, 'pwned'))).toBe(false);
+  });
+
   it('refuses a shallow clone, a dirty tree, a backward roll, and a version that disagrees with its name', async () => {
     const shallow = path.join(root, 'shallow');
     git(root, 'clone', '-q', '--depth', '1', '--no-single-branch', `file://${remote}`, shallow);
