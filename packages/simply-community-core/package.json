@@ -46,7 +46,7 @@
     "xmlbuilder2": "^4.0.3"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.12",
     "vitest": "^4.1.10"
   },
   "publishConfig": {
