@@ -321,3 +321,57 @@ export async function resolveUpgradedPackages(
 
   return upgradedPackages;
 }
+
+/** The `Package2` fields an aer package's file name is built from. */
+export type Package2Info = {
+  Id: string;
+  Name: string;
+  /** `null` for a package with no namespace. */
+  NamespacePrefix: string | null;
+};
+
+/**
+ * The name and namespace of the package a `0Ho` ID identifies, read from the Dev Hub that owns it.
+ *
+ * @param package2Id - A `0Ho` package ID, e.g. a package version report's `Package2Id`.
+ * @param devHubAliasOrUsername - The Dev Hub that owns the package. Must already be authenticated.
+ * @throws {Error} If the Dev Hub has no package with that ID.
+ */
+export async function getPackage2Info(package2Id: string, devHubAliasOrUsername: string): Promise<Package2Info> {
+  const devHub = await resolveOrg(devHubAliasOrUsername, { isDevHub: true });
+  // The ID is interpolated into SOQL, so it's checked against the shape of an ID first.
+  if (!/^0Ho[0-9A-Za-z]{12}(?:[0-9A-Za-z]{3})?$/.test(package2Id)) {
+    throw new Error(`"${package2Id}" is not a package ID (0Ho).`);
+  }
+  const result = await devHub
+    .getConnection()
+    .tooling.query<Package2Info>(`SELECT Id, Name, NamespacePrefix FROM Package2 WHERE Id = '${package2Id}'`);
+  const [record] = result.records;
+  if (!record) {
+    throw new Error(`The Dev Hub has no package with ID ${package2Id}.`);
+  }
+  return { Id: record.Id, Name: record.Name, NamespacePrefix: record.NamespacePrefix ?? null };
+}
+
+/**
+ * The `04t` a `package` + `versionNumber` dependency resolves to, the same way `sf package install`
+ * resolves one: through the Dev Hub that owns the package, `LATEST` included.
+ *
+ * @param package2Id - The dependency's `0Ho` ID, already resolved from its alias.
+ * @param versionNumber - The dependency's `versionNumber`, e.g. `1.2.0.LATEST`.
+ * @param devHubAliasOrUsername - The Dev Hub that owns the package. Must already be authenticated.
+ * @param branch - The dependency's `branch`, if it pins one.
+ */
+export async function resolveDependencyVersionId(
+  package2Id: string,
+  versionNumber: string,
+  devHubAliasOrUsername: string,
+  branch?: string,
+): Promise<string> {
+  const devHub = await resolveOrg(devHubAliasOrUsername, { isDevHub: true });
+  return SubscriberPackageVersion.resolveId(devHub.getConnection(), {
+    packageId: package2Id,
+    versionNumber,
+    branch: branch ?? '',
+  });
+}
