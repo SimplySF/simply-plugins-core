@@ -23,6 +23,7 @@ const PACKAGE_CHANGED_GATED_JOBS = new Set([
   'delete-scratch',
   'create-package-version',
   'publish-utam-page-objects',
+  'publish-aer-package',
 ]);
 
 /**
