@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.12.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.11.0...%40simplysf%2Fsimply-cicd-core%400.12.0) (2026-11-02)
+
+### Features
+
+- **simply-cicd-core:** publish aer packages per package version ([#270](https://github.com/SimplySF/simply-plugins-core/issues/270)) ([b74ad0c](https://github.com/SimplySF/simply-plugins-core/commit/b74ad0cf12c608d4b80e1472015e49cf45db717c))
+
 # [0.11.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.10.1...%40simplysf%2Fsimply-cicd-core%400.11.0) (2026-10-29)
 
 - fix(simply-cicd-core)!: compile UTAM page objects from the staged sources (#269) ([e4d085a](https://github.com/SimplySF/simply-plugins-core/commit/e4d085a4ef161174ce124db3a0b0bebe9dd68700)), closes [#269](https://github.com/SimplySF/simply-plugins-core/issues/269)
