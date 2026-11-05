@@ -28,6 +28,17 @@ export type InstallDependenciesOptions = {
   debug?: boolean;
   installType?: 'All' | 'Delta' | 'Upgrade';
   upgradeType?: PackageInstallUpgradeType;
+  /**
+   * Number of additional attempts to make when a package install fails, before giving up on it.
+   * Default: `0`.
+   */
+  retryAttempts?: number;
+  /** Factor the delay between retries grows by after each failed attempt. Default: `2`. */
+  retryBackoff?: number;
+  /**
+   * Per-package overrides of `retryAttempts`, keyed by alias/04t or as an array of `<aliasOrId>:<count>` strings.
+   */
+  packageRetryAttempts?: Record<string, number> | string[];
 };
 
 /** Authenticates to the scratch org (recorded in `SCRATCH_ORG_INFO.json`) and installs its packaged dependencies. */
@@ -46,6 +57,9 @@ export async function installDependencies(options: InstallDependenciesOptions): 
     wait: '240',
     installType: options.installType,
     upgradeType: options.upgradeType,
+    retryAttempts: options.retryAttempts,
+    retryBackoff: options.retryBackoff,
+    packageRetryAttempts: options.packageRetryAttempts,
   });
   logger.success('Package dependencies installed.');
 }

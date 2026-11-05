@@ -23,6 +23,7 @@ import {
   getPackageVersionReport,
   installPackageDependencies,
   listInstalledPackages,
+  normalizePackageRetryAttempts,
   requestPackageVersionCreate,
   resolveUpgradedPackages,
   type PackageToInstall,
@@ -161,6 +162,60 @@ describe('installPackageDependencies', () => {
     await expect(installPackageDependencies()).rejects.toThrow('install failed');
 
     expect(logger.error).toHaveBeenCalledWith('Failed to install packaged dependencies.');
+  });
+
+  it('forwards retry parameters to core when provided as a record', async () => {
+    await installPackageDependencies({
+      retryAttempts: 3,
+      retryBackoff: 4,
+      packageRetryAttempts: { myPkg: 2, '04t123456789012': 5 },
+    });
+
+    const options = coreCallOptions();
+    expect(options.retryAttempts).toBe(3);
+    expect(options.retryBackoff).toBe(4);
+    expect(options.packageRetryAttempts).toEqual({ myPkg: 2, '04t123456789012': 5 });
+  });
+
+  it('normalizes string array packageRetryAttempts and forwards them to core', async () => {
+    await installPackageDependencies({
+      packageRetryAttempts: ['myPkg:2', '04t123456789012:5 '],
+    });
+
+    const options = coreCallOptions();
+    expect(options.packageRetryAttempts).toEqual({ myPkg: 2, '04t123456789012': 5 });
+  });
+
+  it('throws a descriptive error when packageRetryAttempts has invalid string formatting', async () => {
+    await expect(
+      installPackageDependencies({
+        packageRetryAttempts: ['invalid-format'],
+      }),
+    ).rejects.toThrow(
+      '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+    );
+
+    expect(installPackageDependenciesCoreMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('normalizePackageRetryAttempts', () => {
+  it('returns undefined when input is undefined', () => {
+    expect(normalizePackageRetryAttempts(undefined)).toBeUndefined();
+  });
+
+  it('returns record directly when input is a record', () => {
+    expect(normalizePackageRetryAttempts({ pkg: 2 })).toEqual({ pkg: 2 });
+  });
+
+  it('parses array of strings correctly', () => {
+    expect(normalizePackageRetryAttempts(['pkgA:1', 'pkgB:3'])).toEqual({ pkgA: 1, pkgB: 3 });
+  });
+
+  it('throws on non-integer or bad format in strings', () => {
+    expect(() => normalizePackageRetryAttempts(['pkg:abc'])).toThrow(
+      '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+    );
   });
 });
 
