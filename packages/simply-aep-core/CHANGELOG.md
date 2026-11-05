@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.15.3](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.15.2...%40simplysf%2Fsimply-aep-core%400.15.3) (2026-11-02)
+
+### Bug Fixes
+
+- **deps:** bump zod from 4.5.4 to 4.6.7 ([#276](https://github.com/SimplySF/simply-plugins-core/issues/276)) ([457e5af](https://github.com/SimplySF/simply-plugins-core/commit/457e5af1e123daa65318baa3a67f14e7953f382f))
+
+## [0.15.2](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.15.1...%40simplysf%2Fsimply-aep-core%400.15.2) (2026-11-02)
+
+**Note:** Version bump only for package @simplysf/simply-aep-core
+
 ## [0.15.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-aep-core%400.15.0...%40simplysf%2Fsimply-aep-core%400.15.1) (2026-10-15)
 
 ### Bug Fixes

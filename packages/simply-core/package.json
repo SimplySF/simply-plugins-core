@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-core",
   "description": "Shared internal utilities for SimplySF Salesforce CLI plugins",
-  "version": "1.6.12",
+  "version": "1.6.13",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -38,7 +38,7 @@
     "undici": "^8.12.2"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.12",
     "vitest": "^4.1.10"
   },
   "publishConfig": {

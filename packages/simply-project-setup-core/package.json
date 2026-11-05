@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-project-setup-core",
   "description": "Engine for standardizing a Salesforce DX project's files, .gitignore, and package.json dependencies/scripts from a consumer-supplied set of template packs, presets, and defaults — the reusable backend behind a project-setup command, published separately so a consumer plugin can build its own end-user command on top of it",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -42,7 +42,7 @@
     "minimatch": "^10.2.6"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.12",
     "vitest": "^4.1.10"
   },
   "publishConfig": {

@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.8](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-sobject-core%400.2.7...%40simplysf%2Fsimply-sobject-core%400.2.8) (2026-11-02)
+
+### Bug Fixes
+
+- **deps:** bump zod from 4.5.4 to 4.6.7 ([#276](https://github.com/SimplySF/simply-plugins-core/issues/276)) ([457e5af](https://github.com/SimplySF/simply-plugins-core/commit/457e5af1e123daa65318baa3a67f14e7953f382f))
+
+## [0.2.7](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-sobject-core%400.2.6...%40simplysf%2Fsimply-sobject-core%400.2.7) (2026-11-02)
+
+**Note:** Version bump only for package @simplysf/simply-sobject-core
+
 ## [0.2.6](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-sobject-core%400.2.5...%40simplysf%2Fsimply-sobject-core%400.2.6) (2026-10-13)
 
 **Note:** Version bump only for package @simplysf/simply-sobject-core

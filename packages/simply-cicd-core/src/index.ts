@@ -40,6 +40,8 @@ export * from './sfPackages.js';
 export * from './sfPlugins.js';
 
 // build/
+export * from './build/aerBinary.js';
+export * from './build/aerPackage.js';
 export * from './build/checkPermissionSets.js';
 export * from './build/cleanupScratchOrgs.js';
 export * from './build/createFallbackTag.js';
@@ -53,6 +55,8 @@ export * from './build/flexipageDelta.js';
 export * from './build/flowDelta.js';
 export * from './build/installDependencies.js';
 export * from './build/lwcJest.js';
+export * from './build/packageVersionArtifact.js';
+export * from './build/publishAerPackage.js';
 export * from './build/publishUtamPageObjects.js';
 export * from './build/pushScratch.js';
 export * from './build/scratchOrgAuth.js';

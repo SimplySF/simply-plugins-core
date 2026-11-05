@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-document-core",
   "description": "Confluence-storage-format change report and technical design document rendering — the library layer behind @simplysf/simply-document, published separately for direct consumption (e.g. editor tooling, CI scripts) without the CLI framework",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -41,7 +41,7 @@
     "handlebars": "^4.7.10"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.12",
     "vitest": "^4.1.10"
   },
   "publishConfig": {
