@@ -23,3 +23,11 @@ import { Console } from 'node:console';
 if (typeof console.Console !== 'function') {
   (console as unknown as { Console: typeof Console }).Console = Console;
 }
+
+// A git hook, such as husky's pre-push running these tests, exports variables like GIT_DIR and
+// GIT_INDEX_FILE. Every git command a test runs would inherit them and act on this repository
+// instead of the test's temporary one: committing to its branches, tagging, and even setting
+// core.bare. Clearing them here protects every test, not just the ones that remember to.
+for (const name of Object.keys(process.env).filter((key) => key.startsWith('GIT_'))) {
+  delete process.env[name];
+}
