@@ -93,9 +93,6 @@ export * from './notify/renderTemplate.js';
 export * from './notify/sendNotification.js';
 export * from './notify/templates.js';
 
-// release/
-export * from './release/rollForward.js';
-
 // schemas/
 export * from './schemas/deployConfig.js';
 export * from './schemas/deployProgress.js';

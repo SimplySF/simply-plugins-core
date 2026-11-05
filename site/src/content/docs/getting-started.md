@@ -31,25 +31,27 @@ npm install @simplysf/simply-project-setup-core
 npm install @simplysf/simply-cicd-core
 npm install @simplysf/simply-settings-core
 npm install @simplysf/simply-flow-core
+npm install @simplysf/simply-project-core
 ```
 
-| Package                     | What it's for                                                                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `simply-core`               | Querying, bulk export, CSV, and `sfdx-project.json` utilities                                                                                      |
-| `simply-report`             | Shared HTML report scaffolding                                                                                                                     |
-| `simply-aep-core`           | Apex Enterprise Patterns (fflib, force-di, AT4DX) binding scan and resolution logic                                                                |
-| `simply-document-core`      | Confluence-storage-format change report and technical design document rendering                                                                    |
-| `simply-apex-core`          | Apex execute, log-purge, and trace-flag logic                                                                                                      |
-| `simply-permissions-core`   | Permission set XML and permissions report rendering                                                                                                |
-| `simply-sobject-core`       | Field history object derivation/filtering and relationship-field discovery                                                                         |
-| `simply-community-core`     | Community publish/deploy/domain-verification logic and site-file discovery                                                                         |
-| `simply-data-core`          | Content Version upload/download and CSV row counting logic                                                                                         |
-| `simply-package-core`       | Package/package-version alias resolution, `sfdx-project.json` dependency management, and Dev Hub version lookup                                    |
-| `simply-schema-core`        | sObject schema generation (CSV/Excel parsing, field/object normalization) and interactive schema-report rendering                                  |
-| `simply-project-setup-core` | Salesforce DX project file/dependency standardization engine (template packs, `.gitignore` composition, `package.json` scripts/dependency merging) |
-| `simply-cicd-core`          | ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab)                                                                       |
-| `simply-settings-core`      | State and Country/Territory picklist automation: create states through Setup and activate them via AddressSettings                                 |
-| `simply-flow-core`          | Flow deactivation/deletion and obsolete Flow version pruning                                                                                       |
+| Package                     | What it's for                                                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `simply-core`               | Querying, bulk export, CSV, and `sfdx-project.json` utilities                                                                                             |
+| `simply-report`             | Shared HTML report scaffolding                                                                                                                            |
+| `simply-aep-core`           | Apex Enterprise Patterns (fflib, force-di, AT4DX) binding scan and resolution logic                                                                       |
+| `simply-document-core`      | Confluence-storage-format change report and technical design document rendering                                                                           |
+| `simply-apex-core`          | Apex execute, log-purge, and trace-flag logic                                                                                                             |
+| `simply-permissions-core`   | Permission set XML and permissions report rendering                                                                                                       |
+| `simply-sobject-core`       | Field history object derivation/filtering and relationship-field discovery                                                                                |
+| `simply-community-core`     | Community publish/deploy/domain-verification logic and site-file discovery                                                                                |
+| `simply-data-core`          | Content Version upload/download and CSV row counting logic                                                                                                |
+| `simply-package-core`       | Package/package-version alias resolution, `sfdx-project.json` dependency management, and Dev Hub version lookup                                           |
+| `simply-schema-core`        | sObject schema generation (CSV/Excel parsing, field/object normalization) and interactive schema-report rendering                                         |
+| `simply-project-setup-core` | Salesforce DX project file/dependency standardization engine (template packs, `.gitignore` composition, `package.json` scripts/dependency merging)        |
+| `simply-cicd-core`          | ALM issue linking (Jira, GitLab Issues) and VCS API clients (GitHub, GitLab)                                                                              |
+| `simply-settings-core`      | State and Country/Territory picklist automation: create states through Setup and activate them via AddressSettings                                        |
+| `simply-flow-core`          | Flow deactivation/deletion and obsolete Flow version pruning                                                                                              |
+| `simply-project-core`       | Release-branch roll-forward: merges each release branch into the next with a real merge commit, keeping the target's `sfdx-project.json` package identity |
 
 ## Next steps
 
@@ -71,3 +73,4 @@ TypeScript source:
 - [simply-cicd-core guide](/guides/simply-cicd-core/) · [API](/api/simply-cicd-core/readme/)
 - [simply-settings-core guide](/guides/simply-settings-core/) · [API](/api/simply-settings-core/readme/)
 - [simply-flow-core guide](/guides/simply-flow-core/) · [API](/api/simply-flow-core/readme/)
+- [simply-project-core guide](/guides/simply-project-core/) · [API](/api/simply-project-core/readme/)

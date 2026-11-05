@@ -1,7 +1,7 @@
-# 0057 — `simply cicd release roll-forward`
+# 0057 — `simply project release roll-forward`
 
 **Status:** In progress
-**Package:** `packages/simply-cicd-core` (library); `packages/simply-cicd` (CLI, in
+**Package:** `packages/simply-project-core` (new library); `packages/simply-project` (CLI, in
 `simply-plugins`, where this doc is duplicated as its 0059)
 **Date:** 2026-10-31
 
@@ -28,14 +28,40 @@ Leads do this "roll forward" by hand, which has three traps:
 
 ## Decision
 
-Add `sf simply cicd release roll-forward`. It merges each release branch into the next higher one
+Add `sf simply project release roll-forward`. It merges each release branch into the next higher one
 with a real merge commit, keeps the target's package identity in `sfdx-project.json`, and pushes
 without ever rewriting history or force-pushing. It is run by a lead from a local clone, not by a
 pipeline.
 
-It gets a new `release` subtopic because `build` and `deploy` are pipeline stages and this isn't. The
-logic goes in `simply-cicd-core` (`src/release/rollForward.ts`), per
-[0056](0056-simply-cicd-core-common.md), with a thin command in `simply-cicd`.
+### Where it lives
+
+The command belongs to the `project` topic, in `simply-project`, under a new `release` subtopic. The
+logic goes in a new library, `@simplysf/simply-project-core` (`src/release/rollForward.ts`), with a
+thin command on top, following the `-core` split in
+[0019](0019-plugin-core-library-extraction.md).
+
+The first draft put it in `simply-cicd` as `cicd release roll-forward`, with the logic in
+`simply-cicd-core`. That was the wrong home:
+
+- **It isn't a pipeline command.** Every `simply cicd` command is a pipeline stage or a pipeline's
+  helper, run unattended with a pipeline's environment. This one is run by a lead from a local
+  clone, and works on the project's repository and its `sfdx-project.json`, which is what the
+  `project` topic is for.
+- **It needs none of `simply-cicd-core`.** It only runs `git` and reads `sfdx-project.json`. Putting
+  it in `simply-cicd-core` would make a consumer that only wants to roll branches install the
+  Salesforce packaging, deploy, and VCS libraries that package depends on.
+- **`simply-project` had no `-core` library.** Its one existing command, `project update
+api-version`, is small enough to stay where it is, but new project-maintenance logic now has a
+  home that other tools can use directly.
+
+`simply-project-setup-core` was considered as the library and rejected. Its scope is standardizing a
+project's files from template packs, documented as such in
+[0035](0035-simply-project-setup-core.md), and it ships no opinions of its own. Release-branch rules
+are an opinion.
+
+The `release` subtopic is kept under `project`, so related commands, such as listing release
+branches or cutting a new one, have a place to go. The flag `--package-release-branch-prefix` keeps
+its name, since it must hold the same value as on `cicd build create-package-version`.
 
 ## Behavior
 
@@ -170,20 +196,25 @@ says how many branches will be pushed for this reason.
 
 In `simply-plugins-core`, then released:
 
-1. `simply-cicd-core/src/release/releaseBranches.ts`: parse and sort branch names, and select pairs.
-2. `simply-cicd-core/src/release/projectIdentity.ts`: apply and check the target's identity. A conflict
-   is merged by giving each side the target's identity first, so a text merge sees only real differences.
-3. `simply-cicd-core/src/release/rollForward.ts`: orchestration, using `execa` like `git.ts`.
-4. Export from `src/index.ts` and update the key list in `test/index.test.ts`.
+1. Create `packages/simply-project-core`, registered like the other `-core` libraries: root README
+   and `CONTRIBUTING.md` tables, `eslint.config.mjs`, and the docs site's typedoc plugin, sidebar,
+   getting-started page, homepage card, and a guide. Its only dependencies are `execa`, plus `chalk`
+   and `log-symbols` for its `logger`.
+2. `src/release/releaseBranches.ts`: parse and sort branch names, and select pairs.
+3. `src/release/projectIdentity.ts`: apply and check the target's identity. A conflict is merged by
+   giving each side the target's identity first, so a text merge sees only real differences.
+4. `src/release/rollForward.ts`: orchestration, using `execa`.
+5. Export `rollForward` and its types from `src/index.ts`, pinned by `test/index.test.ts`.
 
 Then in `simply-plugins`:
 
-5. Bump `@simplysf/simply-cicd-core`.
-6. Add `src/commands/simply/cicd/release/roll-forward.ts`, its `messages/` file, and the `release`
-   subtopic in `package.json`. Add the `release` group to `site/scripts/sync-command-reference.mjs`.
-7. Add `site/.../cicd/concepts/release-branches.md`, which documents the strategy for the first time,
-   and `site/.../cicd/reference/release.md`. Confirm the site's reference sync picks up the new topic.
-8. Run the `AGENTS.md` checklist: README, `command-snapshot.json`, and `pnpm --filter site run sync`.
+6. Add `@simplysf/simply-project-core` to `simply-project`.
+7. Add `src/commands/simply/project/release/roll-forward.ts`, its `messages/` file, and the `release`
+   subtopic in `package.json`.
+8. Add `site/.../project/concepts/release-branches.md`, which documents the strategy for the first
+   time, and link it from the `cicd` docs that describe release-branch builds.
+9. Run the `AGENTS.md` checklist: README (including `packages/simply`'s, since `simply-project` is
+   bundled), `command-snapshot.json`, and `pnpm --filter site run sync`.
 
 ## Testing
 
@@ -195,7 +226,7 @@ Then in `simply-plugins`:
   resolves itself; tags are reachable afterward and the target is the first parent; a two-hop chain;
   an unrelated conflict stops, and a re-run finishes; a moved target rejects the push without forcing;
   an unpushed local tag stays local; a shallow clone is refused.
-- **Command:** flag parsing and delegation, matching the other `simply-cicd` command tests.
+- **Command:** flag parsing and delegation, matching the other `simply-project` command tests.
 
 ## Open questions
 
@@ -212,3 +243,8 @@ Decided by the requester on 2026-10-31:
 - **Default run.** With no flags, the command rolls the whole chain and stops at the first conflict.
 - **Branch names.** The primary branch is itself a release branch. A literal `main` is not part of
   the chain.
+
+Decided by the requester on 2026-11-05:
+
+- **Topic and package.** The command moves from `cicd` to `project`, and its logic into a new
+  `simply-project-core` package, as described under [Where it lives](#where-it-lives).
