@@ -155,7 +155,9 @@ beforeEach(async () => {
   delete process.env.PACKAGE_CHANGED;
   delete process.env.SUBSCRIBER_PACKAGE_VERSION_ID;
   originalCwd = process.cwd();
-  projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'publish-aer-test-'));
+  // Resolved, because on macOS os.tmpdir() is a symlink (/var -> /private/var) and the code under
+  // test reports real paths.
+  projectDir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'publish-aer-test-')));
   packageDir = path.join(projectDir, 'force-app');
   process.chdir(projectDir);
 
