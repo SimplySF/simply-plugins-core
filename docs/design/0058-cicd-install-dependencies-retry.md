@@ -1,4 +1,4 @@
-# 0057 — `simply-cicd-core`: `installDependencies` retry support
+# 0058 — `simply-cicd-core`: `installDependencies` retry support
 
 **Status:** Planned  
 **Package:** `packages/simply-cicd-core`  
