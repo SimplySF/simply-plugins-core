@@ -73,4 +73,14 @@ describe('installDependencies', () => {
     });
     expect(logger.success).toHaveBeenCalledWith('Package dependencies installed.');
   });
+
+  it('should allow overriding the wait timeout parameter', async () => {
+    await installDependencies({ wait: '180' });
+
+    expect(installPackageDependenciesCommon).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wait: '180',
+      }),
+    );
+  });
 });

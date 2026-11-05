@@ -45,6 +45,8 @@ export type InstallDependenciesOptions = {
   debug?: boolean;
   installType?: 'All' | 'Delta' | 'Upgrade';
   upgradeType?: PackageInstallUpgradeType;
+  /** Minutes to wait for each package install to complete. Default: '240'. */
+  wait?: string;
   /** Number of additional attempts to make when a package install fails. Default: 0. */
   retryAttempts?: number;
   /** Factor the delay between install retries grows by after each failed attempt. Default: 2. */

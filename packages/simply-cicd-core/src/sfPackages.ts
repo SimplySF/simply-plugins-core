@@ -59,13 +59,20 @@ export type InstallPackageDependenciesConfig = {
 export type { PackageVersionReportResult };
 
 /** Matches a single `alias:count` pair, as accepted by `--package-retry-attempts`. */
-const packageRetryAttemptsRegex = /^\w+:\d+$/;
+const packageRetryAttemptsRegex = /^([^:]+):(\d+)$/;
+
+const FORBIDDEN_PROPERTY_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isValidRetryCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && Number.isSafeInteger(value);
+}
 
 /**
  * Normalizes package retry attempts configuration from either a key-count record or
  * an array of `alias:count` strings into a `Record<string, number>`.
  *
  * @throws {Error} If any string entry does not match the `<aliasOrId>:<count>` format.
+ * @throws {Error} If any key is a reserved property name or any retry count is not a non-negative integer.
  */
 export function normalizePackageRetryAttempts(
   packageRetryAttempts?: Record<string, number> | string[],
@@ -75,19 +82,41 @@ export function normalizePackageRetryAttempts(
   }
 
   if (!Array.isArray(packageRetryAttempts)) {
-    return packageRetryAttempts;
+    const validated: Record<string, number> = {};
+    for (const [key, value] of Object.entries(packageRetryAttempts)) {
+      if (FORBIDDEN_PROPERTY_KEYS.has(key)) {
+        throw new Error(`Invalid package retry attempts key: "${key}" is a reserved property name.`);
+      }
+      if (!isValidRetryCount(value)) {
+        throw new Error(
+          `Package retry attempts for "${key}" must be a non-negative integer, received: ${String(value)}`,
+        );
+      }
+      validated[key] = value;
+    }
+    return validated;
   }
 
   const result: Record<string, number> = {};
   for (let entry of packageRetryAttempts) {
     entry = entry.trim();
-    if (!packageRetryAttemptsRegex.test(entry)) {
+    const match = packageRetryAttemptsRegex.exec(entry);
+    if (!match) {
       throw new Error(
         '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
       );
     }
-    const [aliasOrId, retryAttemptsValue] = entry.split(':');
-    result[aliasOrId] = parseInt(retryAttemptsValue, 10);
+    const [, aliasOrId, retryAttemptsValue] = match;
+    if (FORBIDDEN_PROPERTY_KEYS.has(aliasOrId)) {
+      throw new Error(`Invalid package retry attempts key: "${aliasOrId}" is a reserved property name.`);
+    }
+    const parsed = parseInt(retryAttemptsValue, 10);
+    if (!isValidRetryCount(parsed)) {
+      throw new Error(
+        '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+      );
+    }
+    result[aliasOrId] = parsed;
   }
   return result;
 }
