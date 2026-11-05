@@ -211,8 +211,9 @@ Then in `simply-plugins`:
 6. Add `@simplysf/simply-project-core` to `simply-project`.
 7. Add `src/commands/simply/project/release/roll-forward.ts`, its `messages/` file, and the `release`
    subtopic in `package.json`.
-8. Add `site/.../project/concepts/release-branches.md`, which documents the strategy for the first
-   time, and link it from the `cicd` docs that describe release-branch builds.
+8. Add `site/.../cicd/concepts/release-branches.md`, which documents the strategy for the first
+   time. It stays with the `cicd` docs, because the strategy is what `cicd build` assumes, and links
+   to the command's reference on the `simply-project` plugin page.
 9. Run the `AGENTS.md` checklist: README (including `packages/simply`'s, since `simply-project` is
    bundled), `command-snapshot.json`, and `pnpm --filter site run sync`.
 
