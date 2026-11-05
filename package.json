@@ -44,7 +44,7 @@
     "lerna": "^10.1.1",
     "linkinator": "^8.0.3",
     "lint-staged": "^17.5.1",
-    "minimatch": "^10.2.6",
+    "minimatch": "^11.0.1",
     "oclif": "^4.24.0",
     "prettier": "^3.9.7",
     "sinon": "^22.1.0",
