@@ -14,7 +14,7 @@ Thanks for your interest in contributing to Simply! This document covers the rep
 
 ## Repository Structure
 
-This repository is a Lerna monorepo containing twelve framework-independent libraries — no Salesforce
+This repository is a Lerna monorepo containing sixteen framework-independent libraries — no Salesforce
 CLI plugins live here anymore (see [`simply-plugins`](https://github.com/SimplySF/simply-plugins) for
 those, and [docs/design/0026](docs/design/0026-split-simply-node-simply-plugins-repos.md) for why).
 Every package has its own `CONTRIBUTING.md` covering what's specific to it — read this file first,
@@ -37,6 +37,7 @@ then that one.
 | [`@simplysf/simply-cicd-core`](packages/simply-cicd-core)                   | CI/CD pipeline stages (build, deploy, notify, sfdx-dependabot), ALM issue linking and VCS API clients — like `simply-aep-core`, meant for direct use outside this monorepo too                                                                                         |
 | [`@simplysf/simply-settings-core`](packages/simply-settings-core)           | State and Country/Territory picklist automation: create states through Setup and activate them via AddressSettings — like `simply-aep-core`, meant for direct use outside this monorepo too                                                                            |
 | [`@simplysf/simply-flow-core`](packages/simply-flow-core)                   | Flow deactivation/deletion and obsolete Flow version pruning — like `simply-aep-core`, meant for direct use outside this monorepo too                                                                                                                                  |
+| [`@simplysf/simply-project-core`](packages/simply-project-core)             | Release-branch roll-forward: merges each release branch into the next with a real merge commit, keeping the target's `sfdx-project.json` package identity — like `simply-aep-core`, meant for direct use outside this monorepo too                                     |
 
 Every package here is consumed by one or more plugins over in `simply-plugins`, as an ordinary
 published npm dependency — there is no workspace-protocol link between the two repos. A change to a
