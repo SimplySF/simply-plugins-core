@@ -23,6 +23,7 @@ import {
   getPackageVersionReport,
   installPackageDependencies,
   listInstalledPackages,
+  normalizePackageRetryAttempts,
   requestPackageVersionCreate,
   resolveUpgradedPackages,
   type PackageToInstall,
@@ -161,6 +162,95 @@ describe('installPackageDependencies', () => {
     await expect(installPackageDependencies()).rejects.toThrow('install failed');
 
     expect(logger.error).toHaveBeenCalledWith('Failed to install packaged dependencies.');
+  });
+
+  it('forwards retry parameters to core when provided as a record', async () => {
+    await installPackageDependencies({
+      retryAttempts: 3,
+      retryBackoff: 4,
+      packageRetryAttempts: { myPkg: 2, '04t123456789012': 5 },
+    });
+
+    const options = coreCallOptions();
+    expect(options.retryAttempts).toBe(3);
+    expect(options.retryBackoff).toBe(4);
+    expect(options.packageRetryAttempts).toEqual({ myPkg: 2, '04t123456789012': 5 });
+  });
+
+  it('normalizes string array packageRetryAttempts and forwards them to core', async () => {
+    await installPackageDependencies({
+      packageRetryAttempts: ['myPkg:2', '04t123456789012:5 '],
+    });
+
+    const options = coreCallOptions();
+    expect(options.packageRetryAttempts).toEqual({ myPkg: 2, '04t123456789012': 5 });
+  });
+
+  it('throws a descriptive error when packageRetryAttempts has invalid string formatting', async () => {
+    await expect(
+      installPackageDependencies({
+        packageRetryAttempts: ['invalid-format'],
+      }),
+    ).rejects.toThrow(
+      '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+    );
+
+    expect(installPackageDependenciesCoreMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('normalizePackageRetryAttempts', () => {
+  it('returns undefined when input is undefined', () => {
+    expect(normalizePackageRetryAttempts(undefined)).toBeUndefined();
+  });
+
+  it('returns validated record when input is a record', () => {
+    expect(normalizePackageRetryAttempts({ pkg: 2 })).toEqual({ pkg: 2 });
+  });
+
+  it('throws when record contains invalid retry attempts values', () => {
+    expect(() => normalizePackageRetryAttempts({ pkg: -1 })).toThrow(
+      'Package retry attempts for "pkg" must be a non-negative integer, received: -1',
+    );
+    expect(() => normalizePackageRetryAttempts({ pkg: 1.5 })).toThrow(
+      'Package retry attempts for "pkg" must be a non-negative integer, received: 1.5',
+    );
+    expect(() => normalizePackageRetryAttempts({ pkg: NaN })).toThrow(
+      'Package retry attempts for "pkg" must be a non-negative integer, received: NaN',
+    );
+  });
+
+  it('throws when record or string array contains reserved property names', () => {
+    expect(() => normalizePackageRetryAttempts(JSON.parse('{"__proto__": 1}') as Record<string, number>)).toThrow(
+      'Invalid package retry attempts key: "__proto__" is a reserved property name.',
+    );
+    expect(() => normalizePackageRetryAttempts(['__proto__:2'])).toThrow(
+      'Invalid package retry attempts key: "__proto__" is a reserved property name.',
+    );
+  });
+
+  it('parses array of strings correctly including aliases with hyphens, @, and dots', () => {
+    expect(
+      normalizePackageRetryAttempts([
+        'pkgA:1',
+        'pkgB:3',
+        'my-package:2',
+        'my-package@1.0.0-1:4',
+        '@my-scope/utils@2.0.0:5',
+      ]),
+    ).toEqual({
+      pkgA: 1,
+      pkgB: 3,
+      'my-package': 2,
+      'my-package@1.0.0-1': 4,
+      '@my-scope/utils@2.0.0': 5,
+    });
+  });
+
+  it('throws on non-integer or bad format in strings', () => {
+    expect(() => normalizePackageRetryAttempts(['pkg:abc'])).toThrow(
+      '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+    );
   });
 });
 

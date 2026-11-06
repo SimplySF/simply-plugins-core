@@ -43,9 +43,83 @@ export type InstallPackageDependenciesConfig = {
   installType?: PackageInstallType;
   /** What happens to components an unlocked package upgrade removes. */
   upgradeType?: PackageInstallUpgradeType;
+  /**
+   * Number of additional attempts to make when a package install fails, before giving up on it.
+   * Default: `0`.
+   */
+  retryAttempts?: number;
+  /** Factor the delay between retries grows by after each failed attempt. Default: `2`. */
+  retryBackoff?: number;
+  /**
+   * Per-package overrides of `retryAttempts`, keyed by alias/04t or as an array of `<aliasOrId>:<count>` strings.
+   */
+  packageRetryAttempts?: Record<string, number> | string[];
 };
 
 export type { PackageVersionReportResult };
+
+/** Matches a single `alias:count` pair, as accepted by `--package-retry-attempts`. */
+const packageRetryAttemptsRegex = /^([^:]+):(\d+)$/;
+
+const FORBIDDEN_PROPERTY_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isValidRetryCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && Number.isSafeInteger(value);
+}
+
+/**
+ * Normalizes package retry attempts configuration from either a key-count record or
+ * an array of `alias:count` strings into a `Record<string, number>`.
+ *
+ * @throws {Error} If any string entry does not match the `<aliasOrId>:<count>` format.
+ * @throws {Error} If any key is a reserved property name or any retry count is not a non-negative integer.
+ */
+export function normalizePackageRetryAttempts(
+  packageRetryAttempts?: Record<string, number> | string[],
+): Record<string, number> | undefined {
+  if (!packageRetryAttempts) {
+    return undefined;
+  }
+
+  if (!Array.isArray(packageRetryAttempts)) {
+    const validated: Record<string, number> = {};
+    for (const [key, value] of Object.entries(packageRetryAttempts)) {
+      if (FORBIDDEN_PROPERTY_KEYS.has(key)) {
+        throw new Error(`Invalid package retry attempts key: "${key}" is a reserved property name.`);
+      }
+      if (!isValidRetryCount(value)) {
+        throw new Error(
+          `Package retry attempts for "${key}" must be a non-negative integer, received: ${String(value)}`,
+        );
+      }
+      validated[key] = value;
+    }
+    return validated;
+  }
+
+  const result: Record<string, number> = {};
+  for (let entry of packageRetryAttempts) {
+    entry = entry.trim();
+    const match = packageRetryAttemptsRegex.exec(entry);
+    if (!match) {
+      throw new Error(
+        '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+      );
+    }
+    const [, aliasOrId, retryAttemptsValue] = match;
+    if (FORBIDDEN_PROPERTY_KEYS.has(aliasOrId)) {
+      throw new Error(`Invalid package retry attempts key: "${aliasOrId}" is a reserved property name.`);
+    }
+    const parsed = parseInt(retryAttemptsValue, 10);
+    if (!isValidRetryCount(parsed)) {
+      throw new Error(
+        '--package-retry-attempts should have the key:value format of SubscriberPackageVersionId:RetryAttempts, where RetryAttempts is a non-negative integer.',
+      );
+    }
+    result[aliasOrId] = parsed;
+  }
+  return result;
+}
 
 /**
  * Adapts the library's progress callbacks onto this package's logger. Step boundaries become info
@@ -85,7 +159,16 @@ function loggerProgress(): InstallPackageDependenciesProgress {
 export async function installPackageDependencies(
   config: InstallPackageDependenciesConfig = {},
 ): Promise<PackageToInstall[]> {
-  const { alias, wait = '120', installType = 'Upgrade', upgradeType = 'Mixed' } = config;
+  const {
+    alias,
+    wait = '120',
+    installType = 'Upgrade',
+    upgradeType = 'Mixed',
+    retryAttempts,
+    retryBackoff,
+    packageRetryAttempts,
+  } = config;
+  const normalizedPackageRetryAttempts = normalizePackageRetryAttempts(packageRetryAttempts);
 
   logger.info('Installing packaged dependencies...');
   try {
@@ -100,6 +183,9 @@ export async function installPackageDependencies(
       upgradeType,
       wait: Duration.minutes(parseInt(wait, 10)),
       progress: loggerProgress(),
+      retryAttempts,
+      retryBackoff,
+      packageRetryAttempts: normalizedPackageRetryAttempts,
     });
 
     logger.success('Packaged dependencies installed successfully.');
