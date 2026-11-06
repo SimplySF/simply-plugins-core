@@ -137,6 +137,7 @@ it('exports the expected set of runtime values', () => {
     'loadProgress',
     'loadValidatedJsonFile',
     'logger',
+    'normalizePackageRetryAttempts',
     'parseBooleanString',
     'parseOriginPipelineUrl',
     'parseRepositoryHeader',

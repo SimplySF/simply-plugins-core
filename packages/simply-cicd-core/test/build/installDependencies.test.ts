@@ -48,7 +48,14 @@ describe('installDependencies', () => {
   });
 
   it('should authenticate to the scratch org and install its packaged dependencies', async () => {
-    await installDependencies({ jwtKeyFile: 'key.file', installType: 'Delta', upgradeType: 'Delete' });
+    await installDependencies({
+      jwtKeyFile: 'key.file',
+      installType: 'Delta',
+      upgradeType: 'Delete',
+      retryAttempts: 2,
+      retryBackoff: 3,
+      packageRetryAttempts: ['pkgA:2'],
+    });
 
     expect(ensureScratchOrgSession).toHaveBeenCalledWith(mockScratchOrgInfo.authFields, {
       jwtKeyFile: 'key.file',
@@ -60,7 +67,20 @@ describe('installDependencies', () => {
       wait: '240',
       installType: 'Delta',
       upgradeType: 'Delete',
+      retryAttempts: 2,
+      retryBackoff: 3,
+      packageRetryAttempts: ['pkgA:2'],
     });
     expect(logger.success).toHaveBeenCalledWith('Package dependencies installed.');
+  });
+
+  it('should allow overriding the wait timeout parameter', async () => {
+    await installDependencies({ wait: '180' });
+
+    expect(installPackageDependenciesCommon).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wait: '180',
+      }),
+    );
   });
 });
