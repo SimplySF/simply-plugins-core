@@ -42,7 +42,7 @@
     "@salesforce/kit": "^3.2.6",
     "@salesforce/source-deploy-retrieve": "^12.37.2",
     "@simplysf/simply-core": "workspace:^1.6.13",
-    "fast-xml-parser": "^5.11.1",
+    "fast-xml-parser": "^5.12.0",
     "undici": "^8.12.2"
   },
   "devDependencies": {
