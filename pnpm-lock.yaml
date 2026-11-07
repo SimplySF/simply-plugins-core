@@ -493,8 +493,8 @@ importers:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@26.6.5)
       starlight-typedoc:
-        specifier: ^0.23.1
-        version: 0.23.1(@astrojs/starlight@0.42.8(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(supports-color@8.1.1)(typescript@5.9.3))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3))
+        specifier: ^0.23.2
+        version: 0.23.2(@astrojs/starlight@0.42.8(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(supports-color@8.1.1)(typescript@5.9.3))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3))
       typedoc:
         specifier: ^0.28.20
         version: 0.28.20(typescript@5.9.3)
@@ -6597,9 +6597,8 @@ packages:
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
 
-  starlight-typedoc@0.23.1:
-    resolution: {integrity: sha512-H45Mxv4mZ1xUMhUNjTR4CwKDgKKHZboQA5v5+vTVMdjlCX02Xo7veTB7+F/ivmMHPmQ7SV5auF2BTlU/EpQIoQ==}
-    engines: {node: '>=22.12.0'}
+  starlight-typedoc@0.23.2:
+    resolution: {integrity: sha512-aErehRvL12eAhRAL8n68A6HgEOTd1+loT+tRfeq5UxECzMsThvqdFZaKyCam8b01uhMUDcOcEnqJGh5VnPzxyA==}
     peerDependencies:
       '@astrojs/starlight': '>=0.39.0'
       astro: '>=6.0.0'
@@ -9868,7 +9867,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.72.1
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.6
-      semver: 7.8.5
+      semver: 7.8.6
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
@@ -14580,7 +14579,7 @@ snapshots:
 
   stackback@0.0.2: {}
 
-  starlight-typedoc@0.23.1(@astrojs/starlight@0.42.8(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(supports-color@8.1.1)(typescript@5.9.3))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3)):
+  starlight-typedoc@0.23.2(@astrojs/starlight@0.42.8(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(supports-color@8.1.1)(typescript@5.9.3))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@5.9.3)))(typedoc@0.28.20(typescript@5.9.3)):
     dependencies:
       '@astrojs/starlight': 0.42.8(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(astro@7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1))(supports-color@8.1.1)(typescript@5.9.3)
       astro: 7.3.5(@astrojs/markdown-remark@7.3.5(supports-color@8.1.1))(@types/node@26.6.5)(jiti@2.6.1)(yaml@2.9.1)
