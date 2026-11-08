@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.15](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.14...%40simplysf%2Fsimply-core%401.6.15) (2026-11-08)
+
+### Bug Fixes
+
+- **deps:** bump @jsforce/jsforce-node from 3.10.26 to 3.13.1 ([#281](https://github.com/SimplySF/simply-plugins-core/issues/281)) ([0f4442f](https://github.com/SimplySF/simply-plugins-core/commit/0f4442fc8247fd994d2f01453d0aaab9e4a91cf4))
+
 ## [1.6.14](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.13...%40simplysf%2Fsimply-core%401.6.14) (2026-11-08)
 
 ### Bug Fixes
