@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.14](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-data-core%400.3.13...%40simplysf%2Fsimply-data-core%400.3.14) (2026-11-08)
+
+**Note:** Version bump only for package @simplysf/simply-data-core
+
 ## [0.3.13](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-data-core%400.3.12...%40simplysf%2Fsimply-data-core%400.3.13) (2026-11-02)
 
 **Note:** Version bump only for package @simplysf/simply-data-core
