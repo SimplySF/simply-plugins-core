@@ -2,7 +2,7 @@ packages:
   - 'packages/*'
   - 'site'
 overrides:
-  '@jsforce/jsforce-node': ^3.10.26
+  '@jsforce/jsforce-node': ^3.13.1
 onlyBuiltDependencies:
   - nx
 minimumReleaseAgeExclude:

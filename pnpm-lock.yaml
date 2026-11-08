@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@jsforce/jsforce-node': ^3.10.26
+  '@jsforce/jsforce-node': ^3.13.1
 
 importers:
   .:
@@ -234,8 +234,8 @@ importers:
   packages/simply-core:
     dependencies:
       '@jsforce/jsforce-node':
-        specifier: ^3.10.26
-        version: 3.10.26
+        specifier: ^3.13.1
+        version: 3.13.1
       '@salesforce/core':
         specifier: ^8.30.0
         version: 8.32.6
@@ -1945,9 +1945,9 @@ packages:
     resolution:
       { integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ== }
 
-  '@jsforce/jsforce-node@3.10.26':
+  '@jsforce/jsforce-node@3.13.1':
     resolution:
-      { integrity: sha512-pfVkWJBEPiea7p+hi5IxBpvNg91agGfdRKtlYpx425J54DjFzj/5q2fdpgWdyttAckRxQmLfDtiTuM7L3SfYkA== }
+      { integrity: sha512-vpHhwc+Wcufk9vARzL4oxYSzg8ndNButSn88D6pMImjns7/NTkwPZ9qQwD2F/P4c+A0lwTyDl4Alry0BMgFsTg== }
     engines: { node: '>=22' }
 
   '@jsonjoy.com/base64@1.1.2':
@@ -4318,6 +4318,10 @@ packages:
     resolution:
       { integrity: sha512-uKZghv9UmPkMVLYy//KZ9HFAIJsl7wkhoEdIL0+rhuSY9pZQlhaeGEDPIe+/w7eh81MOql8Q/9+inAGWG6ZHYA== }
 
+  csv-parse@7.0.3:
+    resolution:
+      { integrity: sha512-YFd3QM/yo17vH91L1IOZuvl09zM0zEEtdfTcOCKWcMdM++MNaQSyp09slXyFCLaPXvHstQFx/xC8myiFHSMUvw== }
+
   csv-stringify@6.9.0:
     resolution:
       { integrity: sha512-6b3e29CILFfSQ2nDRuZMRROzQOpPuJ+s8zPB5H7eK5ncXBbFOyVuRLU5Sx/zAUmVri3Ly49GyC8NEme4SVSAbA== }
@@ -5003,6 +5007,11 @@ packages:
     resolution:
       { integrity: sha512-Cg/khikhqlvumHO3efwx2tps2ZgQRjUMrO24G0quz7MMzRYYaEjU224YFXOeuPIvanRegIchVxj6pmHK1W0ikA== }
     engines: { node: '>=0.8.0' }
+
+  faye@1.4.3:
+    resolution:
+      { integrity: sha512-MVbPkUDW31a8tWgdGppHrkuV8+/9eq5u5T5AnrS95HU52YJyy9sx1DYGY7xRL0u/suckuctgxRMunTXIDdxRTg== }
+    engines: { node: '>=14' }
 
   fd-package-json@2.0.0:
     resolution:
@@ -8424,11 +8433,6 @@ packages:
       { integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ== }
     engines: { node: '>=22.19.0' }
 
-  undici@8.11.2:
-    resolution:
-      { integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ== }
-    engines: { node: '>=22.19.0' }
-
   undici@8.12.2:
     resolution:
       { integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg== }
@@ -10287,16 +10291,17 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@jsforce/jsforce-node@3.10.26':
+  '@jsforce/jsforce-node@3.13.1':
     dependencies:
       '@sindresorhus/is': 4.6.0
       base64url: 3.0.1
-      csv-parse: 7.0.2
+      cross-spawn: 7.0.6
+      csv-parse: 7.0.3
       csv-stringify: 6.9.0
-      faye: 1.4.1
+      faye: 1.4.3
       form-data: 4.0.6
       multistream: 3.1.0
-      undici: 8.12.2
+      undici: 8.12.3
       xml2js: 0.6.2
 
   '@jsonjoy.com/base64@1.1.2(tslib@2.8.1)':
@@ -10881,7 +10886,7 @@ snapshots:
 
   '@salesforce/core@8.32.6':
     dependencies:
-      '@jsforce/jsforce-node': 3.10.26
+      '@jsforce/jsforce-node': 3.13.1
       '@salesforce/kit': 3.2.6
       '@salesforce/ts-types': 2.0.12
       ajv: 8.20.0
@@ -10907,7 +10912,7 @@ snapshots:
 
   '@salesforce/packaging@4.27.8(supports-color@8.1.1)':
     dependencies:
-      '@jsforce/jsforce-node': 3.10.26
+      '@jsforce/jsforce-node': 3.13.1
       '@salesforce/core': 8.32.6
       '@salesforce/kit': 3.2.6
       '@salesforce/schemas': 1.10.3
@@ -12376,6 +12381,8 @@ snapshots:
 
   csv-parse@7.0.2: {}
 
+  csv-parse@7.0.3: {}
+
   csv-stringify@6.9.0: {}
 
   data-uri-to-buffer@6.0.2: {}
@@ -13016,6 +13023,13 @@ snapshots:
       csprng: 0.1.2
       faye-websocket: 0.11.4
       safe-buffer: 5.2.1
+      tough-cookie: 6.0.2
+      tunnel-agent: 0.6.0
+
+  faye@1.4.3:
+    dependencies:
+      csprng: 0.1.2
+      faye-websocket: 0.11.4
       tough-cookie: 6.0.2
       tunnel-agent: 0.6.0
 
@@ -16437,8 +16451,6 @@ snapshots:
 
   undici@8.10.0: {}
 
-  undici@8.11.2: {}
-
   undici@8.12.2: {}
 
   undici@8.12.3: {}
@@ -16459,7 +16471,7 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
       ohash: 2.0.12
-      undici: 8.11.2
+      undici: 8.12.3
 
   unist-util-is@6.0.1:
     dependencies:
