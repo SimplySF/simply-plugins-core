@@ -53,6 +53,28 @@ const gitlab = createVcsProvider('gitlab', { token: process.env.GITLAB_TOKEN });
 const mr = await gitlab.findMergeRequest({ sourceBranch: 'feature/x' });
 ```
 
+`VcsProviderKind` and `AlmProviderKind` are defined in `@simplysf/simply-core` (so `.sfdevrc.json`
+can be validated without this package) and re-exported here unchanged.
+
+### `.sfdevrc.json`
+
+| Export                                    | Description                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `loadCicdSfDevRc(cwd?, env?)`             | Loads and validates `.sfdevrc.json` with the base fields plus `deploymentPlugins` and `packageOriginOverrides`, overlaying the `SIMPLY_*` env vars. Throws if malformed. |
+| `cicdSfDevRcSchema`                       | That schema, for consumers that want to extend it further.                                                                                                               |
+| `getPackageOriginOverride(name, config?)` | The `packageOriginOverrides` entry for a package, if any.                                                                                                                |
+| `getAlmProjectKeys(passedKey?)`           | **Deprecated.** Use `resolveAlmProjectKeys(loadCicdSfDevRc().config, passedKey)` from `@simplysf/simply-core`. The passed key now wins over the file.                    |
+| `CicdSfDevRc`, `PackageOriginOverride`    | Types.                                                                                                                                                                   |
+
+```ts
+import { createVcsProvider, loadCicdSfDevRc } from '@simplysf/simply-cicd-core';
+import { resolveVcsSettings } from '@simplysf/simply-core';
+
+const { config } = loadCicdSfDevRc();
+const { kind, host } = resolveVcsSettings(config, { provider: flags['vcs-provider'], host: flags['vcs-host'] });
+const vcs = createVcsProvider(kind, { host, token: process.env.VCS_TOKEN! });
+```
+
 ### Pipeline stages
 
 The modules `@simplysf/simply-cicd`'s commands run, also exported from the package root. Each stage function takes a plain options object (the camelCase equivalent of the command's flags) and throws on failure. Full signatures are in the [API reference](https://simplysf.github.io/simply-plugins-core/api/simply-cicd-core/readme/).

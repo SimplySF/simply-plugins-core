@@ -47,6 +47,29 @@ export {
   type ConfigSchema,
   type JsonConfigResult,
 } from './config/loadJsonConfig.js';
+export {
+  ALM_PROVIDER_KINDS,
+  VCS_PROVIDER_KINDS,
+  type AlmProviderKind,
+  type VcsProviderKind,
+} from './config/providerKinds.js';
+export {
+  findSfDevRcPath,
+  LEGACY_SFDEVRC_FILENAME,
+  loadSfDevRc,
+  resolveAlmProjectKeys,
+  resolveAlmProviderKind,
+  resolveVcsProviderKind,
+  resolveVcsSettings,
+  SFDEVRC_ENV_VARS,
+  SFDEVRC_FILENAME,
+  SfDevRcError,
+  sfDevRcSchema,
+  type LoadSfDevRcOptions,
+  type LoadSfDevRcResult,
+  type ResolvedVcsSettings,
+  type SfDevRc,
+} from './config/sfDevRc.js';
 export { ensureDirectory, timestampForFileName } from './fs/paths.js';
 export { chunkedInQuery, type ChunkedInQueryOptions } from './query/chunkedInQuery.js';
 export { escapeSoqlLiteral } from './query/escapeSoqlLiteral.js';

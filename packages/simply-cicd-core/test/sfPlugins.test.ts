@@ -167,11 +167,27 @@ describe('sfPlugins', () => {
       expect(execa).toHaveBeenCalledWith('sf', ['plugins', 'install', '@simplysf/simply'], expect.any(Object));
     });
 
-    it('should install only default plugins if deploymentPlugins is not an array', async () => {
+    it('should fail, naming the field, if deploymentPlugins is not an array', async () => {
       fs.writeFileSync(path.join(tempProjectDir, '.sfdevrc'), JSON.stringify({ deploymentPlugins: 'not-an-array' }));
       vi.mocked(execa).mockResolvedValue({ stdout: '' } as never);
+      await expect(installDeploymentPlugins()).rejects.toThrow(/- deploymentPlugins: /);
+      expect(execa).not.toHaveBeenCalled();
+    });
+
+    it('should install project plugins listed in .sfdevrc.json', async () => {
+      fs.writeFileSync(path.join(tempProjectDir, '.sfdevrc.json'), JSON.stringify({ deploymentPlugins: ['plugin1'] }));
+      vi.mocked(execa).mockResolvedValue({ stdout: '@simplysf/simply' } as never);
       await installDeploymentPlugins();
-      expect(execa).toHaveBeenCalledWith('sf', ['plugins', 'install', '@simplysf/simply'], expect.any(Object));
+      expect(execa).toHaveBeenCalledWith('sf', ['plugins', 'install', 'plugin1'], expect.any(Object));
+    });
+
+    it('should prefer .sfdevrc.json over the legacy .sfdevrc', async () => {
+      fs.writeFileSync(path.join(tempProjectDir, '.sfdevrc.json'), JSON.stringify({ deploymentPlugins: ['current'] }));
+      fs.writeFileSync(path.join(tempProjectDir, '.sfdevrc'), JSON.stringify({ deploymentPlugins: ['legacy'] }));
+      vi.mocked(execa).mockResolvedValue({ stdout: '@simplysf/simply' } as never);
+      await installDeploymentPlugins();
+      expect(execa).toHaveBeenCalledWith('sf', ['plugins', 'install', 'current'], expect.any(Object));
+      expect(execa).not.toHaveBeenCalledWith('sf', ['plugins', 'install', 'legacy'], expect.any(Object));
     });
 
     it('should install both default and project plugins that are not already installed', async () => {

@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
-/** The set of source-control-hosting platforms `simply-cicd` knows how to talk to. */
-export type VcsProviderKind = 'gitlab' | 'github';
+import type { VcsProviderKind } from '@simplysf/simply-core';
+
+/**
+ * The set of source-control-hosting platforms `simply-cicd` knows how to talk to. Defined in
+ * `@simplysf/simply-core` (so `.sfdevrc.json` can be validated without this package) and
+ * re-exported here unchanged.
+ */
+export type { VcsProviderKind };
 
 /** A repository/project, normalized across VCS platforms. */
 export type VcsProject = {

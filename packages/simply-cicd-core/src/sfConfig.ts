@@ -14,100 +14,83 @@
  * limitations under the License.
  */
 
-import fs from 'node:fs';
-import type { VcsProviderKind } from './vcs/index.js';
+import {
+  loadSfDevRc,
+  resolveAlmProjectKeys,
+  sfDevRcSchema,
+  VCS_PROVIDER_KINDS,
+  type LoadSfDevRcResult,
+} from '@simplysf/simply-core';
+import { z } from 'zod';
 import { logger } from './logger.js';
 
-/** Where a packaged dependency's source lives, for happy-soup story lookups. */
-export type PackageOriginOverride = {
-  vcsProvider: VcsProviderKind;
-  host?: string;
-  projectPath: string;
-};
+const packageOriginOverrideSchema = z.object({
+  vcsProvider: z.enum(VCS_PROVIDER_KINDS),
+  host: z.string().min(1).optional(),
+  projectPath: z.string().min(1),
+});
 
-type SfDevRcConfig = {
-  almProjectKey?: string;
-  almProjectKeys?: string[];
-  /** @deprecated Renamed to `almProjectKey`. Still read, but warns. */
-  jiraProjectKey?: string;
-  /** @deprecated Renamed to `almProjectKeys`. Still read, but warns. */
-  jiraProjectKeys?: string[];
+/** Where a packaged dependency's source lives, for happy-soup story lookups. */
+export type PackageOriginOverride = z.infer<typeof packageOriginOverrideSchema>;
+
+/**
+ * The `.sfdevrc.json` schema as `simply-cicd` reads it: the shared base fields from
+ * `@simplysf/simply-core` plus the sections this package owns. Other consumers' sections (e.g.
+ * `simply-project`'s `setup`) pass through unvalidated.
+ */
+export const cicdSfDevRcSchema = sfDevRcSchema.extend({
+  /** Extra Salesforce CLI plugins to install before a deployment, on top of the defaults. */
+  deploymentPlugins: z.array(z.string().min(1)).optional(),
   /**
    * Maps a package name to the VCS project its source lives in, for happy-soup dependency story
    * lookups. Only needed for packages whose `sf package version report` `Description` doesn't hold
    * a recognizable CI pipeline URL (e.g. externally-vendored packages not built by this pipeline).
    */
-  packageOriginOverrides?: Record<string, PackageOriginOverride>;
-};
+  packageOriginOverrides: z.record(z.string(), packageOriginOverrideSchema).optional(),
+});
 
-/** Reads and parses `.sfdevrc.json`, or returns `undefined` if it's missing or invalid. */
-function readSfDevRcConfig(): SfDevRcConfig | undefined {
-  try {
-    if (!fs.existsSync('.sfdevrc.json')) {
-      return undefined;
-    }
-    return JSON.parse(fs.readFileSync('.sfdevrc.json', 'utf8')) as SfDevRcConfig;
-  } catch {
-    return undefined;
-  }
-}
+/** The parsed `.sfdevrc.json`, including the sections `simply-cicd` owns. */
+export type CicdSfDevRc = z.infer<typeof cicdSfDevRcSchema>;
 
-/** Collects a single-key and multi-key field into one deduplicated, non-empty list. */
-function collectKeys(single: string | undefined, multiple: string[] | undefined): string[] {
-  const keys: string[] = [];
-  if (single) {
-    keys.push(single);
-  }
-  if (Array.isArray(multiple)) {
-    keys.push(...multiple);
-  }
-  return [...new Set(keys.filter(Boolean))];
+/**
+ * Loads `.sfdevrc.json` (or the legacy `.sfdevrc`) from `cwd`, overlays the plugin-neutral
+ * `SIMPLY_*` environment variables (`SFDEVRC_ENV_VARS` in `@simplysf/simply-core`), and validates
+ * the result against {@link cicdSfDevRcSchema}. Warnings go through this package's logger.
+ * Returns an empty config when nothing is set; throws `SfDevRcError` when the file or a variable is
+ * malformed.
+ */
+export function loadCicdSfDevRc(
+  cwd: string = process.cwd(),
+  env: Record<string, string | undefined> = process.env,
+): LoadSfDevRcResult<CicdSfDevRc> {
+  return loadSfDevRc({
+    cwd,
+    schema: cicdSfDevRcSchema,
+    warn: (message) => logger.warn(message),
+    env,
+  });
 }
 
 /**
- * Retrieves ALM project keys from the `.sfdevrc.json` configuration file, or falls back to a
- * provided default. Reads a single or multiple project keys from the configuration, deduplicates
- * them, and filters out empty values.
+ * Retrieves ALM project keys. Precedence: `passedProjectKey` (the `--alm-project-key` flag) >
+ * `.sfdevrc.json`'s `alm.projectKeys` > none. Legacy `almProjectKey(s)` / `jiraProjectKey(s)`
+ * fields are still read, with a deprecation warning.
  *
- * The legacy `jiraProjectKey`/`jiraProjectKeys` fields are still honored, so existing repositories
- * keep working, but `almProjectKey`/`almProjectKeys` win outright when present — the two sets are
- * not merged, so a repository migrating one key at a time gets the new value rather than a blend.
+ * @deprecated Load once with {@link loadCicdSfDevRc} and call `resolveAlmProjectKeys` from
+ * `@simplysf/simply-core`. Kept for one minor version.
  */
 export function getAlmProjectKeys(passedProjectKey?: string): string[] {
-  let projectKeys: string[] = [];
-  try {
-    if (fs.existsSync('.sfdevrc.json')) {
-      const content = fs.readFileSync('.sfdevrc.json', 'utf8');
-      const config = JSON.parse(content) as SfDevRcConfig;
-
-      projectKeys = collectKeys(config.almProjectKey, config.almProjectKeys);
-
-      if (projectKeys.length === 0) {
-        const legacyKeys = collectKeys(config.jiraProjectKey, config.jiraProjectKeys);
-        if (legacyKeys.length > 0) {
-          logger.warn(
-            'The .sfdevrc.json fields "jiraProjectKey" and "jiraProjectKeys" are deprecated. Rename them to "almProjectKey" and "almProjectKeys"; the old names will be removed in a future release.',
-          );
-          projectKeys = legacyKeys;
-        }
-      }
-    }
-  } catch {
-    // Ignore and fall back to the passed command-line project key.
-  }
-
-  if (projectKeys.length > 0) {
-    return projectKeys;
-  }
-
-  return passedProjectKey ? [passedProjectKey] : [];
+  return resolveAlmProjectKeys(loadCicdSfDevRc().config, passedProjectKey);
 }
 
 /**
  * Looks up an explicit VCS project override for a package name from `.sfdevrc.json`'s
  * `packageOriginOverrides`. Returns `undefined` if the file, the field, or an entry for this
- * package doesn't exist.
+ * package doesn't exist. Pass an already-loaded `config` to avoid re-reading the file per package.
  */
-export function getPackageOriginOverride(packageName: string): PackageOriginOverride | undefined {
-  return readSfDevRcConfig()?.packageOriginOverrides?.[packageName];
+export function getPackageOriginOverride(
+  packageName: string,
+  config: CicdSfDevRc = loadCicdSfDevRc().config,
+): PackageOriginOverride | undefined {
+  return config.packageOriginOverrides?.[packageName];
 }

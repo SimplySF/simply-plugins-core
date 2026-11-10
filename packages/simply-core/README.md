@@ -123,6 +123,55 @@ const result = await streamBulkQueryToFile(connection, 'SELECT Id, Name FROM Acc
 | `parseJsonConfig(contents, schema)`                   | The same, from an already-read string.                      |
 | `ConfigSchema`, `JsonConfigResult`                    | Schema and result types.                                    |
 
+### `.sfdevrc.json`
+
+The project-local config file shared by the SimplySF plugins. This package owns the platform-agnostic
+base fields; each consumer adds and validates its own sections. See
+[design doc 0059](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0059-sfdevrc-shared-config.md).
+
+```json
+{
+  "vcs": { "provider": "gitlab", "host": "gitlab.example.com", "projectId": "12345" },
+  "alm": { "provider": "jira", "projectKeys": ["ABC"], "baseUrl": "https://example.atlassian.net/browse" },
+  "branchRegex": "^(feature|bugfix)/ABC-\\d+"
+}
+```
+
+| Export                                                                      | Description                                                                                                                                        |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loadSfDevRc({ cwd, schema, warn, env })`                                   | Reads `.sfdevrc.json` (or legacy `.sfdevrc`), rewrites legacy fields, overlays `SIMPLY_*` env vars, validates. Throws `SfDevRcError` if malformed. |
+| `sfDevRcSchema`                                                             | The base zod schema. Unknown sections pass through; extend it with `sfDevRcSchema.extend({ ... })` for your own sections.                          |
+| `resolveVcsProviderKind(config, explicit?, fallback?)`                      | Flag > `vcs.provider` (env or file) > fallback (`'gitlab'`).                                                                                       |
+| `resolveAlmProviderKind(config, explicit?, fallback?)`                      | Flag > `alm.provider` (env or file) > fallback (`'jira'`).                                                                                         |
+| `resolveVcsSettings(config, explicit?, fallback?)`                          | Provider plus `host`/`projectId`; config values apply only when the config describes the resolved provider.                                        |
+| `resolveAlmProjectKeys(config, explicit?)`                                  | Flag keys > `alm.projectKeys` (env or file) > `[]`, deduplicated.                                                                                  |
+| `SFDEVRC_ENV_VARS`                                                          | The environment variable name for each base field (below).                                                                                         |
+| `findSfDevRcPath(cwd?)`                                                     | The file that `loadSfDevRc` would read, if any.                                                                                                    |
+| `VCS_PROVIDER_KINDS`, `ALM_PROVIDER_KINDS`                                  | The known provider names. `VcsProviderKind`/`AlmProviderKind` are derived from them.                                                               |
+| `SFDEVRC_FILENAME`, `LEGACY_SFDEVRC_FILENAME`, `SfDevRcError`               | File names and the error thrown for a malformed file.                                                                                              |
+| `SfDevRc`, `LoadSfDevRcOptions`, `LoadSfDevRcResult`, `ResolvedVcsSettings` | Types.                                                                                                                                             |
+
+Legacy fields are still read, with a deprecation warning: `gitlabProjectId` → `vcs`,
+`jiraProjectKey(s)` → `alm` (provider `jira`), `almProjectKey(s)` → `alm.projectKeys`. A new-style
+section always wins over its legacy fields.
+
+Each base field can also be set from the environment. Precedence is flag > environment > file >
+fallback. Blank values count as unset.
+
+| Variable                  | Field             |
+| ------------------------- | ----------------- |
+| `SIMPLY_VCS_PROVIDER`     | `vcs.provider`    |
+| `SIMPLY_VCS_HOST`         | `vcs.host`        |
+| `SIMPLY_VCS_PROJECT_ID`   | `vcs.projectId`   |
+| `SIMPLY_ALM_PROVIDER`     | `alm.provider`    |
+| `SIMPLY_ALM_PROJECT_KEYS` | `alm.projectKeys` |
+| `SIMPLY_ALM_BASE_URL`     | `alm.baseUrl`     |
+| `SIMPLY_BRANCH_REGEX`     | `branchRegex`     |
+
+`SIMPLY_ALM_PROJECT_KEYS` is comma-separated. If `SIMPLY_VCS_PROVIDER` or `SIMPLY_ALM_PROVIDER`
+names a different provider than the file, the file's whole section is ignored. A bad value throws
+`SfDevRcError` naming the variable. Pass `env: {}` to read the file alone.
+
 ### Collections and paths
 
 | Export                                       | Description                                                                                                                                                                                                              |
