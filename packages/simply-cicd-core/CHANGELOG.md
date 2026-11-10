@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.14.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.13.2...%40simplysf%2Fsimply-cicd-core%400.14.0) (2026-11-10)
+
+### Features
+
+- **simply-core:** shared, platform-agnostic .sfdevrc.json config ([#285](https://github.com/SimplySF/simply-plugins-core/issues/285)) ([bd85709](https://github.com/SimplySF/simply-plugins-core/commit/bd85709188d21bcdcf9d684a92ab04119855f378))
+
 ## [0.13.2](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.13.1...%40simplysf%2Fsimply-cicd-core%400.13.2) (2026-11-08)
 
 **Note:** Version bump only for package @simplysf/simply-cicd-core

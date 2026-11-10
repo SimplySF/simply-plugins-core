@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.15...%40simplysf%2Fsimply-core%401.7.0) (2026-11-10)
+
+### Features
+
+- **simply-core:** shared, platform-agnostic .sfdevrc.json config ([#285](https://github.com/SimplySF/simply-plugins-core/issues/285)) ([bd85709](https://github.com/SimplySF/simply-plugins-core/commit/bd85709188d21bcdcf9d684a92ab04119855f378))
+
 ## [1.6.15](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.14...%40simplysf%2Fsimply-core%401.6.15) (2026-11-08)
 
 ### Bug Fixes
