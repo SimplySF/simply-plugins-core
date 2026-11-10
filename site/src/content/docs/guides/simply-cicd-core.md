@@ -31,6 +31,24 @@ const gitlab = createVcsProvider('gitlab', { token: process.env.GITLAB_TOKEN });
 const mr = await gitlab.findMergeRequest({ sourceBranch: 'feature/x' });
 ```
 
+## Picking the VCS and ALM provider from `.sfdevrc.json`
+
+`loadCicdSfDevRc` reads the shared base fields plus the sections this package owns
+(`deploymentPlugins`, `packageOriginOverrides`). The resolvers from `@simplysf/simply-core` apply
+the precedence flag > `SIMPLY_*` environment variable > file > default. The old `SIMPLY_CICD_VCS_*` /
+`SIMPLY_CICD_ALM_*` names are not read; see the `simply-core` guide for the variable list.
+
+```ts
+import { createAlmProvider, createVcsProvider, loadCicdSfDevRc } from '@simplysf/simply-cicd-core';
+import { resolveAlmProjectKeys, resolveAlmProviderKind, resolveVcsSettings } from '@simplysf/simply-core';
+
+const { config } = loadCicdSfDevRc();
+const { kind, host } = resolveVcsSettings(config, { provider: flags['vcs-provider'] });
+const vcs = createVcsProvider(kind, { host, token: process.env.VCS_TOKEN! });
+const alm = createAlmProvider(resolveAlmProviderKind(config, flags['alm-provider']));
+const projectKeys = resolveAlmProjectKeys(config, flags['alm-project-key']);
+```
+
 ## Running a pipeline stage without the CLI
 
 Every `sf simply cicd` stage is a function here that takes the camelCase equivalent of the command's

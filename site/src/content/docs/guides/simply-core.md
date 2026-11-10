@@ -104,6 +104,36 @@ const project = await readSfdxProject(projectDir);
 const defaultDir = getDefaultPackageDirectory(project);
 ```
 
+## Reading `.sfdevrc.json`
+
+`loadSfDevRc` validates the shared, platform-agnostic fields (`vcs`, `alm`, `branchRegex`). Extend
+the base schema to validate your own section; other consumers' sections pass through untouched.
+
+```ts
+import { loadSfDevRc, resolveAlmProviderKind, resolveVcsProviderKind, sfDevRcSchema } from '@simplysf/simply-core';
+import { z } from 'zod';
+
+const schema = sfDevRcSchema.extend({
+  setup: z.object({ include: z.array(z.string()).optional(), exclude: z.array(z.string()).optional() }).optional(),
+});
+
+const { config } = loadSfDevRc({ schema });
+const vcsKind = resolveVcsProviderKind(config, flags['vcs-provider']); // flag > env > file > 'gitlab'
+const almKind = resolveAlmProviderKind(config, flags['alm-provider']); // flag > env > file > 'jira'
+```
+
+`loadSfDevRc` also overlays plugin-neutral environment variables onto the file, so a pipeline can
+change a setting per job without editing the committed file. Don't give the matching command flags an
+oclif `env:` of their own; the resolvers already apply the variables, below the flag.
+
+```sh
+SIMPLY_ALM_PROVIDER=jira SIMPLY_ALM_PROJECT_KEYS=ABC,DEF sf simply cicd notify project
+```
+
+The full list is `SFDEVRC_ENV_VARS`: `SIMPLY_VCS_PROVIDER`, `SIMPLY_VCS_HOST`,
+`SIMPLY_VCS_PROJECT_ID`, `SIMPLY_ALM_PROVIDER`, `SIMPLY_ALM_PROJECT_KEYS` (comma-separated),
+`SIMPLY_ALM_BASE_URL`, and `SIMPLY_BRANCH_REGEX`. Blank values count as unset.
+
 ## Retrying a flaky call
 
 ```ts

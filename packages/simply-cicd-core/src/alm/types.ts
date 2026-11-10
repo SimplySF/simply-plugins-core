@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
-/** The set of application-lifecycle-management tools `simply-cicd` knows how to reference. */
-export type AlmProviderKind = 'jira' | 'gitlab-issues';
+import type { AlmProviderKind } from '@simplysf/simply-core';
+
+/**
+ * The set of application-lifecycle-management tools `simply-cicd` knows how to reference. Defined
+ * in `@simplysf/simply-core` (so `.sfdevrc.json` can be validated without this package) and
+ * re-exported here unchanged.
+ */
+export type { AlmProviderKind };
 
 /** A single issue reference found in a commit log, normalized across ALM tools. */
 export type AlmIssueRef = {

@@ -22,6 +22,7 @@ import { DEFAULT_DEPLOYMENT_PLUGINS } from './config/defaultDeploymentPlugins.js
 import { TRUSTED_PLUGINS } from './config/trustedPlugins.js';
 import { runSf } from './exec/sfCli.js';
 import { logger } from './logger.js';
+import { loadCicdSfDevRc } from './sfConfig.js';
 
 /** Installs a Salesforce CLI plugin. */
 export async function installPlugin(plugin: string, debug = false, cwd: string = process.cwd()): Promise<void> {
@@ -37,24 +38,18 @@ export async function installPlugin(plugin: string, debug = false, cwd: string =
   }
 }
 
-type SfDevRc = {
-  deploymentPlugins?: unknown;
-};
-
-/** Installs all plugins listed in the `deploymentPlugins` array of the `.sfdevrc` file, plus this package's defaults. */
+/**
+ * Installs all plugins listed in `.sfdevrc.json`'s `deploymentPlugins` array (the legacy `.sfdevrc`
+ * is read if `.sfdevrc.json` is absent), plus this package's defaults.
+ */
 export async function installDeploymentPlugins(debug = false, cwd: string = process.cwd()): Promise<void> {
-  const sfdevrcPath = path.join(cwd, '.sfdevrc');
-  let projectPlugins: string[] = [];
+  const { config, path: sfdevrcPath } = loadCicdSfDevRc(cwd);
+  const projectPlugins = config.deploymentPlugins ?? [];
 
-  if (fs.existsSync(sfdevrcPath)) {
-    const sfdevrc = JSON.parse(fs.readFileSync(sfdevrcPath, 'utf8')) as SfDevRc;
-    if (Array.isArray(sfdevrc.deploymentPlugins)) {
-      projectPlugins = sfdevrc.deploymentPlugins as string[];
-    } else if (debug) {
-      logger.debug('No deploymentPlugins array found in .sfdevrc. Skipping project-specific plugins.');
-    }
-  } else if (debug) {
-    logger.debug('No .sfdevrc file found. Skipping project-specific plugins.');
+  if (debug && sfdevrcPath === undefined) {
+    logger.debug('No .sfdevrc.json file found. Skipping project-specific plugins.');
+  } else if (debug && sfdevrcPath !== undefined && projectPlugins.length === 0) {
+    logger.debug(`No deploymentPlugins found in ${sfdevrcPath}. Skipping project-specific plugins.`);
   }
 
   const allPlugins = [...new Set<string>([...DEFAULT_DEPLOYMENT_PLUGINS, ...projectPlugins])];

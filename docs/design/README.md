@@ -98,6 +98,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0056](0056-document-erd.md)                                         | `simply document erd`: Mermaid ERDs of a project's data model                         | Accepted — core implemented (simply-document-core 0.3.0); CLI pending |
 | [0057](0057-project-release-roll-forward.md)                         | `simply project release roll-forward` and `simply-project-core`                       | In progress                                                           |
 | [0058](0058-cicd-install-dependencies-retry.md)                      | `simply-cicd-core`: `installDependencies` retry support                               | Planned                                                               |
+| [0059](0059-sfdevrc-shared-config.md)                                | Shared, platform-agnostic `.sfdevrc.json` in `simply-core`                            | Accepted                                                              |
 
 ## Template
 
