@@ -77,6 +77,32 @@ await createRelease({ type: 'minor', confirm: async () => true });
 A version that already has a branch is refused, under either label shape (`release/1.3` or
 `release/v1.3.0`). A `patch` on an older line is allowed while newer releases exist, for hotfixes.
 
+### Stepping by more than one
+
+By default the chosen part of the version moves by one. A project that numbers releases in larger
+steps sets `plugins.simply.release.increments` in `sfdx-project.json`:
+
+```json
+{
+  "plugins": {
+    "simply": {
+      "release": { "increments": { "minor": 10 } }
+    }
+  }
+}
+```
+
+Now a `minor` release of `release/v1.20.0` is `release/v1.30.0`, and `patch` and `major` still move
+by one. The setting is read from the remote's copy of the source branch, like `versionNumber`, so
+the new branch inherits it. Pass `increment` to override it for one call:
+
+```ts
+await createRelease({ type: 'major', increment: 2 }); // v1.4.2 -> v3.0.0
+```
+
+Each increment must be a whole number of at least 1. An invalid value in the file fails before
+anything changes, naming the field and the branch it came from.
+
 ### Publishing the release and setting the default branch
 
 With `createRelease: true`, it first publishes a GitLab or GitHub release for the version being

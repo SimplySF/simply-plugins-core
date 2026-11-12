@@ -86,6 +86,7 @@ await createRelease({
 | Option                       | Default                            | Meaning                                                                 |
 | ---------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
 | `type`                       | required                           | `major`, `minor`, or `patch`.                                           |
+| `increment`                  | project setting, else `1`          | How far `type`'s part of the version moves. See below.                  |
 | `source`                     | current branch                     | Release branch to cut from. Must exist on the remote.                   |
 | `packageReleaseBranchPrefix` | `release/`                         | Prefix identifying release branches, named `[v]MAJOR.MINOR[.PATCH]`.    |
 | `remote`                     | `origin`                           | Remote holding the release branches. Must be a configured remote.       |
@@ -105,3 +106,14 @@ tag that is reachable from the source and on the remote, skipping fallback tags.
 `status` is `Created`, `Would create`, `Commit rejected`, or `Declined`. If a hook rejects the commit,
 nothing is pushed: commit by hand on the new branch, then call `createRelease` again from there to
 finish.
+
+A project that numbers its releases in larger steps declares them in `sfdx-project.json`, read from
+the remote's copy of the source branch (so each new branch carries the setting forward):
+
+```json
+{ "plugins": { "simply": { "release": { "increments": { "minor": 10 } } } } }
+```
+
+With that, a `minor` release of `release/v1.20.0` is `release/v1.30.0`. The parts below the bumped
+one still reset to 0. The `increment` option overrides the setting, and `readReleasePluginConfig`
+reads and validates it on its own. Each increment must be a whole number of at least 1.

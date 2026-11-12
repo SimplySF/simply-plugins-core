@@ -107,17 +107,32 @@ export function sameReleaseVersion(a: ReleaseBranch, b: ReleaseBranch): boolean 
   return compareReleaseBranches(a, b) === 0;
 }
 
+/** Whether `value` can be used as a release increment: a whole number of at least 1. */
+export function isValidIncrement(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1;
+}
+
 /**
  * The branch after `branch` for a semantic bump, keeping its label's shape: `v1.2.0` → `v1.3.0`,
- * `1.2` → `1.3`. A minor-line branch has no patch to bump, so `patch` on one is an error.
+ * `1.2` → `1.3`. `increment` is how far the bumped part moves (`v1.20.0` → `v1.30.0` for a minor
+ * increment of 10); the parts below it reset to 0. A minor-line branch has no patch to bump, so
+ * `patch` on one is an error.
  */
-export function nextReleaseBranch(branch: ReleaseBranch, type: ReleaseType, prefix: string): ReleaseBranch {
+export function nextReleaseBranch(
+  branch: ReleaseBranch,
+  type: ReleaseType,
+  prefix: string,
+  increment = 1,
+): ReleaseBranch {
+  if (!isValidIncrement(increment)) {
+    throw new Error(`Invalid ${type} increment ${String(increment)}. Use a whole number of at least 1.`);
+  }
   if (type === 'patch' && branch.patch === undefined) {
     throw new Error(`${branch.name} names a minor line, which has no patch version to bump. Use minor or major.`);
   }
-  const major = type === 'major' ? branch.major + 1 : branch.major;
-  const minor = type === 'major' ? 0 : type === 'minor' ? branch.minor + 1 : branch.minor;
-  const patch = branch.patch === undefined ? undefined : type === 'patch' ? branch.patch + 1 : 0;
+  const major = type === 'major' ? branch.major + increment : branch.major;
+  const minor = type === 'major' ? 0 : type === 'minor' ? branch.minor + increment : branch.minor;
+  const patch = branch.patch === undefined ? undefined : type === 'patch' ? branch.patch + increment : 0;
   const v = branch.label.startsWith('v') ? 'v' : '';
   const label = `${v}${major}.${minor}${patch === undefined ? '' : `.${patch}`}`;
   return { name: `${prefix}${label}`, label, major, minor, ...(patch === undefined ? {} : { patch }) };

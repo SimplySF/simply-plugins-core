@@ -101,6 +101,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0059](0059-sfdevrc-shared-config.md)                                | Shared, platform-agnostic `.sfdevrc.json` in `simply-core`                            | Accepted                                                              |
 | [0060](0060-cicd-env-var-simply-prefix.md)                           | `SIMPLY_CICD_` prefix for every variable `simply-cicd-core` defines                   | Accepted                                                              |
 | [0061](0061-project-release-create.md)                               | `simply project release create`                                                       | In progress                                                           |
+| [0062](0062-release-create-increments.md)                            | Configurable version increments for `simply project release create`                   | In progress                                                           |
 
 ## Template
 

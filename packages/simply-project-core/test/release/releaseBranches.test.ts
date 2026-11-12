@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  nextReleaseBranch,
   parseReleaseBranch,
   selectReleasePairs,
   sortReleaseBranches,
@@ -72,5 +73,46 @@ describe('releaseBranches', () => {
     expect(versionNumberMatchesBranch('1.2.0.NEXT', patchBranch)).toBe(true);
     expect(versionNumberMatchesBranch('1.1.0.NEXT', patchBranch)).toBe(false);
     expect(versionNumberMatchesBranch('1.2.7.NEXT', minorBranch)).toBe(true);
+  });
+
+  describe('nextReleaseBranch', () => {
+    const branch = (name: string): NonNullable<ReturnType<typeof parseReleaseBranch>> =>
+      parseReleaseBranch(name, 'release/')!;
+    const next = (name: string, type: 'major' | 'minor' | 'patch', increment?: number): string =>
+      nextReleaseBranch(branch(name), type, 'release/', increment).name;
+
+    it.each([
+      ['major', 'release/v2.0.0'],
+      ['minor', 'release/v1.21.0'],
+      ['patch', 'release/v1.20.4'],
+    ] as const)('moves %s by one by default, resetting the parts below it', (type, expected) => {
+      expect(next('release/v1.20.3', type)).toBe(expected);
+    });
+
+    it.each([
+      ['major', 2, 'release/v3.0.0'],
+      ['minor', 10, 'release/v1.30.0'],
+      ['patch', 5, 'release/v1.20.8'],
+    ] as const)('moves %s by an increment of %i', (type, increment, expected) => {
+      expect(next('release/v1.20.3', type, increment)).toBe(expected);
+    });
+
+    it("keeps the label's shape", () => {
+      expect(next('release/1.20', 'minor', 10)).toBe('release/1.30');
+      expect(nextReleaseBranch(branch('release/1.20'), 'minor', 'release/', 10)).toMatchObject({
+        label: '1.30',
+        major: 1,
+        minor: 30,
+      });
+      expect(next('release/1.4', 'major', 2)).toBe('release/3.0');
+    });
+
+    it.each([0, -1, 1.5, Number.NaN])('rejects an increment of %s', (increment) => {
+      expect(() => next('release/v1.2.0', 'minor', increment)).toThrow('Use a whole number of at least 1');
+    });
+
+    it('still refuses a patch on a minor line', () => {
+      expect(() => next('release/1.2', 'patch', 2)).toThrow('names a minor line');
+    });
   });
 });
