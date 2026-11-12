@@ -17,6 +17,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { getPluginConfig, type SfdxProject } from '@simplysf/simply-core';
+import { CICD_ENV_VARS } from '../cicdEnvVars.js';
 import { DEFAULT_VERSION_TAG_FORMAT, VersionTagFormat } from './versionTagFormat.js';
 
 // Moved to packageVersionArtifact.ts, which aer packages share. Re-exported so this module's
@@ -31,9 +32,12 @@ export {
   toNpmVersion,
 } from './packageVersionArtifact.js';
 
-/** The dotenv keys this feature writes, for a downstream UI-test job to install by. */
-export const UTAM_PACKAGE_KEY = 'UTAM_PAGE_OBJECTS_PACKAGE';
-export const UTAM_VERSION_KEY = 'UTAM_PAGE_OBJECTS_VERSION';
+/**
+ * The dotenv keys this feature writes, for a downstream UI-test job to install by. Each is also
+ * written under its deprecated unprefixed name (`UTAM_PAGE_OBJECTS_PACKAGE`/`_VERSION`).
+ */
+export const UTAM_PACKAGE_KEY = CICD_ENV_VARS.utamPageObjectsPackage;
+export const UTAM_VERSION_KEY = CICD_ENV_VARS.utamPageObjectsVersion;
 
 /** The compiler's own default masks, restated so the generated config never depends on them drifting. */
 export const PAGE_OBJECTS_FILE_MASK = ['**/__utam__/**/*.utam.json'];

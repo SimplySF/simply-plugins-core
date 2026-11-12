@@ -123,6 +123,13 @@ describe('buildNotification', () => {
       expect(fsPromises.readFile).toHaveBeenCalledWith(SUBSCRIBER_PACKAGE_VERSION_ID_FILE, 'utf8');
     });
 
+    it('prefers the SIMPLY_CICD_ key over the deprecated one in the env file', async () => {
+      vi.mocked(fsPromises.readFile).mockResolvedValue(
+        `SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID=${VERSION_ID}\nSUBSCRIBER_PACKAGE_VERSION_ID=${OTHER_VERSION_ID}\n`,
+      );
+      expect(await resolveBuiltSubscriberPackageVersionId()).toBe(VERSION_ID);
+    });
+
     it('returns undefined without the env file', async () => {
       expect(await resolveBuiltSubscriberPackageVersionId()).toBeUndefined();
     });

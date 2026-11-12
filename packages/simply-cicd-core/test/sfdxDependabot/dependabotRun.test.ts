@@ -15,8 +15,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { VcsProject } from '../../src/vcs/index.js';
-import { filterProject, generateMrDescription, resolvePackageDetails } from '../../src/sfdxDependabot/dependabotRun.js';
+import type { VcsProject, VcsProvider } from '../../src/vcs/index.js';
+import {
+  filterProject,
+  generateMrDescription,
+  processProject,
+  resolvePackageDetails,
+  type ResolvedOptions,
+  type SfdxDependabotCounters,
+} from '../../src/sfdxDependabot/dependabotRun.js';
+import { logger } from '../../src/logger.js';
 
 const resolveOrgMock = vi.hoisted(() => vi.fn());
 const toolingQueryMock = vi.hoisted(() => vi.fn());
@@ -191,6 +199,68 @@ describe('dependabotRun', () => {
       expect(md).toContain('This pull request updates a Salesforce 2GP package dependency.');
       expect(md).toContain('This pull request was generated automatically');
       expect(md).not.toContain('merge request');
+    });
+  });
+
+  describe('processProject opt-in', () => {
+    const project = { pathWithNamespace: 'group/app', defaultBranch: 'main' } as VcsProject;
+    const options = { dryRun: true, branchPrefix: 'sfdx-dependabot', subscriberPackageVersionId: '04t000000000000AAA' };
+
+    function run(variables: Array<{ key: string; value: string }>): Promise<SfdxDependabotCounters> {
+      const counters: SfdxDependabotCounters = {
+        projectsUpdated: 0,
+        mergeRequestsCreated: 0,
+        mergeRequestsAlreadyOpen: 0,
+        alreadyCurrent: 0,
+        noDependencyFound: 0,
+        missingSfdxProjectFile: 0,
+        skipped: 0,
+        failed: 0,
+      };
+      const vcsProvider = {
+        terminology: { changeRequest: 'merge request', changeRequestShort: 'MR', projectVariable: 'CI/CD variable' },
+        getFileContent: vi.fn().mockResolvedValue(JSON.stringify({ packageDirectories: [{ path: 'force-app' }] })),
+        getProjectVariables: vi.fn().mockResolvedValue(variables),
+      } as unknown as VcsProvider;
+      return processProject(project, vcsProvider, options as ResolvedOptions, 'lwc-utilities', '2.41.0', counters).then(
+        () => counters,
+      );
+    }
+
+    it('skips a project that has not opted in', async () => {
+      const counters = await run([]);
+
+      expect(counters.skipped).toBe(1);
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('SIMPLY_CICD_SFDX_DEPENDABOT_ENABLED=TRUE'));
+    });
+
+    it('accepts SIMPLY_CICD_SFDX_DEPENDABOT_ENABLED=TRUE without a warning', async () => {
+      const counters = await run([{ key: 'SIMPLY_CICD_SFDX_DEPENDABOT_ENABLED', value: 'TRUE' }]);
+
+      expect(counters.skipped).toBe(0);
+      expect(counters.noDependencyFound).toBe(1);
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('still accepts the deprecated SFDX_DEPENDABOT_ENABLED=TRUE, with a warning', async () => {
+      const counters = await run([{ key: 'SFDX_DEPENDABOT_ENABLED', value: 'TRUE' }]);
+
+      expect(counters.skipped).toBe(0);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'group/app: SFDX_DEPENDABOT_ENABLED is deprecated and will be removed in a future release. Set SIMPLY_CICD_SFDX_DEPENDABOT_ENABLED instead.',
+        ),
+      );
+    });
+
+    it('prefers the SIMPLY_CICD_ variable when both are set', async () => {
+      const counters = await run([
+        { key: 'SFDX_DEPENDABOT_ENABLED', value: 'TRUE' },
+        { key: 'SIMPLY_CICD_SFDX_DEPENDABOT_ENABLED', value: 'FALSE' },
+      ]);
+
+      expect(counters.skipped).toBe(1);
+      expect(logger.warn).not.toHaveBeenCalled();
     });
   });
 });

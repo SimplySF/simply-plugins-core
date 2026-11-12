@@ -17,6 +17,7 @@
 import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
 import { getDefaultPackageDirectory, readSfdxProject } from '@simplysf/simply-core';
+import { CICD_ENV_VARS, toEnvFileContent, withLegacyCicdEnvVars } from '../cicdEnvVars.js';
 import { logger } from '../logger.js';
 import { VersionTagFormat } from './versionTagFormat.js';
 
@@ -55,7 +56,9 @@ async function detectPackageChanges(): Promise<PackageChangeDetection> {
   const projectJson = await readSfdxProject();
   const defaultDir = getDefaultPackageDirectory(projectJson);
   if (!defaultDir?.path) {
-    logger.warn('No default package directory found in sfdx-project.json. Defaulting to PACKAGE_CHANGED=FALSE.');
+    logger.warn(
+      'No default package directory found in sfdx-project.json. Defaulting to SIMPLY_CICD_PACKAGE_CHANGED=FALSE.',
+    );
     return { packageChanged: false, lastTag: '' };
   }
 
@@ -81,8 +84,8 @@ export type DeterminePackageChangesOptions = {
 /**
  * Detects whether any files under the default package directory (or `sfdx-project.json` itself)
  * have changed since the last release tag, and writes the result as a dotenv file. Any failure
- * during detection (missing/invalid sfdx-project.json, git errors) defaults to `PACKAGE_CHANGED=TRUE`
- * so a build never silently skips work it should have done.
+ * during detection (missing/invalid sfdx-project.json, git errors) defaults to
+ * `SIMPLY_CICD_PACKAGE_CHANGED=TRUE` (also written as the deprecated `PACKAGE_CHANGED`) so a build never silently skips work it should have done.
  */
 export async function determinePackageChanges(options: DeterminePackageChangesOptions): Promise<void> {
   logger.info('Determining package changes...');
@@ -98,7 +101,12 @@ export async function determinePackageChanges(options: DeterminePackageChangesOp
     lastTag = '';
   }
 
-  const envContent = `PACKAGE_CHANGED=${packageChanged ? 'TRUE' : 'FALSE'}\nLAST_TAG=${lastTag}\n`;
+  const envContent = toEnvFileContent(
+    withLegacyCicdEnvVars({
+      [CICD_ENV_VARS.packageChanged]: packageChanged ? 'TRUE' : 'FALSE',
+      [CICD_ENV_VARS.lastTag]: lastTag,
+    }),
+  );
   await fs.writeFile(outFile, envContent, 'utf-8');
   logger.success(`Wrote change detection results to ${outFile}`);
 }

@@ -18,6 +18,7 @@ import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
 import { isSubscriberPackageVersionId, readSfdxProject } from '@simplysf/simply-core';
 import { createAlmProvider, type AlmProviderKind } from '../alm/index.js';
+import { findSubscriberPackageVersionIdInEnvFile } from '../build/packageVersionArtifact.js';
 import { VersionTagFormat } from '../build/versionTagFormat.js';
 import { logger } from '../logger.js';
 import { NOT_AVAILABLE, renderIssuesFromCommitLog, type CommitStories } from './getCommitStories.js';
@@ -64,7 +65,7 @@ export async function resolveBuiltSubscriberPackageVersionId(explicit?: string):
   } catch {
     return undefined;
   }
-  const value = /^SUBSCRIBER_PACKAGE_VERSION_ID=(?<id>\S+)\s*$/m.exec(content)?.groups?.id;
+  const value = findSubscriberPackageVersionIdInEnvFile(content)?.value;
   return value && isSubscriberPackageVersionId(value) ? value : undefined;
 }
 

@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execa } from 'execa';
 import { getDefaultPackageDirectory, readSfdxProject } from '@simplysf/simply-core';
+import { withLegacyCicdEnvVars } from '../cicdEnvVars.js';
 import { appendToEnvFile } from '../env.js';
 import { logger } from '../logger.js';
 import { getPackageVersionReport } from '../sfPackages.js';
@@ -483,7 +484,7 @@ export async function publishUtamPageObjects(
 
   const { npmPackageName, version, distTag } = target;
   const outFile = options.out ?? DEFAULT_ENV_FILE;
-  const publishedKeys = { [UTAM_PACKAGE_KEY]: npmPackageName, [UTAM_VERSION_KEY]: version };
+  const publishedKeys = withLegacyCicdEnvVars({ [UTAM_PACKAGE_KEY]: npmPackageName, [UTAM_VERSION_KEY]: version });
   logger.info(`Publishing ${npmPackageName}@${version} (dist-tag ${distTag}) for ${target.salesforceVersion}.`);
 
   // Never inside the repo: the checkout is what gets compiled, and a generated package.json next to

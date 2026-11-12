@@ -17,11 +17,15 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { getPluginConfig, type SfdxProject } from '@simplysf/simply-core';
+import { CICD_ENV_VARS } from '../cicdEnvVars.js';
 
-/** The dotenv keys this feature writes, for a downstream job or a consuming repo to fetch by. */
-export const AER_PACKAGE_URL_KEY = 'AER_PACKAGE_URL';
-export const AER_PACKAGE_FILE_KEY = 'AER_PACKAGE_FILE';
-export const AER_PACKAGE_VERSION_KEY = 'AER_PACKAGE_VERSION';
+/**
+ * The dotenv keys this feature writes, for a downstream job or a consuming repo to fetch by. Each is
+ * also written under its deprecated unprefixed name (`AER_PACKAGE_URL`/`_FILE`/`_VERSION`).
+ */
+export const AER_PACKAGE_URL_KEY = CICD_ENV_VARS.aerPackageUrl;
+export const AER_PACKAGE_FILE_KEY = CICD_ENV_VARS.aerPackageFile;
+export const AER_PACKAGE_VERSION_KEY = CICD_ENV_VARS.aerPackageVersion;
 
 /**
  * What aer accepts as each half of a package file name, `<package>@<namespace>.pkg`. aer reads a

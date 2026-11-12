@@ -294,6 +294,8 @@ describe('publishUtamPageObjects', () => {
       await publishUtamPageObjects({ ...baseOptions, out: 'out.env' });
 
       expect(appendToEnvFile).toHaveBeenCalledWith('out.env', {
+        SIMPLY_CICD_UTAM_PAGE_OBJECTS_PACKAGE: '@acme/my-package-pageobjects',
+        SIMPLY_CICD_UTAM_PAGE_OBJECTS_VERSION: '1.2.3-4',
         UTAM_PAGE_OBJECTS_PACKAGE: '@acme/my-package-pageobjects',
         UTAM_PAGE_OBJECTS_VERSION: '1.2.3-4',
       });
@@ -404,6 +406,8 @@ describe('publishUtamPageObjects', () => {
       await publishUtamPageObjects(baseOptions);
 
       expect(appendToEnvFile).toHaveBeenCalledWith('subscriberPackageVersionId.env', {
+        SIMPLY_CICD_UTAM_PAGE_OBJECTS_PACKAGE: '@acme/my-package-pageobjects',
+        SIMPLY_CICD_UTAM_PAGE_OBJECTS_VERSION: '1.2.3-4',
         UTAM_PAGE_OBJECTS_PACKAGE: '@acme/my-package-pageobjects',
         UTAM_PAGE_OBJECTS_VERSION: '1.2.3-4',
       });

@@ -22,7 +22,34 @@ describe('getSkipReason', () => {
 
   afterEach(() => {
     process.env.PACKAGE_CHANGED = originalPackageChanged;
+    delete process.env.SIMPLY_CICD_PACKAGE_CHANGED;
   });
+
+  describe('SIMPLY_CICD_PACKAGE_CHANGED', () => {
+    it('skips gated jobs when it is FALSE, naming it in the reason', () => {
+      delete process.env.PACKAGE_CHANGED;
+      process.env.SIMPLY_CICD_PACKAGE_CHANGED = 'FALSE';
+      expect(getSkipReason('create-scratch')).toBe(
+        'No package changes detected (SIMPLY_CICD_PACKAGE_CHANGED=FALSE). Skipping job: create-scratch',
+      );
+    });
+
+    it('skips create-fallback-tag when it is TRUE', () => {
+      delete process.env.PACKAGE_CHANGED;
+      process.env.SIMPLY_CICD_PACKAGE_CHANGED = 'TRUE';
+      expect(getSkipReason('create-fallback-tag')).toBe(
+        'Package changes detected (SIMPLY_CICD_PACKAGE_CHANGED=TRUE). Skipping fallback tag creation.',
+      );
+    });
+
+    it('wins over the deprecated PACKAGE_CHANGED', () => {
+      process.env.PACKAGE_CHANGED = 'FALSE';
+      process.env.SIMPLY_CICD_PACKAGE_CHANGED = 'TRUE';
+      expect(getSkipReason('create-scratch')).toBeUndefined();
+    });
+  });
+
+  // The tests below set only the deprecated PACKAGE_CHANGED, which must keep working until removed.
 
   it('should skip build/scratch-related jobs if PACKAGE_CHANGED is FALSE', () => {
     process.env.PACKAGE_CHANGED = 'FALSE';

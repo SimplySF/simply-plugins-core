@@ -16,6 +16,7 @@
 
 import { escapeSoqlLiteral } from '@simplysf/simply-core';
 import type { VcsProject, VcsProvider } from '../vcs/index.js';
+import { CICD_ENV_VARS, findCicdVar, legacyEnvVarReadWarning } from '../cicdEnvVars.js';
 import { logger } from '../logger.js';
 import { resolveOrg } from '../resolveOrg.js';
 import { updateSfdxProject } from './updater.js';
@@ -327,7 +328,16 @@ export async function processProject(
   let isExplicitlyEnabled = false;
   try {
     const variables = await vcsProvider.getProjectVariables(project);
-    const enabledVar = variables.find((variable) => variable.key === 'SFDX_DEPENDABOT_ENABLED');
+    const enabledVar = findCicdVar(
+      CICD_ENV_VARS.sfdxDependabotEnabled,
+      (key) => variables.find((variable) => variable.key === key)?.value,
+      { warn: false },
+    );
+    if (enabledVar && enabledVar.name !== CICD_ENV_VARS.sfdxDependabotEnabled) {
+      logger.warn(
+        `${projectPath}: ${legacyEnvVarReadWarning(enabledVar.name, CICD_ENV_VARS.sfdxDependabotEnabled)} (a repository-level ${vcsProvider.terminology.projectVariable})`,
+      );
+    }
     if (enabledVar?.value === 'TRUE') {
       isExplicitlyEnabled = true;
     }
@@ -337,7 +347,7 @@ export async function processProject(
 
   if (!isExplicitlyEnabled) {
     logger.info(
-      `Project ${projectPath} is skipped because automatic dependabot updates are off by default. To enable, configure the repository-level ${vcsProvider.terminology.projectVariable} SFDX_DEPENDABOT_ENABLED=TRUE.`,
+      `Project ${projectPath} is skipped because automatic dependabot updates are off by default. To enable, configure the repository-level ${vcsProvider.terminology.projectVariable} ${CICD_ENV_VARS.sfdxDependabotEnabled}=TRUE.`,
     );
     counters.skipped++;
     return;
