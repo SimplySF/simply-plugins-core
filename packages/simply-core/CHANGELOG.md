@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.7.0...%40simplysf%2Fsimply-core%401.8.0) (2026-11-12)
+
+### Features
+
+- **simply-project-core:** add createRelease, with VCS providers moved to simply-core ([#288](https://github.com/SimplySF/simply-plugins-core/issues/288)) ([14c8a6d](https://github.com/SimplySF/simply-plugins-core/commit/14c8a6d914a084c10f45d7e6a32ec50a0b3f0b3c))
+
 # [1.7.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.6.15...%40simplysf%2Fsimply-core%401.7.0) (2026-11-10)
 
 ### Features

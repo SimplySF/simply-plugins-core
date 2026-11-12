@@ -1,7 +1,7 @@
 {
   "name": "@simplysf/simply-project-core",
   "description": "Salesforce DX project maintenance logic: cutting release branches and rolling them forward while keeping each branch's package identity in sfdx-project.json",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "@ClayChipps",
   "homepage": "https://github.com/SimplySF/simply-plugins-core",
   "bugs": "https://github.com/SimplySF/simply-plugins-core/issues",
@@ -38,7 +38,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@simplysf/simply-core": "workspace:^1.7.0",
+    "@simplysf/simply-core": "workspace:^1.8.0",
     "chalk": "^5.6.2",
     "execa": "^8.0.1",
     "log-symbols": "^7.0.1"
