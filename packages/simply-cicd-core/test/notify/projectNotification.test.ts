@@ -96,11 +96,16 @@ describe('projectNotification', () => {
 
       expect(fsPromises.writeFile).toHaveBeenCalledWith(
         'project-build.env',
-        expect.stringContaining('CREATED_BY_JOB_NAME='),
+        expect.stringMatching(/^SIMPLY_CICD_CREATED_BY_JOB_NAME=.*\nCREATED_BY_JOB_NAME=/),
       );
       expect(appendToEnvFile).toHaveBeenCalledWith(
         'project-build.env',
-        { PREV_INSTALLED_PACKAGE_VERSION: 'N/A', TARGET_PACKAGE_VERSION: 'N/A' },
+        {
+          SIMPLY_CICD_PREV_INSTALLED_PACKAGE_VERSION: 'N/A',
+          SIMPLY_CICD_TARGET_PACKAGE_VERSION: 'N/A',
+          PREV_INSTALLED_PACKAGE_VERSION: 'N/A',
+          TARGET_PACKAGE_VERSION: 'N/A',
+        },
         expect.anything(),
       );
     });
@@ -133,7 +138,12 @@ describe('projectNotification', () => {
       expect(execa).not.toHaveBeenCalled();
       expect(appendToEnvFile).toHaveBeenCalledWith(
         'project-build.env',
-        { PREV_INSTALLED_PACKAGE_VERSION: 'v2.40.0.10', TARGET_PACKAGE_VERSION: 'v2.41.0.1' },
+        {
+          SIMPLY_CICD_PREV_INSTALLED_PACKAGE_VERSION: 'v2.40.0.10',
+          SIMPLY_CICD_TARGET_PACKAGE_VERSION: 'v2.41.0.1',
+          PREV_INSTALLED_PACKAGE_VERSION: 'v2.40.0.10',
+          TARGET_PACKAGE_VERSION: 'v2.41.0.1',
+        },
         expect.anything(),
       );
     });

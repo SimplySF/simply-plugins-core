@@ -23,6 +23,7 @@ import {
   type SfdxProject,
 } from '@simplysf/simply-core';
 import { createVcsProvider, type VcsProviderKind } from '../vcs/index.js';
+import { CICD_ENV_VARS, toEnvFileContent, withLegacyCicdEnvVars } from '../cicdEnvVars.js';
 import { addGitRemote } from '../git.js';
 import { logger } from '../logger.js';
 import { VersionTagFormat } from './versionTagFormat.js';
@@ -179,7 +180,11 @@ export async function createFallbackTag(options: CreateFallbackTagOptions): Prom
   await execa('git', ['push', remoteAlias, nextTag]);
   logger.success(`Successfully created and pushed tag: ${nextTag}`);
 
-  await fs.writeFile(outFile, `SUBSCRIBER_PACKAGE_VERSION_ID=${packageId}\n`, 'utf-8');
+  await fs.writeFile(
+    outFile,
+    toEnvFileContent(withLegacyCicdEnvVars({ [CICD_ENV_VARS.builtSubscriberPackageVersionId]: packageId })),
+    'utf-8',
+  );
   logger.success(`Wrote package version ID to ${outFile}`);
 
   return { created: true, tag: nextTag, packageId };

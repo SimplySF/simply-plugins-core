@@ -140,7 +140,7 @@ describe('createPackageVersion', () => {
     expect(getPackageVersionCreateStatus).toHaveBeenCalledWith('08c000000000001', 'packaging-devhub');
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'subscriberPackageVersionId.env',
-      'SUBSCRIBER_PACKAGE_VERSION_ID=04t000000000001',
+      'SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID=04t000000000001\nSUBSCRIBER_PACKAGE_VERSION_ID=04t000000000001\n',
     );
     expect(execa).toHaveBeenCalledWith('git', ['tag', '-a', 'v1.0.0.1', '-m', '04t000000000001']);
     expect(execa).toHaveBeenCalledWith('git', ['push', 'origin-alias', 'v1.0.0.1']);

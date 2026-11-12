@@ -49,7 +49,7 @@ describe('determinePackageChanges', () => {
 
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'changes.env',
-      'PACKAGE_CHANGED=TRUE\nLAST_TAG=v1.0.0\n',
+      'SIMPLY_CICD_PACKAGE_CHANGED=TRUE\nSIMPLY_CICD_LAST_TAG=v1.0.0\nPACKAGE_CHANGED=TRUE\nLAST_TAG=v1.0.0\n',
       'utf-8',
     );
   });
@@ -67,7 +67,7 @@ describe('determinePackageChanges', () => {
 
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'changes.env',
-      'PACKAGE_CHANGED=FALSE\nLAST_TAG=v1.0.0\n',
+      'SIMPLY_CICD_PACKAGE_CHANGED=FALSE\nSIMPLY_CICD_LAST_TAG=v1.0.0\nPACKAGE_CHANGED=FALSE\nLAST_TAG=v1.0.0\n',
       'utf-8',
     );
   });
@@ -82,7 +82,11 @@ describe('determinePackageChanges', () => {
 
     await determinePackageChanges({ out: 'changes.env' });
 
-    expect(fsPromises.writeFile).toHaveBeenCalledWith('changes.env', 'PACKAGE_CHANGED=TRUE\nLAST_TAG=\n', 'utf-8');
+    expect(fsPromises.writeFile).toHaveBeenCalledWith(
+      'changes.env',
+      'SIMPLY_CICD_PACKAGE_CHANGED=TRUE\nSIMPLY_CICD_LAST_TAG=\nPACKAGE_CHANGED=TRUE\nLAST_TAG=\n',
+      'utf-8',
+    );
   });
 
   it('should fallback to PACKAGE_CHANGED=TRUE if sfdx-project.json is corrupted or invalid', async () => {
@@ -90,7 +94,11 @@ describe('determinePackageChanges', () => {
 
     await determinePackageChanges({ out: 'changes.env' });
 
-    expect(fsPromises.writeFile).toHaveBeenCalledWith('changes.env', 'PACKAGE_CHANGED=TRUE\nLAST_TAG=\n', 'utf-8');
+    expect(fsPromises.writeFile).toHaveBeenCalledWith(
+      'changes.env',
+      'SIMPLY_CICD_PACKAGE_CHANGED=TRUE\nSIMPLY_CICD_LAST_TAG=\nPACKAGE_CHANGED=TRUE\nLAST_TAG=\n',
+      'utf-8',
+    );
   });
 
   it('should fallback to PACKAGE_CHANGED=TRUE if packageDirectories is not an array', async () => {
@@ -100,7 +108,11 @@ describe('determinePackageChanges', () => {
 
     await determinePackageChanges({ out: 'changes.env' });
 
-    expect(fsPromises.writeFile).toHaveBeenCalledWith('changes.env', 'PACKAGE_CHANGED=TRUE\nLAST_TAG=\n', 'utf-8');
+    expect(fsPromises.writeFile).toHaveBeenCalledWith(
+      'changes.env',
+      'SIMPLY_CICD_PACKAGE_CHANGED=TRUE\nSIMPLY_CICD_LAST_TAG=\nPACKAGE_CHANGED=TRUE\nLAST_TAG=\n',
+      'utf-8',
+    );
   });
 
   it('should write PACKAGE_CHANGED=FALSE if no default package directory is found in sfdx-project.json', async () => {
@@ -108,7 +120,11 @@ describe('determinePackageChanges', () => {
 
     await determinePackageChanges({ out: 'changes.env' });
 
-    expect(fsPromises.writeFile).toHaveBeenCalledWith('changes.env', 'PACKAGE_CHANGED=FALSE\nLAST_TAG=\n', 'utf-8');
+    expect(fsPromises.writeFile).toHaveBeenCalledWith(
+      'changes.env',
+      'SIMPLY_CICD_PACKAGE_CHANGED=FALSE\nSIMPLY_CICD_LAST_TAG=\nPACKAGE_CHANGED=FALSE\nLAST_TAG=\n',
+      'utf-8',
+    );
   });
 
   it('should write PACKAGE_CHANGED=FALSE if default package directory has no path', async () => {
@@ -116,7 +132,11 @@ describe('determinePackageChanges', () => {
 
     await determinePackageChanges({ out: 'changes.env' });
 
-    expect(fsPromises.writeFile).toHaveBeenCalledWith('changes.env', 'PACKAGE_CHANGED=FALSE\nLAST_TAG=\n', 'utf-8');
+    expect(fsPromises.writeFile).toHaveBeenCalledWith(
+      'changes.env',
+      'SIMPLY_CICD_PACKAGE_CHANGED=FALSE\nSIMPLY_CICD_LAST_TAG=\nPACKAGE_CHANGED=FALSE\nLAST_TAG=\n',
+      'utf-8',
+    );
   });
 
   it('should filter tags by major.minor.patch version prefix from sfdx-project.json', async () => {
@@ -137,7 +157,7 @@ describe('determinePackageChanges', () => {
 
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'changes.env',
-      'PACKAGE_CHANGED=FALSE\nLAST_TAG=v6.40.0.12\n',
+      'SIMPLY_CICD_PACKAGE_CHANGED=FALSE\nSIMPLY_CICD_LAST_TAG=v6.40.0.12\nPACKAGE_CHANGED=FALSE\nLAST_TAG=v6.40.0.12\n',
       'utf-8',
     );
   });
@@ -167,7 +187,7 @@ describe('determinePackageChanges', () => {
 
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'changes.env',
-      'PACKAGE_CHANGED=FALSE\nLAST_TAG=release/6.40.0+12\n',
+      'SIMPLY_CICD_PACKAGE_CHANGED=FALSE\nSIMPLY_CICD_LAST_TAG=release/6.40.0+12\nPACKAGE_CHANGED=FALSE\nLAST_TAG=release/6.40.0+12\n',
       'utf-8',
     );
   });

@@ -28,6 +28,7 @@ export * from './alm/index.js';
 export * from './vcs/index.js';
 
 // shared kernel
+export * from './cicdEnvVars.js';
 export * from './env.js';
 export * from './git.js';
 export * from './logger.js';

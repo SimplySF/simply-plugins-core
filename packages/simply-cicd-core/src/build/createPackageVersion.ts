@@ -18,6 +18,7 @@ import { promises as fs } from 'node:fs';
 import { execa } from 'execa';
 import { getDefaultPackageDirectory, getPluginConfig, readSfdxProject, type SfdxProject } from '@simplysf/simply-core';
 import { createVcsProvider, type VcsProviderKind } from '../vcs/index.js';
+import { CICD_ENV_VARS, toEnvFileContent, withLegacyCicdEnvVars } from '../cicdEnvVars.js';
 import { addGitRemote } from '../git.js';
 import { logger } from '../logger.js';
 import { getPackageVersionCreateStatus, getPackageVersionReport, requestPackageVersionCreate } from '../sfPackages.js';
@@ -198,7 +199,12 @@ export async function createPackageVersion(options: CreatePackageVersionOptions)
   logger.info(`Package version creation requested. Request ID: ${createRequestId}`);
 
   const subscriberPackageVersionId = await pollPackageVersionCreation(createRequestId, options.packagingDevhub);
-  await fs.writeFile('subscriberPackageVersionId.env', `SUBSCRIBER_PACKAGE_VERSION_ID=${subscriberPackageVersionId}`);
+  await fs.writeFile(
+    'subscriberPackageVersionId.env',
+    toEnvFileContent(
+      withLegacyCicdEnvVars({ [CICD_ENV_VARS.builtSubscriberPackageVersionId]: subscriberPackageVersionId }),
+    ),
+  );
 
   const versionReport = await getPackageVersionReport(subscriberPackageVersionId, options.packagingDevhub);
   // `null` for an org-dependent package, which the Dev Hub doesn't compute coverage for; the CLI

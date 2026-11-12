@@ -16,13 +16,17 @@
 
 import { promises as fs } from 'node:fs';
 import { isSubscriberPackageVersionId } from '@simplysf/simply-core';
+import { CICD_ENV_VARS, findCicdVar, readCicdEnvVar, type FoundEnvVar } from '../cicdEnvVars.js';
 import { logger } from '../logger.js';
 
 // Helpers for any artifact published per package version (UTAM page objects, aer packages): finding
 // the `04t` a build produced and mapping its Salesforce version number onto a semver version.
 
-/** The dotenv key `create-package-version` and `create-fallback-tag` both write their `04t` under. */
-export const SUBSCRIBER_PACKAGE_VERSION_ID_KEY = 'SUBSCRIBER_PACKAGE_VERSION_ID';
+/**
+ * The dotenv key `create-package-version` and `create-fallback-tag` both write their `04t` under.
+ * They also write it under the deprecated `SUBSCRIBER_PACKAGE_VERSION_ID`, which is still read.
+ */
+export const SUBSCRIBER_PACKAGE_VERSION_ID_KEY = CICD_ENV_VARS.builtSubscriberPackageVersionId;
 
 /** `sf package version report` returns `Version` as `major.minor.patch.build`, which is not semver. */
 const SALESFORCE_VERSION_PATTERN = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)$/;
@@ -108,10 +112,30 @@ export function readEnvFileValue(content: string, key: string): string | undefin
   return found;
 }
 
+/**
+ * The `04t` line in dotenv-shaped `content`, under {@link SUBSCRIBER_PACKAGE_VERSION_ID_KEY} or else
+ * the deprecated `SUBSCRIBER_PACKAGE_VERSION_ID`. An empty value counts as absent. Logs no
+ * deprecation warning: a file with only the old key was written by an older simply-cicd, not by
+ * anything the user set.
+ */
+export function findSubscriberPackageVersionIdInEnvFile(content: string): FoundEnvVar | undefined {
+  return findCicdVar(
+    SUBSCRIBER_PACKAGE_VERSION_ID_KEY,
+    (key) => {
+      const value = readEnvFileValue(content, key);
+      return value === '' ? undefined : value;
+    },
+    { warn: false },
+  );
+}
+
 export type ResolveSubscriberPackageVersionIdOptions = {
   /** `--subscriber-package-version-id`, if passed. */
   flagValue?: string;
-  /** The environment to read `SUBSCRIBER_PACKAGE_VERSION_ID` from. Defaults to `process.env`. */
+  /**
+   * The environment to read `SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID` (or the deprecated
+   * `SUBSCRIBER_PACKAGE_VERSION_ID`) from. Defaults to `process.env`.
+   */
   env?: NodeJS.ProcessEnv;
   /** Dotenv file to fall back to — the one `create-package-version` wrote earlier in this job. */
   envFile: string;
@@ -121,7 +145,8 @@ export type ResolveSubscriberPackageVersionIdOptions = {
  * Find the `04t` this run should publish page objects for.
  *
  * Three sources, because the command is useful from two pipeline shapes and they surface the value
- * differently: an explicit flag; `SUBSCRIBER_PACKAGE_VERSION_ID` in the environment, which is how a
+ * differently: an explicit flag; `SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID` in the environment
+ * (or the deprecated `SUBSCRIBER_PACKAGE_VERSION_ID`, with a warning), which is how a
  * *separate* job receives `create-package-version`'s dotenv report artifact; and the dotenv file
  * itself, which is how the *same* job sees it, since a dotenv report only ever reaches other jobs.
  *
@@ -145,13 +170,13 @@ export async function resolveSubscriberPackageVersionId(
     return flagValue;
   }
 
-  const fromEnv = env[SUBSCRIBER_PACKAGE_VERSION_ID_KEY];
+  const fromEnv = readCicdEnvVar(SUBSCRIBER_PACKAGE_VERSION_ID_KEY, env);
   if (fromEnv) {
-    if (isSubscriberPackageVersionId(fromEnv)) {
-      logger.info(`Using ${SUBSCRIBER_PACKAGE_VERSION_ID_KEY} from the environment: ${fromEnv}`);
-      return fromEnv;
+    if (isSubscriberPackageVersionId(fromEnv.value)) {
+      logger.info(`Using ${fromEnv.name} from the environment: ${fromEnv.value}`);
+      return fromEnv.value;
     }
-    logger.warn(`Ignoring ${SUBSCRIBER_PACKAGE_VERSION_ID_KEY}="${fromEnv}" from the environment: not a 04t ID.`);
+    logger.warn(`Ignoring ${fromEnv.name}="${fromEnv.value}" from the environment: not a 04t ID.`);
   }
 
   let content: string;
@@ -161,15 +186,15 @@ export async function resolveSubscriberPackageVersionId(
     return undefined;
   }
 
-  const fromFile = readEnvFileValue(content, SUBSCRIBER_PACKAGE_VERSION_ID_KEY);
+  const fromFile = findSubscriberPackageVersionIdInEnvFile(content);
   if (!fromFile) {
     return undefined;
   }
-  if (!isSubscriberPackageVersionId(fromFile)) {
-    logger.warn(`Ignoring ${SUBSCRIBER_PACKAGE_VERSION_ID_KEY}="${fromFile}" in ${envFile}: not a 04t ID.`);
+  if (!isSubscriberPackageVersionId(fromFile.value)) {
+    logger.warn(`Ignoring ${fromFile.name}="${fromFile.value}" in ${envFile}: not a 04t ID.`);
     return undefined;
   }
 
-  logger.info(`Using ${SUBSCRIBER_PACKAGE_VERSION_ID_KEY} from ${envFile}: ${fromFile}`);
-  return fromFile;
+  logger.info(`Using ${fromFile.name} from ${envFile}: ${fromFile.value}`);
+  return fromFile.value;
 }

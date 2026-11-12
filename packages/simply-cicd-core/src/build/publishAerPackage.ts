@@ -25,6 +25,7 @@ import {
   readSfdxProject,
   type SfdxPackageDirectoryDependency,
 } from '@simplysf/simply-core';
+import { withLegacyCicdEnvVars } from '../cicdEnvVars.js';
 import { appendToEnvFile } from '../env.js';
 import { logger } from '../logger.js';
 import {
@@ -420,11 +421,11 @@ export async function publishAerPackage(options: PublishAerPackageOptions): Prom
 
   const { location } = target;
   const outFile = options.out ?? DEFAULT_ENV_FILE;
-  const publishedKeys = {
+  const publishedKeys = withLegacyCicdEnvVars({
     [AER_PACKAGE_URL_KEY]: location.url,
     [AER_PACKAGE_FILE_KEY]: location.file,
     [AER_PACKAGE_VERSION_KEY]: location.version,
-  };
+  });
   const described = { packageName: location.name, namespace: location.namespace, version: location.version };
   logger.info(`Publishing ${location.file} ${location.version} to ${forLog(location.url)}.`);
 

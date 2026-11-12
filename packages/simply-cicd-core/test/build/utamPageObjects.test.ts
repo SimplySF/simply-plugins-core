@@ -36,6 +36,7 @@ import {
 } from '../../src/build/utamPageObjects.js';
 import { determineTagSuffix } from '../../src/build/createPackageVersion.js';
 import { VersionTagFormat } from '../../src/build/versionTagFormat.js';
+import { logger } from '../../src/logger.js';
 
 vi.mock('../../src/logger.js', () => ({
   logger: {
@@ -494,5 +495,47 @@ describe('resolveSubscriberPackageVersionId', () => {
     await fs.writeFile(envFile, 'SUBSCRIBER_PACKAGE_VERSION_ID=not-an-id\n');
 
     expect(await resolveSubscriberPackageVersionId({ env: {}, envFile })).toBeUndefined();
+  });
+
+  describe('SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID', () => {
+    const OTHER_ID = '04t000000000000BBB';
+
+    beforeEach(() => {
+      vi.mocked(logger.warn).mockClear();
+    });
+
+    it('should prefer it over the deprecated name in the environment, without a warning', async () => {
+      const resolved = await resolveSubscriberPackageVersionId({
+        env: { SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID: VALID_ID, SUBSCRIBER_PACKAGE_VERSION_ID: OTHER_ID },
+        envFile,
+      });
+
+      expect(resolved).toBe(VALID_ID);
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('should warn when the environment has only the deprecated name', async () => {
+      await resolveSubscriberPackageVersionId({ env: { SUBSCRIBER_PACKAGE_VERSION_ID: VALID_ID }, envFile });
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('SUBSCRIBER_PACKAGE_VERSION_ID is deprecated and will be removed in a future release'),
+      );
+    });
+
+    it('should prefer it over the deprecated name in the dotenv file', async () => {
+      await fs.writeFile(
+        envFile,
+        `SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID=${VALID_ID}\nSUBSCRIBER_PACKAGE_VERSION_ID=${OTHER_ID}\n`,
+      );
+
+      expect(await resolveSubscriberPackageVersionId({ env: {}, envFile })).toBe(VALID_ID);
+    });
+
+    it('should not warn about a dotenv file an older simply-cicd wrote with only the deprecated name', async () => {
+      await fs.writeFile(envFile, `SUBSCRIBER_PACKAGE_VERSION_ID=${VALID_ID}\n`);
+
+      expect(await resolveSubscriberPackageVersionId({ env: {}, envFile })).toBe(VALID_ID);
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
   });
 });

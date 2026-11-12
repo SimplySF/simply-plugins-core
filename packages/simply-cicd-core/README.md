@@ -102,6 +102,30 @@ await deployProject({
 });
 ```
 
+### Environment variables and dotenv keys
+
+Every variable this package defines starts with `SIMPLY_CICD_`. The unprefixed names in the right
+column are **deprecated and will be removed in a future release**. Until then, every writer also
+writes the old name with the same value, and every reader falls back to it, logging a deprecation
+warning when it does. Move pipeline YAML (`rules:`, `$VAR` references) to the new names now.
+
+| Variable                                             | Deprecated name                          | Written by / read by                                                                     |
+| ---------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `SIMPLY_CICD_PACKAGE_CHANGED`                        | `PACKAGE_CHANGED`                        | `determinePackageChanges`; read by `getSkipReason`                                       |
+| `SIMPLY_CICD_LAST_TAG`                               | `LAST_TAG`                               | `determinePackageChanges`                                                                |
+| `SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID`    | `SUBSCRIBER_PACKAGE_VERSION_ID`          | `createPackageVersion`, `createFallbackTag`; read by `resolveSubscriberPackageVersionId` |
+| `SIMPLY_CICD_AER_PACKAGE_URL` / `_FILE` / `_VERSION` | `AER_PACKAGE_URL` / `_FILE` / `_VERSION` | `publishAerPackage`                                                                      |
+| `SIMPLY_CICD_UTAM_PAGE_OBJECTS_PACKAGE` / `_VERSION` | `UTAM_PAGE_OBJECTS_PACKAGE` / `_VERSION` | `publishUtamPageObjects`                                                                 |
+| `SIMPLY_CICD_CREATED_BY_JOB_NAME`                    | `CREATED_BY_JOB_NAME`                    | `projectNotifyBeforeScript`                                                              |
+| `SIMPLY_CICD_PREV_INSTALLED_PACKAGE_VERSION`         | `PREV_INSTALLED_PACKAGE_VERSION`         | `projectNotifyBeforeScript`                                                              |
+| `SIMPLY_CICD_TARGET_PACKAGE_VERSION`                 | `TARGET_PACKAGE_VERSION`                 | `projectNotifyBeforeScript`                                                              |
+| `SIMPLY_CICD_SFDX_DEPENDABOT_ENABLED`                | `SFDX_DEPENDABOT_ENABLED`                | Repository-level CI variable read by `processProject` to opt a project in                |
+
+`CICD_ENV_VARS` and `LEGACY_CICD_ENV_VARS` export these names. `readCicdEnvVar`, `findCicdVar` and
+`withLegacyCicdEnvVars` are the read/write helpers that handle the fallback. The existing
+`*_KEY` constants (`SUBSCRIBER_PACKAGE_VERSION_ID_KEY`, `AER_PACKAGE_URL_KEY`, `UTAM_PACKAGE_KEY`, …)
+now hold the `SIMPLY_CICD_` names.
+
 ## Issues
 
 Please report any issues at https://github.com/SimplySF/simply-plugins-core/issues

@@ -212,6 +212,9 @@ describe('skip guards', () => {
     expect(result).toMatchObject({ skipped: true, published: false, alreadyPublished: true, url: URL });
     expect(execa).not.toHaveBeenCalled();
     expect(appendToEnvFile).toHaveBeenCalledWith('subscriberPackageVersionId.env', {
+      SIMPLY_CICD_AER_PACKAGE_URL: URL,
+      SIMPLY_CICD_AER_PACKAGE_FILE: 'MyPackage@acme.pkg',
+      SIMPLY_CICD_AER_PACKAGE_VERSION: '1.2.3-4',
       AER_PACKAGE_URL: URL,
       AER_PACKAGE_FILE: 'MyPackage@acme.pkg',
       AER_PACKAGE_VERSION: '1.2.3-4',
@@ -292,6 +295,9 @@ describe('publishing', () => {
     });
     expect(put?.body?.toString()).toBe(PACKAGE_BYTES);
     expect(appendToEnvFile).toHaveBeenCalledWith('subscriberPackageVersionId.env', {
+      SIMPLY_CICD_AER_PACKAGE_URL: URL,
+      SIMPLY_CICD_AER_PACKAGE_FILE: 'MyPackage@acme.pkg',
+      SIMPLY_CICD_AER_PACKAGE_VERSION: '1.2.3-4',
       AER_PACKAGE_URL: URL,
       AER_PACKAGE_FILE: 'MyPackage@acme.pkg',
       AER_PACKAGE_VERSION: '1.2.3-4',

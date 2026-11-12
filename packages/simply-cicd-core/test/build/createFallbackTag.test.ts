@@ -76,7 +76,7 @@ describe('createFallbackTag', () => {
     expect(execa).toHaveBeenCalledWith('git', ['push', 'origin-alias', 'v1.1.0-1']);
     expect(fsPromises.writeFile).toHaveBeenCalledWith(
       'subscriberPackageVersionId.env',
-      'SUBSCRIBER_PACKAGE_VERSION_ID=04t123456789012\n',
+      'SIMPLY_CICD_BUILT_SUBSCRIBER_PACKAGE_VERSION_ID=04t123456789012\nSUBSCRIBER_PACKAGE_VERSION_ID=04t123456789012\n',
       'utf-8',
     );
   });

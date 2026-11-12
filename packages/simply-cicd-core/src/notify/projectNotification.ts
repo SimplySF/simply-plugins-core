@@ -20,6 +20,7 @@ import { getDefaultPackageDirectory, isSubscriberPackageVersionId, readSfdxProje
 import { createAlmProvider, type AlmProviderKind } from '../alm/index.js';
 import { logger } from '../logger.js';
 import { getPackageVersionReport, listInstalledPackages } from '../sfPackages.js';
+import { CICD_ENV_VARS, toEnvFileContent, withLegacyCicdEnvVars } from '../cicdEnvVars.js';
 import { appendToEnvFile } from '../env.js';
 import { getCommitStories } from './getCommitStories.js';
 import { renderNotifyTemplate } from './renderTemplate.js';
@@ -148,7 +149,10 @@ export async function projectNotifyBeforeScript(options: NotifyProjectOptions): 
   }
 
   logger.info('Running before_script for project notification...');
-  await fs.writeFile('project-build.env', `CREATED_BY_JOB_NAME=${options.ciJobName ?? ''}\n`);
+  await fs.writeFile(
+    'project-build.env',
+    toEnvFileContent(withLegacyCicdEnvVars({ [CICD_ENV_VARS.createdByJobName]: options.ciJobName ?? '' })),
+  );
 
   const prevInstalledPackageVersion = await resolvePrevInstalledPackageVersion({
     alias: options.alias,
@@ -163,13 +167,16 @@ export async function projectNotifyBeforeScript(options: NotifyProjectOptions): 
 
   appendToEnvFile(
     'project-build.env',
-    { PREV_INSTALLED_PACKAGE_VERSION: prevInstalledPackageVersion, TARGET_PACKAGE_VERSION: targetPackageVersion },
+    withLegacyCicdEnvVars({
+      [CICD_ENV_VARS.prevInstalledPackageVersion]: prevInstalledPackageVersion,
+      [CICD_ENV_VARS.targetPackageVersion]: targetPackageVersion,
+    }),
     logger,
   );
 
   logger.success('before_script for project notification finished.');
-  logger.log(`PREV_INSTALLED_PACKAGE_VERSION=${prevInstalledPackageVersion}`);
-  logger.log(`TARGET_PACKAGE_VERSION=${targetPackageVersion}`);
+  logger.log(`${CICD_ENV_VARS.prevInstalledPackageVersion}=${prevInstalledPackageVersion}`);
+  logger.log(`${CICD_ENV_VARS.targetPackageVersion}=${targetPackageVersion}`);
 }
 
 /** Posts the deployment result card (with Jira stories on success) to Teams. */

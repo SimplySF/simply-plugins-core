@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { CICD_ENV_VARS, readCicdEnvVar } from '../cicdEnvVars.js';
+
 /** Jobs that only make sense to run when the package actually changed. */
 const PACKAGE_CHANGED_GATED_JOBS = new Set([
   'create-scratch',
@@ -28,18 +30,24 @@ const PACKAGE_CHANGED_GATED_JOBS = new Set([
 
 /**
  * Returns a warning message (and thus "should skip") if `job` should be skipped given the current
- * `PACKAGE_CHANGED` environment variable set by `determine-package-changes` earlier in the
- * pipeline: scratch-org-lifecycle jobs skip when nothing changed, `create-fallback-tag` skips when
- * something did (since a real package version will be created instead). Returns `undefined`
- * (don't skip) otherwise.
+ * `SIMPLY_CICD_PACKAGE_CHANGED` environment variable set by `determine-package-changes` earlier in
+ * the pipeline (or the deprecated `PACKAGE_CHANGED`, with a warning): scratch-org-lifecycle jobs
+ * skip when nothing changed, `create-fallback-tag` skips when something did (since a real package
+ * version will be created instead). Returns `undefined` (don't skip) otherwise.
  */
 export function getSkipReason(job: string): string | undefined {
-  if (PACKAGE_CHANGED_GATED_JOBS.has(job) && process.env.PACKAGE_CHANGED === 'FALSE') {
-    return `No package changes detected (PACKAGE_CHANGED=FALSE). Skipping job: ${job}`;
+  const gated = PACKAGE_CHANGED_GATED_JOBS.has(job);
+  if (!gated && job !== 'create-fallback-tag') {
+    return undefined;
   }
 
-  if (job === 'create-fallback-tag' && process.env.PACKAGE_CHANGED === 'TRUE') {
-    return 'Package changes detected (PACKAGE_CHANGED=TRUE). Skipping fallback tag creation.';
+  const packageChanged = readCicdEnvVar(CICD_ENV_VARS.packageChanged);
+  if (gated && packageChanged?.value === 'FALSE') {
+    return `No package changes detected (${packageChanged.name}=FALSE). Skipping job: ${job}`;
+  }
+
+  if (job === 'create-fallback-tag' && packageChanged?.value === 'TRUE') {
+    return `Package changes detected (${packageChanged.name}=TRUE). Skipping fallback tag creation.`;
   }
 
   return undefined;
