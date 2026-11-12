@@ -24,6 +24,8 @@ import type {
   VcsProjectRef,
   VcsProjectVariable,
   VcsProvider,
+  VcsRelease,
+  VcsReleaseInput,
   VcsProviderOptions,
   VcsTerminology,
 } from './types.js';
@@ -51,6 +53,8 @@ type GitHubPullRequestResponse = {
 type GitHubVariableResponse = { name: string; value: string };
 
 type GitHubContentResponse = { sha: string };
+
+type GitHubReleaseResponse = { tag_name: string; name: string | null; html_url?: string };
 
 type GitHubRefResponse = { object: { sha: string } };
 
@@ -95,6 +99,10 @@ function splitProject(project: VcsProjectRef): { owner: string; repo: string } {
     throw new Error(`Invalid GitHub repository "${key}". Expected "owner/repo".`);
   }
   return { owner: encodeURIComponent(owner), repo: encodeURIComponent(repo) };
+}
+
+function normalizeRelease(release: GitHubReleaseResponse): VcsRelease {
+  return { tagName: release.tag_name, name: release.name ?? release.tag_name, webUrl: release.html_url, raw: release };
 }
 
 function repoPath(project: VcsProjectRef): string {
@@ -333,6 +341,36 @@ export class GitHubProvider implements VcsProvider {
       // If we don't have permission to read variables, treat it as "no variables".
       return [];
     }
+  }
+
+  public async findRelease(project: VcsProjectRef, tagName: string): Promise<VcsRelease | undefined> {
+    const endpoint = `${repoPath(project)}/releases/tags/${encodeURIComponent(tagName)}`;
+    try {
+      return normalizeRelease((await this.getJson(endpoint)) as GitHubReleaseResponse);
+    } catch (error) {
+      const err = error as Error;
+      if (err.message.includes('404')) {
+        return undefined;
+      }
+      throw err;
+    }
+  }
+
+  public async createRelease(project: VcsProjectRef, release: VcsReleaseInput): Promise<VcsRelease> {
+    // GitHub would create a missing tag from the default branch, so callers must check the tag exists first.
+    /* eslint-disable camelcase -- GitHub API field names */
+    const body: Record<string, unknown> = { tag_name: release.tagName, name: release.name };
+    /* eslint-enable camelcase */
+    if (release.description !== undefined) {
+      body.body = release.description;
+    }
+    const response = await this.request(`${repoPath(project)}/releases`, { method: 'POST', body });
+    return normalizeRelease((await response.json()) as GitHubReleaseResponse);
+  }
+
+  public async setDefaultBranch(project: VcsProjectRef, branchName: string): Promise<void> {
+    // eslint-disable-next-line camelcase -- GitHub API field name
+    await this.request(repoPath(project), { method: 'PATCH', body: { default_branch: branchName } });
   }
 
   // eslint-disable-next-line class-methods-use-this -- part of the VcsProvider instance contract; the path scheme needs no instance state

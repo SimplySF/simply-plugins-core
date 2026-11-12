@@ -361,4 +361,64 @@ describe('GitHubProvider', () => {
 
     expect(commits).toEqual([]);
   });
+
+  describe('releases and the default branch', () => {
+    /* eslint-disable camelcase -- GitHub API field names */
+    const releaseFixture = {
+      tag_name: 'v1.2.0.13',
+      name: 'v1.2.0',
+      html_url: 'https://github.com/my-org/downstream/releases/tag/v1.2.0.13',
+    };
+    /* eslint-enable camelcase */
+
+    it('findRelease looks the release up by tag', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(releaseFixture));
+
+      const release = await new GitHubProvider({ host, token }).findRelease(project, 'v1.2.0.13');
+
+      expect(release).toMatchObject({ tagName: 'v1.2.0.13', name: 'v1.2.0', webUrl: releaseFixture.html_url });
+      expect(lastCall().url).toBe('https://api.github.com/repos/my-org/downstream/releases/tags/v1.2.0.13');
+    });
+
+    it('findRelease returns undefined on a 404', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse('Not Found', { ok: false, status: 404, statusText: 'Not Found' }));
+
+      await expect(new GitHubProvider({ host, token }).findRelease(project, 'v9.9.9.1')).resolves.toBeUndefined();
+    });
+
+    it('falls back to the tag when a release has no name', async () => {
+      // eslint-disable-next-line camelcase -- GitHub API field name
+      fetchMock.mockResolvedValueOnce(jsonResponse({ tag_name: 'v1.2.0.13', name: null }));
+
+      const release = await new GitHubProvider({ host, token }).findRelease(project, 'v1.2.0.13');
+
+      expect(release?.name).toBe('v1.2.0.13');
+    });
+
+    it('createRelease posts the tag and name, sending a description as body', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(releaseFixture));
+
+      await new GitHubProvider({ host, token }).createRelease(project, {
+        tagName: 'v1.2.0.13',
+        name: 'v1.2.0',
+        description: 'notes',
+      });
+
+      expect(lastCall().url).toBe('https://api.github.com/repos/my-org/downstream/releases');
+      expect(lastCall().options.method).toBe('POST');
+      // eslint-disable-next-line camelcase -- GitHub API field name
+      expect(bodyOf()).toEqual({ tag_name: 'v1.2.0.13', name: 'v1.2.0', body: 'notes' });
+    });
+
+    it('setDefaultBranch patches default_branch on the repo', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(repoFixture));
+
+      await new GitHubProvider({ host, token }).setDefaultBranch(project, 'release/v1.3.0');
+
+      expect(lastCall().url).toBe('https://api.github.com/repos/my-org/downstream');
+      expect(lastCall().options.method).toBe('PATCH');
+      // eslint-disable-next-line camelcase -- GitHub API field name
+      expect(bodyOf()).toEqual({ default_branch: 'release/v1.3.0' });
+    });
+  });
 });

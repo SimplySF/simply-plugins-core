@@ -97,3 +97,28 @@ export function versionNumberMatchesBranch(versionNumber: string, branch: Releas
     (branch.patch === undefined || Number(patch) === branch.patch)
   );
 }
+
+export type ReleaseType = 'major' | 'minor' | 'patch';
+
+export const RELEASE_TYPES: readonly ReleaseType[] = ['major', 'minor', 'patch'];
+
+/** Whether two branches name the same version, e.g. `release/1.3` and `release/v1.3.0`. */
+export function sameReleaseVersion(a: ReleaseBranch, b: ReleaseBranch): boolean {
+  return compareReleaseBranches(a, b) === 0;
+}
+
+/**
+ * The branch after `branch` for a semantic bump, keeping its label's shape: `v1.2.0` → `v1.3.0`,
+ * `1.2` → `1.3`. A minor-line branch has no patch to bump, so `patch` on one is an error.
+ */
+export function nextReleaseBranch(branch: ReleaseBranch, type: ReleaseType, prefix: string): ReleaseBranch {
+  if (type === 'patch' && branch.patch === undefined) {
+    throw new Error(`${branch.name} names a minor line, which has no patch version to bump. Use minor or major.`);
+  }
+  const major = type === 'major' ? branch.major + 1 : branch.major;
+  const minor = type === 'major' ? 0 : type === 'minor' ? branch.minor + 1 : branch.minor;
+  const patch = branch.patch === undefined ? undefined : type === 'patch' ? branch.patch + 1 : 0;
+  const v = branch.label.startsWith('v') ? 'v' : '';
+  const label = `${v}${major}.${minor}${patch === undefined ? '' : `.${patch}`}`;
+  return { name: `${prefix}${label}`, label, major, minor, ...(patch === undefined ? {} : { patch }) };
+}

@@ -6,12 +6,16 @@ Logic for maintaining a Salesforce DX project's repository, run by a person from
 rather than by a pipeline. It backs the `sf simply project` commands in
 [`@simplysf/simply-project`](https://github.com/SimplySF/simply-plugins/tree/main/packages/simply-project).
 
-Its first module rolls release branches forward: it merges each release branch into the next higher
-one, such as `release/v1.1.0` into `release/v1.2.0`, with a real merge commit, so the source's
-version tags stay in the target's history while the target keeps its own package identity in
-`sfdx-project.json`. See
-[docs/design/0057-project-release-roll-forward.md](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0057-project-release-roll-forward.md)
-for the reasoning.
+It has two release-branch modules:
+
+- **`rollForward`** merges each release branch into the next higher one, such as `release/v1.1.0`
+  into `release/v1.2.0`, with a real merge commit, so the source's version tags stay in the target's
+  history while the target keeps its own package identity in `sfdx-project.json`. See
+  [design doc 0057](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0057-project-release-roll-forward.md).
+- **`createRelease`** cuts the next release branch, such as `release/v1.3.0` from `release/v1.2.0`,
+  with its version bumped in `sfdx-project.json`. It can also publish a GitLab or GitHub release for
+  the version being closed out, and make the new branch the project's default. See
+  [design doc 0061](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0061-project-release-create.md).
 
 ## Install
 
@@ -22,7 +26,7 @@ npm install @simplysf/simply-project-core
 Requires Node.js `>=22`, `git` on the `PATH`, and either `"type": "module"` or a dynamic `import()` —
 this package ships ESM only.
 
-## Usage
+## Rolling release branches forward
 
 ```ts
 import { rollForward } from '@simplysf/simply-project-core';
@@ -58,3 +62,46 @@ Each hop in the result has a `status` of `Rolled`, `Up to date`, `Conflict`, `Co
 merge in progress on its roll branch; resolve or commit it by hand, then call `rollForward` again to
 continue. The function never force-pushes or pushes tags, and always runs the repository's commit
 hooks.
+
+## Cutting a release branch
+
+```ts
+import { createRelease, resolveReleaseVcs } from '@simplysf/simply-project-core';
+
+// Cut release/v1.3.0 from the current release branch, as the remote has it.
+const result = await createRelease({ type: 'minor' });
+
+// Also publish a release for v1.2.0 and make the new branch the default. The project ID and host
+// come from SIMPLY_VCS_* or .sfdevrc.json's `vcs` section.
+await createRelease({
+  type: 'minor',
+  source: 'release/v1.2.0',
+  createRelease: true,
+  setDefault: true,
+  vcs: resolveReleaseVcs({ token: process.env.SIMPLY_VCS_TOKEN }),
+  confirm: async (plan) => plan.branch === 'release/v1.3.0',
+});
+```
+
+| Option                       | Default                            | Meaning                                                                 |
+| ---------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| `type`                       | required                           | `major`, `minor`, or `patch`.                                           |
+| `source`                     | current branch                     | Release branch to cut from. Must exist on the remote.                   |
+| `packageReleaseBranchPrefix` | `release/`                         | Prefix identifying release branches, named `[v]MAJOR.MINOR[.PATCH]`.    |
+| `remote`                     | `origin`                           | Remote holding the release branches. Must be a configured remote.       |
+| `message`                    | `chore: bump version to {VERSION}` | Commit message template.                                                |
+| `createRelease`              | `false`                            | Publish a platform release for the source's version first. Needs `vcs`. |
+| `releaseTag`                 | latest pushed build tag            | The tag to publish from. Implies `createRelease`.                       |
+| `setDefault`                 | `false`                            | Make the new branch the project's default after pushing. Needs `vcs`.   |
+| `vcs`                        | none                               | `{ provider, project }`, usually from `resolveReleaseVcs`.              |
+| `dryRun`                     | `false`                            | Plan only.                                                              |
+| `confirm`                    | none                               | Called once with the planned result; returning `false` changes nothing. |
+| `cwd`                        | `process.cwd()`                    | Any directory inside the repository.                                    |
+
+The new branch starts from the remote's source, never from local commits, and its `versionNumber`
+becomes `<version>.NEXT` in every package directory on the source's version. The version inside each
+`versionName` is replaced in place. The release is published from the highest `v<version>.<build>`
+tag that is reachable from the source and on the remote, skipping fallback tags. The result's
+`status` is `Created`, `Would create`, `Commit rejected`, or `Declined`. If a hook rejects the commit,
+nothing is pushed: commit by hand on the new branch, then call `createRelease` again from there to
+finish.

@@ -226,4 +226,71 @@ describe('GitLabProvider', () => {
     expect(headers['JOB-TOKEN']).toBe(token);
     expect(headers['PRIVATE-TOKEN']).toBeUndefined();
   });
+
+  describe('releases and the default branch', () => {
+    /* eslint-disable camelcase -- GitLab API field names */
+    const selfUrl = 'https://gitlab.example.com/group/proj/-/releases/v1.2.0.13';
+    const releaseFixture = { tag_name: 'v1.2.0.13', name: 'v1.2.0', _links: { self: selfUrl } };
+    /* eslint-enable camelcase */
+
+    it('findRelease normalizes a release, encoding the tag', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(releaseFixture));
+
+      const release = await new GitLabProvider({ host, token }).findRelease('group/proj', 'v1.2.0.13');
+
+      expect(release).toMatchObject({ tagName: 'v1.2.0.13', name: 'v1.2.0', webUrl: selfUrl });
+      const [url] = fetchMock.mock.calls[0] as [string];
+      expect(url).toBe(`${apiUrl}/projects/group%2Fproj/releases/v1.2.0.13`);
+    });
+
+    it('findRelease returns undefined on a 404, and rethrows anything else', async () => {
+      const provider = new GitLabProvider({ host, token });
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse('404 Not found', { ok: false, status: 404, statusText: 'Not Found' }),
+      );
+      await expect(provider.findRelease('123', 'v1.2.0.13')).resolves.toBeUndefined();
+
+      fetchMock.mockResolvedValueOnce(jsonResponse('denied', { ok: false, status: 403, statusText: 'Forbidden' }));
+      await expect(provider.findRelease('123', 'v1.2.0.13')).rejects.toThrow('403');
+    });
+
+    it('createRelease posts the tag and name, and a description only when given', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(releaseFixture));
+      const provider = new GitLabProvider({ host, token });
+
+      await provider.createRelease('123', { tagName: 'v1.2.0.13', name: 'v1.2.0' });
+      const [url, firstOptions] = fetchMock.mock.calls[0] as [string, RequestInit];
+      let options = firstOptions;
+      expect(url).toBe(`${apiUrl}/projects/123/releases`);
+      expect(options.method).toBe('POST');
+      // eslint-disable-next-line camelcase -- GitLab API field name
+      expect(JSON.parse(options.body as string)).toEqual({ tag_name: 'v1.2.0.13', name: 'v1.2.0' });
+
+      await provider.createRelease('123', { tagName: 'v1.2.0.13', name: 'v1.2.0', description: 'notes' });
+      [, options] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(JSON.parse(options.body as string)).toMatchObject({ description: 'notes' });
+    });
+
+    it('setDefaultBranch puts default_branch on the project', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ id: 123 }));
+
+      await new GitLabProvider({ host, token }).setDefaultBranch('123', 'release/v1.3.0');
+
+      const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(`${apiUrl}/projects/123`);
+      expect(options.method).toBe('PUT');
+      // eslint-disable-next-line camelcase -- GitLab API field name
+      expect(JSON.parse(options.body as string)).toEqual({ default_branch: 'release/v1.3.0' });
+    });
+
+    it('never puts the token in an error message', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse('boom', { ok: false, status: 500, statusText: 'Server Error' }));
+
+      const error = await new GitLabProvider({ host, token })
+        .setDefaultBranch('123', 'release/v1.3.0')
+        .catch((caught: unknown) => caught as Error);
+
+      expect((error as Error).message).not.toContain(token);
+    });
+  });
 });

@@ -24,6 +24,8 @@ import type {
   VcsProjectRef,
   VcsProjectVariable,
   VcsProvider,
+  VcsRelease,
+  VcsReleaseInput,
   VcsProviderOptions,
   VcsTerminology,
 } from './types.js';
@@ -52,6 +54,12 @@ type GitLabMergeRequestResponse = {
 type GitLabProjectVariableResponse = {
   key: string;
   value: string;
+};
+
+type GitLabReleaseResponse = {
+  tag_name: string;
+  name: string;
+  _links?: { self?: string };
 };
 
 type GitLabCommitResponse = {
@@ -88,6 +96,11 @@ function normalizeMergeRequest(mergeRequest: GitLabMergeRequestResponse): VcsMer
     webUrl: mergeRequest.web_url,
     raw: mergeRequest,
   };
+}
+
+function normalizeRelease(release: GitLabReleaseResponse): VcsRelease {
+  // eslint-disable-next-line no-underscore-dangle -- GitLab API field name
+  return { tagName: release.tag_name, name: release.name, webUrl: release._links?.self, raw: release };
 }
 
 /** GitLab addresses projects by numeric ID or URL-encoded path; both arrive here already usable. */
@@ -302,6 +315,36 @@ export class GitLabProvider implements VcsProvider {
       // If we don't have permission to read variables, treat it as "no variables".
       return [];
     }
+  }
+
+  public async findRelease(project: VcsProjectRef, tagName: string): Promise<VcsRelease | undefined> {
+    const endpoint = `/projects/${projectSegment(project)}/releases/${encodeURIComponent(tagName)}`;
+    try {
+      return normalizeRelease((await this.getJson(endpoint)) as GitLabReleaseResponse);
+    } catch (error) {
+      const err = error as Error;
+      if (err.message.includes('404')) {
+        return undefined;
+      }
+      throw err;
+    }
+  }
+
+  public async createRelease(project: VcsProjectRef, release: VcsReleaseInput): Promise<VcsRelease> {
+    const endpoint = `/projects/${projectSegment(project)}/releases`;
+    /* eslint-disable camelcase -- GitLab API field names */
+    const body: Record<string, unknown> = { tag_name: release.tagName, name: release.name };
+    /* eslint-enable camelcase */
+    if (release.description !== undefined) {
+      body.description = release.description;
+    }
+    const response = await this.request(endpoint, { method: 'POST', body });
+    return normalizeRelease((await response.json()) as GitLabReleaseResponse);
+  }
+
+  public async setDefaultBranch(project: VcsProjectRef, branchName: string): Promise<void> {
+    // eslint-disable-next-line camelcase -- GitLab API field name
+    await this.request(`/projects/${projectSegment(project)}`, { method: 'PUT', body: { default_branch: branchName } });
   }
 
   // eslint-disable-next-line class-methods-use-this -- part of the VcsProvider instance contract; the path scheme needs no instance state

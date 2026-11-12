@@ -70,6 +70,9 @@ export {
   type ResolvedVcsSettings,
   type SfDevRc,
 } from './config/sfDevRc.js';
+// The VCS provider registry and its GitLab/GitHub clients (moved from simply-cicd-core, see
+// docs/design/0061-project-release-create.md). Importing this registers the built-in providers.
+export * from './vcs/index.js';
 export { ensureDirectory, timestampForFileName } from './fs/paths.js';
 export { chunkedInQuery, type ChunkedInQueryOptions } from './query/chunkedInQuery.js';
 export { escapeSoqlLiteral } from './query/escapeSoqlLiteral.js';

@@ -172,6 +172,39 @@ fallback. Blank values count as unset.
 names a different provider than the file, the file's whole section is ignored. A bad value throws
 `SfDevRcError` naming the variable. Pass `env: {}` to read the file alone.
 
+### VCS providers
+
+A client for each source-control platform, so callers never encode one platform's API. These moved
+here from `@simplysf/simply-cicd-core`, which still re-exports every name unchanged and shares the
+same registry. See
+[design doc 0061](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0061-project-release-create.md).
+
+| Export                             | Description                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `createVcsProvider(kind, options)` | Builds a `VcsProvider` for a registered platform (`'github'`, `'gitlab'`), given host/token options. |
+| `listVcsProviderKinds()`           | The VCS platforms currently registered.                                                              |
+| `registerVcsProvider(...)`         | Registers a custom `VcsProvider` implementation without modifying this package.                      |
+| `GitHubProvider`                   | A `VcsProvider` backed by the GitHub REST API: branches, pull requests, CI variables, and releases.  |
+| `GitLabProvider`                   | A `VcsProvider` backed by the GitLab REST API v4, with the same surface as `GitHubProvider`.         |
+
+`findRelease`, `createRelease`, and `setDefaultBranch` are optional `VcsProvider` members, so a provider
+written before they existed still compiles. Both built-in providers implement them, so check for one
+before calling it. `createRelease` needs an existing tag, since GitHub would otherwise create one from
+the default branch.
+
+```ts
+import { createVcsProvider, loadSfDevRc, resolveVcsSettings } from '@simplysf/simply-core';
+
+const { config } = loadSfDevRc();
+const { kind, host, projectId } = resolveVcsSettings(config);
+const vcs = createVcsProvider(kind, { host, token: process.env.SIMPLY_VCS_TOKEN! });
+await vcs.createRelease?.(projectId!, { tagName: 'v1.2.0.13', name: 'v1.2.0' });
+```
+
+Types: `VcsProvider`, `VcsProviderFactory`, `VcsProviderOptions`, `VcsProject`, `VcsProjectRef`,
+`VcsBranch`, `VcsCommit`, `VcsCommitLogEntry`, `VcsMergeRequest`, `VcsProjectVariable`, `VcsRelease`,
+`VcsReleaseInput`, `VcsTerminology`, `VcsCiContext`.
+
 ### Collections and paths
 
 | Export                                       | Description                                                                                                                                                                                                              |
