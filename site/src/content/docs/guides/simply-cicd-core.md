@@ -24,6 +24,9 @@ const { html } = jira.render(issues, 'https://example.atlassian.net/browse');
 
 ## Talking to a VCS platform
 
+The VCS clients are defined in `@simplysf/simply-core` and re-exported here unchanged, with one
+shared registry, so either import works.
+
 ```ts
 import { createVcsProvider } from '@simplysf/simply-cicd-core';
 

@@ -134,6 +134,26 @@ The full list is `SFDEVRC_ENV_VARS`: `SIMPLY_VCS_PROVIDER`, `SIMPLY_VCS_HOST`,
 `SIMPLY_VCS_PROJECT_ID`, `SIMPLY_ALM_PROVIDER`, `SIMPLY_ALM_PROJECT_KEYS` (comma-separated),
 `SIMPLY_ALM_BASE_URL`, and `SIMPLY_BRANCH_REGEX`. Blank values count as unset.
 
+## Talking to a VCS platform
+
+The GitLab and GitHub clients live here, and `@simplysf/simply-cicd-core` re-exports them. Combine
+them with `resolveVcsSettings` so the host and project come from flags, `SIMPLY_VCS_*`, or
+`.sfdevrc.json`:
+
+```ts
+import { createVcsProvider, loadSfDevRc, resolveVcsSettings } from '@simplysf/simply-core';
+
+const { config } = loadSfDevRc();
+const { kind, host, projectId } = resolveVcsSettings(config, { provider: flags['vcs-provider'] });
+const vcs = createVcsProvider(kind, { host, token: process.env.SIMPLY_VCS_TOKEN! });
+
+// Optional members: check before calling, since a third-party provider may not have them.
+if (vcs.createRelease && vcs.setDefaultBranch) {
+  await vcs.createRelease(projectId!, { tagName: 'v1.2.0.13', name: 'v1.2.0' });
+  await vcs.setDefaultBranch(projectId!, 'release/v1.3.0');
+}
+```
+
 ## Retrying a flaky call
 
 ```ts

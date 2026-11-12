@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-import { GitHubProvider } from './github.js';
-import { GitLabProvider } from './gitlab.js';
-import { registerVcsProvider } from './registry.js';
+// The VCS providers now live in @simplysf/simply-core (docs/design/0061-project-release-create.md).
+// This barrel re-exports them unchanged, so importers of simply-cicd-core see the same names and
+// share simply-core's single provider registry.
 
-registerVcsProvider('gitlab', (options) => new GitLabProvider(options));
-registerVcsProvider('github', (options) => new GitHubProvider(options));
-
-export { createVcsProvider, listVcsProviderKinds, registerVcsProvider } from './registry.js';
-
-export { GitHubProvider } from './github.js';
-export { GitLabProvider } from './gitlab.js';
+export {
+  createVcsProvider,
+  GitHubProvider,
+  GitLabProvider,
+  listVcsProviderKinds,
+  registerVcsProvider,
+} from '@simplysf/simply-core';
 
 export type {
   VcsBranch,
@@ -39,5 +39,7 @@ export type {
   VcsProviderFactory,
   VcsProviderKind,
   VcsProviderOptions,
+  VcsRelease,
+  VcsReleaseInput,
   VcsTerminology,
-} from './types.js';
+} from '@simplysf/simply-core';

@@ -14,13 +14,9 @@
  * limitations under the License.
  */
 
-import type { VcsProviderKind } from '@simplysf/simply-core';
+import type { VcsProviderKind } from '../config/providerKinds.js';
 
-/**
- * The set of source-control-hosting platforms `simply-cicd` knows how to talk to. Defined in
- * `@simplysf/simply-core` (so `.sfdevrc.json` can be validated without this package) and
- * re-exported here unchanged.
- */
+/** The set of source-control-hosting platforms the built-in providers cover. */
 export type { VcsProviderKind };
 
 /** A repository/project, normalized across VCS platforms. */
@@ -103,6 +99,23 @@ export type VcsTerminology = {
 export type VcsCiContext = {
   projectPath?: string;
   projectId?: string;
+};
+
+/** A release published on the platform for an existing tag. */
+export type VcsRelease = {
+  tagName: string;
+  name: string;
+  /** The release's page, when the platform returns one. */
+  webUrl?: string;
+  raw: unknown;
+};
+
+/** What `createRelease` publishes. */
+export type VcsReleaseInput = {
+  /** An existing tag. The caller must check it exists, since GitHub would otherwise create it. */
+  tagName: string;
+  name: string;
+  description?: string;
 };
 
 /** Everything a provider needs to talk to a specific instance of its platform. */
@@ -204,6 +217,18 @@ export interface VcsProvider {
 
   /** Builds a CI-job-token-authenticated remote URL suitable for a read-only `git clone`. */
   buildCiCloneUrl(ciJobToken: string, projectPath: string): string;
+
+  // The members below are optional so a provider written before they existed still compiles. A
+  // caller checks for each one before changing anything. See docs/design/0061-project-release-create.md.
+
+  /** Finds the release for a tag, returning undefined when there is none. */
+  findRelease?(project: VcsProjectRef, tagName: string): Promise<VcsRelease | undefined>;
+
+  /** Publishes a release for an existing tag. */
+  createRelease?(project: VcsProjectRef, release: VcsReleaseInput): Promise<VcsRelease>;
+
+  /** Makes a branch the project's default branch. */
+  setDefaultBranch?(project: VcsProjectRef, branchName: string): Promise<void>;
 }
 
 /** Constructs a provider for one instance of a platform. */

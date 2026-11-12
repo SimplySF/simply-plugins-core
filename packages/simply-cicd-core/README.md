@@ -33,10 +33,15 @@ Everything below is exported from the package root. Removing or renaming an expo
 | `GitHubProvider`                   | A `VcsProvider` backed by the GitHub REST API — branches, merge requests (pull requests), CI variables, etc. |
 | `GitLabProvider`                   | A `VcsProvider` backed by the GitLab REST API v4 — same surface as `GitHubProvider`.                         |
 
+The VCS exports are defined in `@simplysf/simply-core` and re-exported here unchanged, sharing one
+provider registry, so importing them from either package is equivalent. See that package's README for
+the optional `findRelease`, `createRelease`, and `setDefaultBranch` members.
+
 Types (`AlmProviderKind`, `AlmIssueRef`, `AlmIssueRendering`, `AlmProvider`, `AlmProviderFactory`,
 `VcsProviderKind`, `VcsProject`, `VcsProjectRef`, `VcsBranch`, `VcsCommit`, `VcsCommitLogEntry`,
-`VcsMergeRequest`, `VcsProjectVariable`, `VcsTerminology`, `VcsCiContext`, `VcsProviderOptions`,
-`VcsProvider`, `VcsProviderFactory`) are also exported from the package root.
+`VcsMergeRequest`, `VcsProjectVariable`, `VcsRelease`, `VcsReleaseInput`, `VcsTerminology`,
+`VcsCiContext`, `VcsProviderOptions`, `VcsProvider`, `VcsProviderFactory`) are also exported from the
+package root.
 
 ```ts
 import { createAlmProvider } from '@simplysf/simply-cicd-core';
