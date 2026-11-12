@@ -18,6 +18,17 @@
 // export is a minor/patch change, but removing or renaming one is breaking. `test/index.test.ts`
 // pins the exported-key list down so an accidental removal fails a test instead of silently shipping
 // in a patch release. See docs/design/0057-project-release-roll-forward.md for why this package
-// exists separately from `@simplysf/simply-cicd-core`.
+// exists separately from `@simplysf/simply-cicd-core`, and 0061-project-release-create.md for why
+// its VCS steps use `@simplysf/simply-core`'s providers rather than that package's.
 
 export * from './release/rollForward.js';
+export {
+  createRelease,
+  type CreateReleaseOptions,
+  type CreateReleaseResult,
+  type CreateReleaseStatus,
+  type CreateReleaseVcs,
+  type ReleaseType,
+} from './release/createRelease.js';
+export { RELEASE_TYPES } from './release/releaseBranches.js';
+export { resolveReleaseVcs, type ResolveReleaseVcsOptions } from './release/releaseVcs.js';
