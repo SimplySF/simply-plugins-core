@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-project-core%400.3.0...%40simplysf%2Fsimply-project-core%400.4.0) (2026-11-12)
+
+### Features
+
+- **simply-project-core:** configurable version increments for createRelease ([#289](https://github.com/SimplySF/simply-plugins-core/issues/289)) ([3c11fb9](https://github.com/SimplySF/simply-plugins-core/commit/3c11fb95d4e975a21bf9184fb16034378c18c91d))
+
 # [0.3.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-project-core%400.2.0...%40simplysf%2Fsimply-project-core%400.3.0) (2026-11-12)
 
 ### Features
