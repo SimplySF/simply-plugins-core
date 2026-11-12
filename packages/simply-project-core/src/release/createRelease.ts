@@ -33,6 +33,7 @@ import {
 import { stringifyProject } from './projectIdentity.js';
 import { bumpProjectVersion, hasVersion } from './projectVersion.js';
 import {
+  isValidIncrement,
   nextReleaseBranch,
   parseReleaseBranch,
   RELEASE_TYPES,
@@ -42,6 +43,7 @@ import {
   sortReleaseBranches,
   versionNumberMatchesBranch,
 } from './releaseBranches.js';
+import { readReleasePluginConfig } from './releaseConfig.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -77,6 +79,11 @@ export type CreateReleaseResult = {
 
 export type CreateReleaseOptions = {
   type: ReleaseType;
+  /**
+   * How far `type`'s part of the version moves. Defaults to the source branch's
+   * `plugins.simply.release.increments` in `sfdx-project.json`, else 1.
+   */
+  increment?: number;
   /** The release branch to cut from. Defaults to the current branch. */
   source?: string;
   packageReleaseBranchPrefix?: string;
@@ -121,6 +128,11 @@ function assertOptions(options: CreateReleaseOptions, message: string): void {
     throw new Error(`Invalid release type "${String(options.type)}". Use ${RELEASE_TYPES.join(', ')}.`);
   }
   assertValidMessage(message, ['{VERSION}']);
+  if (options.increment !== undefined && !isValidIncrement(options.increment)) {
+    throw new Error(
+      `Invalid ${options.type} increment ${String(options.increment)}. Use a whole number of at least 1.`,
+    );
+  }
 
   const wantsRelease = wantsPlatformRelease(options);
   if ((wantsRelease || options.setDefault) && !options.vcs) {
@@ -310,10 +322,11 @@ async function buildPlan(options: CreateReleaseOptions, message: string): Promis
   const { source, resuming } = await resolveSource(cwd, remote, prefix, options.source);
   const remoteSource = `${remote}/${source.name}`;
   const project = await assertSourceVersion(cwd, remoteSource, source);
-  const target = nextReleaseBranch(source, options.type, prefix);
+  const increment = options.increment ?? readReleasePluginConfig(project, remoteSource).increments?.[options.type] ?? 1;
+  const target = nextReleaseBranch(source, options.type, prefix, increment);
   if (resuming && resuming.name !== target.name) {
     throw new Error(
-      `${resuming.name} was cut from ${source.name}, but a ${options.type} release of it is ${target.name}. Re-run with the release type that names ${resuming.name}.`,
+      `${resuming.name} was cut from ${source.name}, but a ${options.type} release of it with an increment of ${increment} is ${target.name}. Re-run with the release type and increment that name ${resuming.name}.`,
     );
   }
   await assertTargetFree(cwd, remote, prefix, target);

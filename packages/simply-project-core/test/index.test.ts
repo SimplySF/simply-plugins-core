@@ -26,5 +26,12 @@ import * as api from '../src/index.js';
  * renamed key is the signal to treat the change as breaking (see `src/index.ts`'s header comment).
  */
 it('exports the expected set of runtime values', () => {
-  expect(Object.keys(api).sort()).toStrictEqual(['RELEASE_TYPES', 'createRelease', 'resolveReleaseVcs', 'rollForward']);
+  expect(Object.keys(api).sort()).toStrictEqual([
+    'RELEASE_CONFIG_PATH',
+    'RELEASE_TYPES',
+    'createRelease',
+    'readReleasePluginConfig',
+    'resolveReleaseVcs',
+    'rollForward',
+  ]);
 });

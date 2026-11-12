@@ -31,4 +31,5 @@ export {
   type ReleaseType,
 } from './release/createRelease.js';
 export { RELEASE_TYPES } from './release/releaseBranches.js';
+export { RELEASE_CONFIG_PATH, readReleasePluginConfig, type ReleasePluginConfig } from './release/releaseConfig.js';
 export { resolveReleaseVcs, type ResolveReleaseVcsOptions } from './release/releaseVcs.js';

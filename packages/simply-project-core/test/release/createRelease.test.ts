@@ -53,6 +53,13 @@ const project = (version: string, indent: number | string = 2): string =>
     indent,
   )}\n`;
 
+/** `project(version)` with `plugins.simply.release.increments` set. */
+const projectWithIncrements = (version: string, increments: Record<string, unknown>): string => {
+  const parsed = JSON.parse(project(version)) as Record<string, unknown>;
+  return `${JSON.stringify({ ...parsed, plugins: { simply: { release: { increments } } } }, undefined, 2)}
+`;
+};
+
 function commit(cwd: string, file: string, content: string, message = file): void {
   fs.writeFileSync(path.join(cwd, file), content);
   git(cwd, 'add', '-A');
@@ -149,6 +156,57 @@ describe('createRelease', () => {
     await createRelease({ type: 'minor', source: 'release/v2.0.0', cwd: lead });
 
     expect(git(remote, 'show', 'release/v2.1.0:sfdx-project.json')).toBe(project('2.1.0', 4).trim());
+  });
+
+  describe('increments', () => {
+    it("moves by the source branch's plugins.simply.release.increments, and carries the setting forward", async () => {
+      commit(lead, 'sfdx-project.json', projectWithIncrements('1.2.0', { minor: 10, patch: 1 }), 'increments');
+      git(lead, 'push', '-q', 'origin', 'release/v1.2.0');
+
+      const result = await createRelease({ type: 'minor', cwd: lead });
+
+      expect(result).toMatchObject({ branch: 'release/v1.12.0', version: '1.12.0' });
+      const cut = remoteProject('release/v1.12.0') as Project & { plugins: unknown };
+      expect(cut.packageDirectories[0].versionNumber).toBe('1.12.0.NEXT');
+      expect(cut.plugins).toEqual({ simply: { release: { increments: { minor: 10, patch: 1 } } } });
+    });
+
+    it('uses only the chosen type, defaulting the others to 1', async () => {
+      commit(lead, 'sfdx-project.json', projectWithIncrements('1.2.0', { minor: 10 }), 'increments');
+      git(lead, 'push', '-q', 'origin', 'release/v1.2.0');
+
+      await expect(createRelease({ type: 'patch', cwd: lead })).resolves.toMatchObject({ branch: 'release/v1.2.1' });
+    });
+
+    it("lets the increment option beat the project's setting", async () => {
+      commit(lead, 'sfdx-project.json', projectWithIncrements('1.2.0', { major: 5 }), 'increments');
+      git(lead, 'push', '-q', 'origin', 'release/v1.2.0');
+
+      await expect(createRelease({ type: 'major', increment: 2, cwd: lead })).resolves.toMatchObject({
+        branch: 'release/v3.0.0',
+      });
+    });
+
+    it("reads the remote source's sfdx-project.json, not unpushed local commits", async () => {
+      commit(lead, 'sfdx-project.json', projectWithIncrements('1.2.0', { minor: 10 }), 'local only');
+
+      await expect(createRelease({ type: 'minor', dryRun: true, cwd: lead })).resolves.toMatchObject({
+        branch: 'release/v1.3.0',
+      });
+    });
+
+    it('refuses an invalid increment before changing anything', async () => {
+      await expect(createRelease({ type: 'minor', increment: 0, cwd: lead })).rejects.toThrow(
+        'Invalid minor increment 0',
+      );
+
+      commit(lead, 'sfdx-project.json', projectWithIncrements('1.2.0', { minor: 'ten' }), 'bad increments');
+      git(lead, 'push', '-q', 'origin', 'release/v1.2.0');
+      await expect(createRelease({ type: 'minor', cwd: lead })).rejects.toThrow(
+        `plugins.simply.release.increments.minor in origin/release/v1.2.0's sfdx-project.json must be a whole number of at least 1, not "ten".`,
+      );
+      expect(remoteBranches()).toEqual(['release/v1.2.0']);
+    });
   });
 
   it('allows a patch on an older line while a newer release exists', async () => {
