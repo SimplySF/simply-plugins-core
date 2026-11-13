@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.9.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.8.0...%40simplysf%2Fsimply-core%401.9.0) (2026-11-13)
+
+### Features
+
+- **simply-cicd-core:** happy-soup release branches, and draft merge requests ([#290](https://github.com/SimplySF/simply-plugins-core/issues/290)) ([2979b36](https://github.com/SimplySF/simply-plugins-core/commit/2979b362f9f1c28e7c02069e8ad0074ccd47f303))
+
 # [1.8.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.7.0...%40simplysf%2Fsimply-core%401.8.0) (2026-11-12)
 
 ### Features
