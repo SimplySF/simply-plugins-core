@@ -32,6 +32,7 @@ export type {
   VcsCommit,
   VcsCommitLogEntry,
   VcsMergeRequest,
+  VcsMergeRequestOptions,
   VcsProject,
   VcsProjectRef,
   VcsProjectVariable,

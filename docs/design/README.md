@@ -102,6 +102,7 @@ with no `simply-core`/`-core` library involvement, so they now live only in that
 | [0060](0060-cicd-env-var-simply-prefix.md)                           | `SIMPLY_CICD_` prefix for every variable `simply-cicd-core` defines                   | Accepted                                                              |
 | [0061](0061-project-release-create.md)                               | `simply project release create`                                                       | In progress                                                           |
 | [0062](0062-release-create-increments.md)                            | Configurable version increments for `simply project release create`                   | In progress                                                           |
+| [0063](0063-happy-soup-release-branches.md)                          | `simply cicd happy-soup release create` and `release stage`                           | In progress                                                           |
 
 ## Template
 

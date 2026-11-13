@@ -152,6 +152,20 @@ if (vcs.createRelease && vcs.setDefaultBranch) {
   await vcs.createRelease(projectId!, { tagName: 'v1.2.0.13', name: 'v1.2.0' });
   await vcs.setDefaultBranch(projectId!, 'release/v1.3.0');
 }
+
+// A draft merge request that keeps its source branch after merging.
+await vcs.createMergeRequest(
+  projectId!,
+  'release/2026-10-19',
+  'environment/production',
+  'Release 2026-10-19',
+  '',
+  undefined,
+  {
+    draft: true,
+    removeSourceBranch: false,
+  },
+);
 ```
 
 ## Retrying a flaky call

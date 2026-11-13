@@ -77,6 +77,17 @@ export type VcsMergeRequest = {
   raw: unknown;
 };
 
+/** Optional behavior for {@link VcsProvider.createMergeRequest}. */
+export type VcsMergeRequestOptions = {
+  /** Open it as a draft: a `Draft:` title prefix on GitLab, a draft pull request on GitHub. */
+  draft?: boolean;
+  /**
+   * Delete the source branch when it merges. Defaults to `true`. Only GitLab sets this per merge
+   * request; GitHub follows the repository's `delete_branch_on_merge` setting.
+   */
+  removeSourceBranch?: boolean;
+};
+
 /** A project/repo-level CI variable, normalized across VCS platforms. */
 export type VcsProjectVariable = {
   key: string;
@@ -192,6 +203,7 @@ export interface VcsProvider {
     title: string,
     description: string,
     labels?: string[],
+    options?: VcsMergeRequestOptions,
   ): Promise<VcsMergeRequest>;
 
   /** Updates an existing merge/pull request's title, description, and labels. */

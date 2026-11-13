@@ -20,6 +20,7 @@ import type {
   VcsCommit,
   VcsCommitLogEntry,
   VcsMergeRequest,
+  VcsMergeRequestOptions,
   VcsProject,
   VcsProjectRef,
   VcsProjectVariable,
@@ -283,12 +284,19 @@ export class GitHubProvider implements VcsProvider {
     title: string,
     description: string,
     labels?: string[],
+    options: VcsMergeRequestOptions = {},
   ): Promise<VcsMergeRequest> {
     // GitLab's `remove_source_branch` has no per-pull-request equivalent here; branch cleanup is
-    // the repo-level `delete_branch_on_merge` setting.
+    // the repo-level `delete_branch_on_merge` setting, so `options.removeSourceBranch` is ignored.
     const response = await this.request(`${repoPath(project)}/pulls`, {
       method: 'POST',
-      body: { title, body: description, head: sourceBranch, base: targetBranch },
+      body: {
+        title,
+        body: description,
+        head: sourceBranch,
+        base: targetBranch,
+        ...(options.draft ? { draft: true } : {}),
+      },
     });
     const pullRequest = normalizePullRequest((await response.json()) as GitHubPullRequestResponse);
 
