@@ -25,6 +25,7 @@ import {
   assertKnownRemote,
   assertValidMessage,
   assertWorkingTreeReady,
+  commitWithHooks,
   fetchRemote,
   gitSucceeds,
   PROJECT_FILE,
@@ -238,8 +239,8 @@ async function mergeHop(
   if (remaining.length > 0) {
     return { conflictedFiles: remaining };
   }
-  const commit = await execa('git', ['commit', '-m', renderMessage(message, hop)], { cwd, reject: false, all: true });
-  return commit.exitCode === 0 ? {} : { commitError: commit.all ?? '' };
+  const commitError = await commitWithHooks(cwd, renderMessage(message, hop));
+  return commitError === undefined ? {} : { commitError };
 }
 
 /** Confirms a finished merge really has the promised shape before it can be pushed. */

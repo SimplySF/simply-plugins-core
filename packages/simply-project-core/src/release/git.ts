@@ -15,6 +15,7 @@
  */
 
 import { execa } from 'execa';
+import { logger } from '../logger.js';
 
 export const PROJECT_FILE = 'sfdx-project.json';
 
@@ -75,11 +76,66 @@ export function assertValidMessage(message: string, placeholders: string[]): voi
   }
 }
 
-/** Switches back to where the lead started: their branch if it still exists, else the commit they were on. */
-export async function restoreStart(cwd: string, startBranch: string, startCommit: string): Promise<void> {
+/**
+ * Switches back to where the lead started: their branch if it still exists, else the commit they were on.
+ * It runs after the work is pushed, so a failed switch is logged as a warning instead of failing the run.
+ *
+ * @returns `false` if the switch failed.
+ */
+export async function restoreStart(cwd: string, startBranch: string, startCommit: string): Promise<boolean> {
+  let args: string[];
   if (startBranch === 'HEAD') {
-    await runGit(cwd, ['switch', '--detach', startCommit]);
+    args = ['switch', '--detach', startCommit];
   } else if (await gitSucceeds(cwd, ['show-ref', '--verify', '-q', `refs/heads/${startBranch}`])) {
-    await runGit(cwd, ['switch', startBranch]);
+    args = ['switch', startBranch];
+  } else {
+    return true;
   }
+  const { exitCode, stderr } = await execa('git', args, { cwd, reject: false });
+  if (exitCode === 0) {
+    return true;
+  }
+  logger.warn(
+    `Everything was pushed, but switching back failed. Check \`git status\`, then run \`git ${args.join(' ')}\`.\n${stderr}`,
+  );
+  return false;
+}
+
+/** How many times a hook's changes are amended into the commit before giving up. */
+const MAX_HOOK_AMENDS = 2;
+
+/** Tracked files that differ from `HEAD`, staged or not. */
+async function dirtyTrackedFiles(cwd: string): Promise<string[]> {
+  return (await runGit(cwd, ['diff', '--name-only', 'HEAD'])).split(/\r?\n/).filter(Boolean);
+}
+
+/**
+ * Commits what is staged, running the repository's hooks. A pre-commit hook that rewrites files without
+ * restaging them (a formatter, say) leaves them dirty, so they're staged and amended into the same commit,
+ * which runs the hooks again. Callers start from a clean tree, so anything dirty was written by a hook.
+ *
+ * @returns The hook's output if it rejected the commit, else `undefined`.
+ * @throws If the hooks still change files after {@link MAX_HOOK_AMENDS} amends; nothing has been pushed.
+ */
+export async function commitWithHooks(cwd: string, message: string): Promise<string | undefined> {
+  let commit = await execa('git', ['commit', '-m', message], { cwd, reject: false, all: true });
+  for (let amends = 0; commit.exitCode === 0; amends++) {
+    // eslint-disable-next-line no-await-in-loop -- each pass checks the commit the previous one made
+    const dirty = await dirtyTrackedFiles(cwd);
+    if (dirty.length === 0) {
+      return undefined;
+    }
+    if (amends === MAX_HOOK_AMENDS) {
+      throw new Error(
+        `A pre-commit hook keeps changing ${dirty.join(', ')} after every commit, so nothing was pushed. Make the hook's output stable, or have it restage what it changes, then re-run this command.`,
+      );
+    }
+    logger.info(`A pre-commit hook changed ${dirty.join(', ')}, so its changes are amended into the commit.`);
+    // eslint-disable-next-line no-await-in-loop
+    await runGit(cwd, ['add', '-u']);
+    // --allow-empty: a hook that undid the whole change should fail the caller's own checks, not this amend.
+    // eslint-disable-next-line no-await-in-loop
+    commit = await execa('git', ['commit', '--amend', '--no-edit', '--allow-empty'], { cwd, reject: false, all: true });
+  }
+  return commit.all ?? '';
 }

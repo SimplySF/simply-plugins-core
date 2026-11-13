@@ -63,7 +63,9 @@ the tag history.
 `release/v1.2.0`. It starts from the remote's copy of the source, never from local commits, and
 commits one version bump to `sfdx-project.json`: `versionNumber` becomes `1.3.0.NEXT`, and the
 version inside `versionName` is replaced in place. The commit runs the repository's hooks, and the
-push never forces.
+push never forces. If a pre-commit hook reformats files without restaging them, its changes are
+amended into the same commit before the push. A hook that keeps changing files, or one that removes
+the new version, stops the run before anything is pushed.
 
 ```ts
 import { createRelease } from '@simplysf/simply-project-core';

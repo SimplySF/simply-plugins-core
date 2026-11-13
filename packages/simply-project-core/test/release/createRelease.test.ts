@@ -66,6 +66,17 @@ function commit(cwd: string, file: string, content: string, message = file): voi
   git(cwd, 'commit', '-qm', message);
 }
 
+/** Installs a git hook in `cwd`'s repository. */
+function installHook(cwd: string, name: string, body: string): void {
+  const hook = path.join(cwd, '.git', 'hooks', name);
+  fs.mkdirSync(path.dirname(hook), { recursive: true });
+  fs.writeFileSync(hook, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+}
+
+/** A pre-commit hook that reformats sfdx-project.json as compact JSON and doesn't restage it, like a bare `prettier --write`. */
+const REFORMAT_HOOK =
+  "node -e \"const fs=require('fs');const f='sfdx-project.json';fs.writeFileSync(f,JSON.stringify(JSON.parse(fs.readFileSync(f,'utf8')))+'\\n')\"";
+
 type Project = { packageDirectories: Array<Record<string, unknown>> };
 const remoteProject = (branch: string): Project =>
   JSON.parse(git(remote, 'show', `${branch}:sfdx-project.json`)) as Project;
@@ -259,6 +270,69 @@ describe('createRelease', () => {
     await expect(createRelease({ type: 'minor', cwd: lead })).resolves.toMatchObject({ status: 'Created' });
     expect(git(lead, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('release/v1.3.0');
     expect(git(remote, 'log', '-1', '--format=%s', 'release/v1.3.0')).toBe('chore: PROJ-1 bump version to 1.3.0');
+  });
+
+  describe('pre-commit hooks', () => {
+    it("amends a reformatting hook's changes into the one bump commit, then goes back to the start branch", async () => {
+      installHook(lead, 'pre-commit', REFORMAT_HOOK);
+      const remoteTip = git(remote, 'rev-parse', 'release/v1.2.0');
+
+      const result = await createRelease({ type: 'minor', cwd: lead });
+
+      expect(result.status).toBe('Created');
+      expect(git(lead, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('release/v1.2.0');
+      expect(git(lead, 'status', '--porcelain')).toBe('');
+      expect(git(remote, 'rev-parse', 'release/v1.3.0^')).toBe(remoteTip);
+      expect(git(remote, 'rev-parse', 'release/v1.3.0')).toBe(result.commit);
+      const pushed = git(remote, 'show', 'release/v1.3.0:sfdx-project.json');
+      expect(pushed.split('\n')).toHaveLength(1);
+      expect(JSON.parse(pushed)).toMatchObject({ packageDirectories: [{ versionNumber: '1.3.0.NEXT' }] });
+    });
+
+    it('stops before pushing when a hook changes files on every commit', async () => {
+      commit(lead, 'stamp.txt', '0');
+      git(lead, 'push', '-q', 'origin', 'release/v1.2.0');
+      installHook(lead, 'pre-commit', 'date +%s%N >> stamp.txt');
+
+      await expect(createRelease({ type: 'minor', cwd: lead })).rejects.toThrow(
+        'keeps changing stamp.txt after every commit, so nothing was pushed',
+      );
+      expect(remoteBranches()).not.toContain('release/v1.3.0');
+    });
+
+    it('stops before pushing when a hook takes the new version back out', async () => {
+      installHook(lead, 'pre-commit', "sed -i 's/1.3.0/1.2.0/g' sfdx-project.json");
+
+      await expect(createRelease({ type: 'minor', cwd: lead })).rejects.toThrow(
+        'no longer declares 1.3.0, so nothing was pushed',
+      );
+      expect(remoteBranches()).not.toContain('release/v1.3.0');
+    });
+
+    it('reports Created, and warns, when switching back fails after the push', async () => {
+      // A pre-push hook that dirties the bumped file leaves nothing to fix before the push, only after it.
+      installHook(lead, 'pre-push', 'echo " " >> sfdx-project.json');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await createRelease({ type: 'minor', cwd: lead });
+
+      expect(result.status).toBe('Created');
+      expect(remoteBranches()).toContain('release/v1.3.0');
+      expect(git(lead, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('release/v1.3.0');
+      expect(warn.mock.calls.flat().join(' ')).toContain('git switch release/v1.2.0');
+      warn.mockRestore();
+    });
+  });
+
+  it('keeps CRLF line endings in sfdx-project.json', async () => {
+    git(lead, 'config', 'core.autocrlf', 'false');
+    commit(lead, 'sfdx-project.json', project('1.2.0').replaceAll('\n', '\r\n'), 'crlf');
+    git(lead, 'push', '-q', 'origin', 'release/v1.2.0');
+
+    await createRelease({ type: 'minor', cwd: lead });
+
+    const pushed = execFileSync('git', ['show', 'release/v1.3.0:sfdx-project.json'], { cwd: remote, encoding: 'utf8' });
+    expect(pushed).toBe(project('1.3.0').replaceAll('\n', '\r\n'));
   });
 
   it('refuses a stale local branch with the new name before changing anything', async () => {

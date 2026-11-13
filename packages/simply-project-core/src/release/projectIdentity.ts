@@ -75,8 +75,9 @@ export function identityMismatches(actual: JsonObject, target: JsonObject): stri
   });
 }
 
-/** Serializes a project using the indentation of `likeText`, so a rewrite doesn't reformat the file. */
+/** Serializes a project using the indentation and line endings of `likeText`, so a rewrite doesn't reformat the file. */
 export function stringifyProject(project: JsonObject, likeText: string): string {
   const indent = /^(?<indent>[ \t]+)"/m.exec(likeText)?.groups?.indent ?? '  ';
-  return `${JSON.stringify(project, undefined, indent)}\n`;
+  const eol = likeText.includes('\r\n') ? '\r\n' : '\n';
+  return `${JSON.stringify(project, undefined, indent).replaceAll('\n', eol)}${eol}`;
 }

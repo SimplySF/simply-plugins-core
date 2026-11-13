@@ -61,7 +61,8 @@ Each hop in the result has a `status` of `Rolled`, `Up to date`, `Conflict`, `Co
 `Merged, not pushed`, `Would roll`, or `Not started`. A `Conflict` or `Commit rejected` hop leaves the
 merge in progress on its roll branch; resolve or commit it by hand, then call `rollForward` again to
 continue. The function never force-pushes or pushes tags, and always runs the repository's commit
-hooks.
+hooks. A pre-commit hook that rewrites files without restaging them, such as a formatter, has its
+changes amended into the same commit (see "Pre-commit hooks that change files" below).
 
 ## Cutting a release branch
 
@@ -106,6 +107,22 @@ tag that is reachable from the source and on the remote, skipping fallback tags.
 `status` is `Created`, `Would create`, `Commit rejected`, or `Declined`. If a hook rejects the commit,
 nothing is pushed: commit by hand on the new branch, then call `createRelease` again from there to
 finish.
+
+### Pre-commit hooks that change files
+
+Both functions start only from a clean working tree, so a tracked file that is dirty after their
+commit was changed by a hook. Such changes are staged and amended into the same commit, which runs
+the hooks again. This repeats up to twice before anything is pushed:
+
+- A formatter's output is stable, so the second pass finds nothing to change, and the formatted
+  commit is pushed.
+- A hook that changes files on every commit makes the function throw before pushing.
+- `createRelease` also throws before pushing if a hook takes the new version out of
+  `sfdx-project.json`.
+
+The rewritten `sfdx-project.json` keeps the file's indentation and line endings. If switching back to
+the starting branch fails after the push, it is logged as a warning, and the result is still
+`Created` or `Rolled`.
 
 A project that numbers its releases in larger steps declares them in `sfdx-project.json`, read from
 the remote's copy of the source branch (so each new branch carries the setting forward):
