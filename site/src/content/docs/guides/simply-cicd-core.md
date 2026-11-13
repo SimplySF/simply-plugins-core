@@ -52,6 +52,31 @@ const alm = createAlmProvider(resolveAlmProviderKind(config, flags['alm-provider
 const projectKeys = resolveAlmProjectKeys(config, flags['alm-project-key']);
 ```
 
+## Opening a happy-soup release
+
+`createReleaseBranch` cuts `release/<date>` from the remote's copy of the production branch, commits
+the deployment steps and config files copied from their templates in one commit, pushes, and opens a
+draft merge request back into production. The config file goes to the path `determineDeployConfigFile`
+derives from the branch, so the deploy stages pick it up. `stageReleaseBranch` starts a
+`<team>/<app>/<name>` branch for work headed into a release.
+
+```ts
+import { createReleaseBranch, resolveHappySoupVcs, stageReleaseBranch } from '@simplysf/simply-cicd-core';
+
+const result = await createReleaseBranch({
+  date: '2026-10-19',
+  vcs: resolveHappySoupVcs({ token: process.env.SIMPLY_VCS_TOKEN }),
+});
+console.log(result.status, result.files, result.mergeRequest?.webUrl);
+
+await stageReleaseBranch({ team: 'platform', app: 'core', name: 'PROJ-1058', baseBranch: result.branch });
+```
+
+Both read `config/release.json` (searched upward to the repository root), refuse a dirty working tree
+before changing anything, and never force a checkout. Pass `dryRun: true` to get the plan without
+changing anything. If the branch is already on the remote, it is checked out instead, and
+`createReleaseBranch` opens the merge request if it's missing, so a re-run finishes a failed one.
+
 ## Running a pipeline stage without the CLI
 
 Every `sf simply cicd` stage is a function here that takes the camelCase equivalent of the command's

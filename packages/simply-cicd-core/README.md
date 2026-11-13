@@ -107,6 +107,31 @@ await deployProject({
 });
 ```
 
+### Happy-soup release branches
+
+The developer-run side of a happy-soup release, behind `sf simply cicd happy-soup release create` and
+`release stage`. Neither prints anything: each returns a structured result, with any warnings in it.
+
+```ts
+import { createReleaseBranch, resolveHappySoupVcs, stageReleaseBranch } from '@simplysf/simply-cicd-core';
+
+// Cut release/2026-10-19 from the remote's production branch, commit the deployment steps and
+// config templates, push, and open a draft merge request back into production.
+await createReleaseBranch({
+  date: '2026-10-19',
+  vcs: resolveHappySoupVcs({ token: process.env.SIMPLY_VCS_TOKEN }),
+});
+
+// Start platform/core/PROJ-1058 from the remote's copy of the release branch, and check it out.
+await stageReleaseBranch({ team: 'platform', app: 'core', name: 'PROJ-1058', baseBranch: 'release/2026-10-19' });
+```
+
+Settings come from `config/release.json` (`loadReleaseConfig`): `teams` and `applications` for
+prompts, `productionBranch` (default `environment/production`), and the two template paths. The
+deployment config lands where `determineDeployConfigFile` looks for the branch, so the deploy stages
+find it. Both functions refuse a dirty working tree before changing anything, never force a checkout,
+and check out a branch that's already on the remote instead of recreating it.
+
 ### Environment variables and dotenv keys
 
 Every variable this package defines starts with `SIMPLY_CICD_`. The unprefixed names in the right

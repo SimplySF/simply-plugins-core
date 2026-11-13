@@ -171,6 +171,30 @@ describe('GitLabProvider', () => {
     expect(body.labels).toBeUndefined();
   });
 
+  it('createMergeRequest removes the source branch by default, and marks a draft with a title prefix', async () => {
+    /* eslint-disable camelcase -- GitLab API field names */
+    const created = { id: 1, iid: 1, title: 't', source_branch: 'a', target_branch: 'b' };
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(created))
+      .mockResolvedValueOnce(jsonResponse(created))
+      .mockResolvedValueOnce(jsonResponse(created));
+    const provider = new GitLabProvider({ host, token });
+    const bodyOf = (call: number): Record<string, unknown> =>
+      JSON.parse((fetchMock.mock.calls[call] as [string, RequestInit])[1].body as string) as Record<string, unknown>;
+
+    await provider.createMergeRequest('123', 'a', 'b', 'Release 2026-10-19', 'd');
+    await provider.createMergeRequest('123', 'a', 'b', 'Release 2026-10-19', 'd', undefined, {
+      draft: true,
+      removeSourceBranch: false,
+    });
+    await provider.createMergeRequest('123', 'a', 'b', 'Draft: already', 'd', undefined, { draft: true });
+
+    expect(bodyOf(0)).toMatchObject({ title: 'Release 2026-10-19', remove_source_branch: true });
+    expect(bodyOf(1)).toMatchObject({ title: 'Draft: Release 2026-10-19', remove_source_branch: false });
+    expect(bodyOf(2).title).toBe('Draft: already');
+    /* eslint-enable camelcase */
+  });
+
   it('findOpenMergeRequest returns undefined when none are open', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([]));
 

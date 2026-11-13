@@ -20,6 +20,7 @@ import type {
   VcsCommit,
   VcsCommitLogEntry,
   VcsMergeRequest,
+  VcsMergeRequestOptions,
   VcsProject,
   VcsProjectRef,
   VcsProjectVariable,
@@ -270,15 +271,18 @@ export class GitLabProvider implements VcsProvider {
     title: string,
     description: string,
     labels?: string[],
+    options: VcsMergeRequestOptions = {},
   ): Promise<VcsMergeRequest> {
     const endpoint = `/projects/${projectSegment(project)}/merge_requests`;
+    // GitLab has no draft field on create: a `Draft:` title prefix is what marks one.
+    const draftTitle = options.draft && !/^(draft:|\[draft\])/i.test(title) ? `Draft: ${title}` : title;
     /* eslint-disable camelcase -- GitLab API field names */
     const body: Record<string, unknown> = {
       source_branch: sourceBranch,
       target_branch: targetBranch,
-      title,
+      title: draftTitle,
       description,
-      remove_source_branch: true,
+      remove_source_branch: options.removeSourceBranch ?? true,
     };
     /* eslint-enable camelcase */
     if (labels?.length) {

@@ -239,6 +239,17 @@ describe('GitHubProvider', () => {
     expect(bodyOf(0)).toEqual({ title: 'title', body: 'desc', head: 'a', base: 'b' });
   });
 
+  it('createMergeRequest opens a draft pull request when asked', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(pullRequestFixture));
+
+    await new GitHubProvider({ host, token }).createMergeRequest(project, 'a', 'b', 'title', 'desc', undefined, {
+      draft: true,
+      removeSourceBranch: false,
+    });
+
+    expect(bodyOf(0)).toEqual({ title: 'title', body: 'desc', head: 'a', base: 'b', draft: true });
+  });
+
   it('createMergeRequest posts labels to the backing issue when given', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(pullRequestFixture)).mockResolvedValueOnce(jsonResponse([]));
 

@@ -192,6 +192,11 @@ written before they existed still compiles. Both built-in providers implement th
 before calling it. `createRelease` needs an existing tag, since GitHub would otherwise create one from
 the default branch.
 
+`createMergeRequest` takes an optional last argument, `{ draft, removeSourceBranch }`. `draft` opens a
+draft pull request on GitHub, and prefixes the title with `Draft:` on GitLab, which has no draft field
+on create. `removeSourceBranch` defaults to `true` and only applies on GitLab; GitHub follows the
+repository's `delete_branch_on_merge` setting.
+
 ```ts
 import { createVcsProvider, loadSfDevRc, resolveVcsSettings } from '@simplysf/simply-core';
 
@@ -202,7 +207,7 @@ await vcs.createRelease?.(projectId!, { tagName: 'v1.2.0.13', name: 'v1.2.0' });
 ```
 
 Types: `VcsProvider`, `VcsProviderFactory`, `VcsProviderOptions`, `VcsProject`, `VcsProjectRef`,
-`VcsBranch`, `VcsCommit`, `VcsCommitLogEntry`, `VcsMergeRequest`, `VcsProjectVariable`, `VcsRelease`,
+`VcsBranch`, `VcsCommit`, `VcsCommitLogEntry`, `VcsMergeRequest`, `VcsMergeRequestOptions`, `VcsProjectVariable`, `VcsRelease`,
 `VcsReleaseInput`, `VcsTerminology`, `VcsCiContext`.
 
 ### Collections and paths
