@@ -81,6 +81,17 @@ function cutRelease(
   git(cwd, 'tag', '-a', buildTag, '-m', '04t');
 }
 
+/** Installs a git hook in `cwd`'s repository. */
+function installHook(cwd: string, name: string, body: string): void {
+  const hook = path.join(cwd, '.git', 'hooks', name);
+  fs.mkdirSync(path.dirname(hook), { recursive: true });
+  fs.writeFileSync(hook, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+}
+
+/** A pre-commit hook that reformats sfdx-project.json as compact JSON and doesn't restage it, like a bare `prettier --write`. */
+const REFORMAT_HOOK =
+  "node -e \"const fs=require('fs');const f='sfdx-project.json';fs.writeFileSync(f,JSON.stringify(JSON.parse(fs.readFileSync(f,'utf8')))+'\\n')\"";
+
 const pushAll = (): string => git(lead, 'push', '-q', 'origin', '--all', '--follow-tags');
 type Project = { packageDirectories: Array<Record<string, unknown>>; packageAliases: Record<string, string> };
 const remoteProject = (branch: string): Project =>
@@ -237,6 +248,21 @@ describe('rollForward', () => {
     await expect(rollForward({ cwd: lead, message: '  ' })).rejects.toThrow(/empty/);
     await expect(rollForward({ cwd: lead, message: 'roll {SORCE}' })).rejects.toThrow(/\{SORCE\}/);
     expect(git(lead, 'branch', '--list', 'roll-forward/*')).toBe('');
+  });
+
+  it("amends a reformatting hook's changes into the merge commit, keeping both parents", async () => {
+    installHook(lead, 'pre-commit', REFORMAT_HOOK);
+    const before = git(remote, 'rev-parse', 'release/v1.2.0');
+    const sourceTip = git(remote, 'rev-parse', 'release/v1.1.0');
+
+    const { hops } = await rollForward({ cwd: lead });
+
+    expect(hops.at(-1)?.status).toBe('Rolled');
+    expect(git(lead, 'status', '--porcelain')).toBe('');
+    expect(git(remote, 'rev-parse', 'release/v1.2.0^1')).toBe(before);
+    expect(git(remote, 'rev-parse', 'release/v1.2.0^2')).toBe(sourceTip);
+    expect(git(remote, 'show', 'release/v1.2.0:sfdx-project.json').split('\n')).toHaveLength(1);
+    expect(remoteProject('release/v1.2.0').packageDirectories[0].versionNumber).toBe('1.2.0.NEXT');
   });
 
   it('reports a hook rejecting the commit, and finishes after the lead commits by hand', async () => {

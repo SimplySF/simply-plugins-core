@@ -16,13 +16,13 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { execa } from 'execa';
 import type { VcsProjectRef, VcsProvider } from '@simplysf/simply-core';
 import { logger } from '../logger.js';
 import {
   assertKnownRemote,
   assertValidMessage,
   assertWorkingTreeReady,
+  commitWithHooks,
   fetchRemote,
   gitSucceeds,
   PROJECT_FILE,
@@ -306,8 +306,13 @@ async function cutBranch(plan: Plan, project: JsonObject): Promise<string | unde
   await runGit(cwd, ['add', '--', PROJECT_FILE]);
 
   const commitMessage = plan.message.replaceAll('{VERSION}', () => result.version);
-  const commit = await execa('git', ['commit', '-m', commitMessage], { cwd, reject: false, all: true });
-  return commit.exitCode === 0 ? undefined : (commit.all ?? '');
+  const commitError = await commitWithHooks(cwd, commitMessage);
+  if (commitError === undefined && !hasVersion(JSON.parse(await readProjectAt(cwd, 'HEAD')) as JsonObject, target)) {
+    throw new Error(
+      `A commit hook changed ${PROJECT_FILE} so that it no longer declares ${versionOf(target)}, so nothing was pushed. Fix the hook, delete ${target.name} with \`git switch ${source.name} && git branch -D ${target.name}\`, and re-run this command.`,
+    );
+  }
+  return commitError;
 }
 
 async function buildPlan(options: CreateReleaseOptions, message: string): Promise<{ plan: Plan; project: JsonObject }> {
