@@ -77,6 +77,33 @@ before changing anything, and never force a checkout. Pass `dryRun: true` to get
 changing anything. If the branch is already on the remote, it is checked out instead, and
 `createReleaseBranch` opens the merge request if it's missing, so a re-run finishes a failed one.
 
+## Merging a happy-soup release after production
+
+Once the production `deployment-close-out` has run, `mergeReleaseMergeRequest` merges the release's
+merge request into production. It refuses to merge anything that wasn't deployed. The merge request's
+head must be the deployed commit, or that commit plus close-out's `[skip ci]` commits. Anything pushed
+to the release branch mid-deploy stops the merge.
+
+```ts
+import { createVcsProvider, mergeReleaseMergeRequest } from '@simplysf/simply-cicd-core';
+
+const result = await mergeReleaseMergeRequest({
+  vcs: {
+    provider: createVcsProvider('gitlab', { token: process.env.PROJECT_ACCESS_TOKEN! }),
+    project: 'group/project',
+  },
+  sourceBranch: 'release/2026-10-19',
+  targetBranch: 'environment/production',
+  deployedSha: process.env.CI_COMMIT_SHA!,
+});
+console.log(result.status); // 'Merged', 'Would merge' (dryRun), or 'Already merged'
+```
+
+A draft is marked ready first. The merge passes the checked head SHA, so the platform refuses it if
+the branch moves. If approvals, required checks, conflicts, or open threads block the merge, it fails
+with a message naming what to fix. The `[skip ci]` close-out commit never runs a pipeline, so GitLab's
+"Pipelines must succeed" also needs "Skipped pipelines are considered successful".
+
 ## Running a pipeline stage without the CLI
 
 Every `sf simply cicd` stage is a function here that takes the camelCase equivalent of the command's

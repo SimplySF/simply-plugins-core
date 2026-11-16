@@ -33,6 +33,8 @@ import {
   updateProgress,
 } from '../../src/deploy/deployCommon.js';
 import { deployHappySoup } from '../../src/deploy/deployHappySoup.js';
+import { mergeReleaseMergeRequest } from '../../src/happySoup/mergeReleaseMergeRequest.js';
+import { loadReleaseConfig } from '../../src/happySoup/releaseConfig.js';
 
 chalk.level = 0;
 
@@ -61,6 +63,13 @@ vi.mock('../../src/sfPlugins.js', () => ({ installDeploymentPlugins: vi.fn().moc
 vi.mock('../../src/sfPackages.js', () => ({
   installPackageDependencies: vi.fn().mockResolvedValue([]),
   resolveUpgradedPackages: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../src/happySoup/mergeReleaseMergeRequest.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/happySoup/mergeReleaseMergeRequest.js')>()),
+  mergeReleaseMergeRequest: vi.fn(),
+}));
+vi.mock('../../src/happySoup/releaseConfig.js', () => ({
+  loadReleaseConfig: vi.fn(() => ({ config: { productionBranch: 'environment/production' } })),
 }));
 vi.mock('../../src/deploy/deployCommon.js', () => ({
   determineDeployConfigFile: vi.fn(),
@@ -269,6 +278,79 @@ describe('deployHappySoup', () => {
 
       expect(fs.copyFile).not.toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalledWith('Unable to find a deploy.json to archive.');
+    });
+  });
+
+  describe("'merge-release' stage", () => {
+    const mergeOptions = {
+      ...baseOptions,
+      stage: 'merge-release',
+      ciCommitRefName: 'release/2026-10-19',
+      ciCommitSha: 'deployed0000',
+      ciProjectPath: 'group/proj',
+      projectAccessToken: 'token',
+    };
+    const result = {
+      mergeRequest: { iid: 42, title: 'Release 2026-10-19', webUrl: 'https://mr/42' },
+      headSha: 'archive00000',
+      closeOutCommits: ['archive00000'],
+      warnings: [],
+    };
+
+    it('merges into productionBranch from config/release.json by default', async () => {
+      vi.mocked(mergeReleaseMergeRequest).mockResolvedValue({ ...result, status: 'Merged', mergeCommitSha: 'm1' });
+
+      await deployHappySoup(mergeOptions);
+
+      expect(loadReleaseConfig).toHaveBeenCalled();
+      expect(mergeReleaseMergeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vcs: { provider: expect.objectContaining({ kind: 'gitlab' }), project: 'group/proj' },
+          sourceBranch: 'release/2026-10-19',
+          targetBranch: 'environment/production',
+          deployedSha: 'deployed0000',
+          mergeRequestIid: undefined,
+          waitMinutes: 10,
+        }),
+      );
+      expect(logger.log).toHaveBeenCalledWith(
+        'Merged MR "Release 2026-10-19" (https://mr/42) into environment/production as m1.',
+      );
+    });
+
+    it('passes an explicit target, iid, wait, and merge options through', async () => {
+      vi.mocked(mergeReleaseMergeRequest).mockResolvedValue({ ...result, status: 'Would merge' });
+
+      await deployHappySoup({
+        ...mergeOptions,
+        targetBranch: 'main',
+        mergeRequestIid: '42',
+        wait: '3',
+        squash: true,
+        removeSourceBranch: true,
+        dryRun: true,
+      });
+
+      expect(mergeReleaseMergeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetBranch: 'main',
+          mergeRequestIid: 42,
+          waitMinutes: 3,
+          squash: true,
+          removeSourceBranch: true,
+          dryRun: true,
+        }),
+      );
+      expect(logger.log).toHaveBeenCalledWith(
+        'Would merge MR "Release 2026-10-19" (https://mr/42) into main at archive00000.',
+      );
+    });
+
+    it('rejects an iid that is not a positive whole number', async () => {
+      await expect(deployHappySoup({ ...mergeOptions, mergeRequestIid: 'abc' })).rejects.toThrow(
+        '--merge-request-iid must be a positive whole number, not "abc".',
+      );
+      expect(mergeReleaseMergeRequest).not.toHaveBeenCalled();
     });
   });
 

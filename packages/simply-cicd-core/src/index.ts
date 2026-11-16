@@ -83,6 +83,7 @@ export * from './flags/env.js';
 
 // happySoup/
 export * from './happySoup/createReleaseBranch.js';
+export * from './happySoup/mergeReleaseMergeRequest.js';
 export * from './happySoup/releaseConfig.js';
 export * from './happySoup/resolveOriginProject.js';
 export * from './happySoup/stageReleaseBranch.js';

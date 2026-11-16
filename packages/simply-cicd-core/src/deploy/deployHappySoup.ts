@@ -25,6 +25,12 @@ import {
   resolveUpgradedPackages,
 } from '../sfPackages.js';
 import type { UpgradedPackage } from '../schemas/deployProgress.js';
+import {
+  CLOSE_OUT_COMMIT_MESSAGES,
+  DEFAULT_MERGE_WAIT_MINUTES,
+  mergeReleaseMergeRequest,
+} from '../happySoup/mergeReleaseMergeRequest.js';
+import { loadReleaseConfig } from '../happySoup/releaseConfig.js';
 import { runDeployStage } from './runDeployStage.js';
 import {
   determineDeployConfigFile,
@@ -46,7 +52,7 @@ async function archiveOrRemoveDeployConfig(
       const newDeployPath = 'config/deploy.json';
       await fs.copyFile(finalDeployConfigFile, newDeployPath);
       await execa('git', ['add', newDeployPath]);
-      await execa('git', ['commit', '-m', 'Archiving deploy.json [skip ci]', newDeployPath]);
+      await execa('git', ['commit', '-m', CLOSE_OUT_COMMIT_MESSAGES.archive, newDeployPath]);
       await execa('git', ['push', remoteAlias]);
       return;
     } catch {
@@ -57,7 +63,7 @@ async function archiveOrRemoveDeployConfig(
   try {
     await fs.access('config/deploy.json');
     await execa('git', ['rm', 'config/deploy.json']);
-    await execa('git', ['commit', '-m', 'Removing obsolete config/deploy.json [skip ci]', 'config/deploy.json']);
+    await execa('git', ['commit', '-m', CLOSE_OUT_COMMIT_MESSAGES.remove, 'config/deploy.json']);
     await execa('git', ['push', remoteAlias]);
   } catch {
     logger.warn('Unable to find a deploy.json to archive.');
@@ -95,6 +101,73 @@ async function deploymentCloseOut(config: DeploymentCloseOutConfig): Promise<voi
 
   const finalDeployConfigFile = deployReleaseDate ? `deployment-configs/${deployReleaseDate}.json` : deployConfigFile;
   await archiveOrRemoveDeployConfig(finalDeployConfigFile, remoteAlias);
+}
+
+export type MergeReleaseConfig = {
+  projectAccessToken: string;
+  ciProjectPath: string;
+  /** The release branch, which is the merge request's source. */
+  ciCommitRefName: string;
+  /** The commit this pipeline deployed. */
+  ciCommitSha: string;
+  /** Defaults to `productionBranch` from `config/release.json`. */
+  targetBranch?: string;
+  mergeRequestIid?: string;
+  squash?: boolean;
+  removeSourceBranch?: boolean;
+  /** Minutes to wait for the platform to work out mergeability. */
+  wait?: string;
+  dryRun?: boolean;
+  vcsHost?: string;
+  vcsProvider: VcsProviderKind;
+};
+
+function parsePositiveInteger(value: string | undefined, flag: string): number | undefined {
+  if (value === undefined || value === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${flag} must be a positive whole number, not "${value}".`);
+  }
+  return parsed;
+}
+
+/** Merges the release branch's merge request into production. See `mergeReleaseMergeRequest`. */
+async function mergeRelease(config: MergeReleaseConfig): Promise<void> {
+  const provider = createVcsProvider(config.vcsProvider, { host: config.vcsHost, token: config.projectAccessToken });
+  const targetBranch = config.targetBranch ?? loadReleaseConfig().config.productionBranch;
+
+  const result = await mergeReleaseMergeRequest({
+    // GitLab takes the URL-encoded path in place of the numeric ID, and GitHub's key is the path.
+    vcs: { provider, project: config.ciProjectPath },
+    sourceBranch: config.ciCommitRefName,
+    targetBranch,
+    deployedSha: config.ciCommitSha,
+    mergeRequestIid: parsePositiveInteger(config.mergeRequestIid, '--merge-request-iid'),
+    squash: config.squash,
+    removeSourceBranch: config.removeSourceBranch,
+    waitMinutes: parsePositiveInteger(config.wait, '--wait') ?? DEFAULT_MERGE_WAIT_MINUTES,
+    dryRun: config.dryRun,
+  });
+
+  for (const warning of result.warnings) {
+    logger.warn(warning);
+  }
+  const where = result.mergeRequest.webUrl ? ` (${result.mergeRequest.webUrl})` : '';
+  const what = `${provider.terminology.changeRequestShort} "${result.mergeRequest.title}"${where}`;
+  if (result.closeOutCommits.length > 0) {
+    logger.info(
+      `Including ${result.closeOutCommits.length} deployment-close-out commit(s) on top of the deployed one.`,
+    );
+  }
+  if (result.status === 'Merged') {
+    logger.log(`Merged ${what} into ${targetBranch}${result.mergeCommitSha ? ` as ${result.mergeCommitSha}` : ''}.`);
+  } else if (result.status === 'Would merge') {
+    logger.log(`Would merge ${what} into ${targetBranch} at ${result.headSha ?? 'its head'}.`);
+  } else {
+    logger.log(`${what} was already merged into ${targetBranch}.`);
+  }
 }
 
 function formatDeploymentTimestamp(date: Date): string {
@@ -193,6 +266,18 @@ export type DeployHappySoupOptions = OrgAuthConfig & {
   ciMergeRequestIid?: string;
   ciCommitRefName?: string;
   deployReleaseDate?: string;
+  /** `merge-release`: the commit this pipeline deployed. */
+  ciCommitSha?: string;
+  /** `merge-release`: the merge request's target. Defaults to `productionBranch`. */
+  targetBranch?: string;
+  /** `merge-release`: merge this merge request instead of looking it up by branches. */
+  mergeRequestIid?: string;
+  /** `merge-release`: squash on merge. */
+  squash?: boolean;
+  /** `merge-release`: delete the release branch after merging (GitLab only). */
+  removeSourceBranch?: boolean;
+  /** `merge-release`: report what would merge without changing anything. */
+  dryRun?: boolean;
 };
 
 /**
@@ -230,6 +315,9 @@ async function runHappySoupStage(
   } else if (stage === 'deployment-close-out') {
     // The CLI layer requires projectAccessToken/ciPipelineId/ciProjectPath/ciCommitRefName for this stage.
     await deploymentCloseOut({ ...(config as DeploymentCloseOutConfig), deployConfigFile });
+  } else if (stage === 'merge-release') {
+    // The CLI layer requires projectAccessToken/ciProjectPath/ciCommitRefName/ciCommitSha for this stage.
+    await mergeRelease(config as MergeReleaseConfig);
   } else {
     // The CLI layer requires ciJobToken for every other stage.
     const stepsConfig: RunDeploymentStepsConfig = {
@@ -248,6 +336,7 @@ async function runHappySoupStage(
 /**
  * Runs a "happy-soup" (multi-repo, unlocked-package) deployment stage. `install-packaged` installs
  * dependencies only; `tag-deployment` and `deployment-close-out` have their own git-native logic;
+ * `merge-release` merges the release's merge request through the VCS provider's API;
  * every other stage runs through the resumable deployment-steps loop against the branch-derived
  * (or explicit) deploy config file.
  */
