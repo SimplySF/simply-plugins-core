@@ -197,6 +197,22 @@ draft pull request on GitHub, and prefixes the title with `Draft:` on GitLab, wh
 on create. `removeSourceBranch` defaults to `true` and only applies on GitLab; GitHub follows the
 repository's `delete_branch_on_merge` setting.
 
+Merging is optional too (see
+[design doc 0065](https://github.com/SimplySF/simply-plugins-core/blob/main/docs/design/0065-happy-soup-merge-release.md)).
+Both built-in providers implement these members:
+
+- `getMergeRequest(project, iid)` and `findMergeRequests(project, source, target, 'open' | 'merged')`.
+  These return `VcsMergeRequest`s, which now also carry `state`, `draft`, and `headSha` when the
+  platform reports them.
+- `getMergeability(project, mergeRequest)` returns `{ state: 'checking' | 'mergeable' }` or
+  `{ state: 'blocked', reason }`, where `reason` is `approvals`, `checks`, `conflict`, `discussions`,
+  `draft`, or `other`. GitHub reports missing reviews and missing required checks the same way, so on
+  GitHub both read as `other`.
+- `markMergeRequestReady(project, mergeRequest)` takes it out of draft. GitLab drops the `Draft:` title
+  prefix. GitHub uses a GraphQL mutation, since REST can't do it.
+- `mergeMergeRequest(project, mergeRequest, { sha, squash, removeSourceBranch })` merges. Pass `sha`
+  so the platform refuses the merge if the branch has moved.
+
 ```ts
 import { createVcsProvider, loadSfDevRc, resolveVcsSettings } from '@simplysf/simply-core';
 

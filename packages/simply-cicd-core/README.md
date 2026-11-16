@@ -35,7 +35,9 @@ Everything below is exported from the package root. Removing or renaming an expo
 
 The VCS exports are defined in `@simplysf/simply-core` and re-exported here unchanged, sharing one
 provider registry, so importing them from either package is equivalent. See that package's README for
-the optional `findRelease`, `createRelease`, and `setDefaultBranch` members.
+the optional `findRelease`, `createRelease`, and `setDefaultBranch` members, and the optional merging
+members (`getMergeRequest`, `findMergeRequests`, `getMergeability`, `markMergeRequestReady`,
+`mergeMergeRequest`).
 
 Types (`AlmProviderKind`, `AlmIssueRef`, `AlmIssueRendering`, `AlmProvider`, `AlmProviderFactory`,
 `VcsProviderKind`, `VcsProject`, `VcsProjectRef`, `VcsBranch`, `VcsCommit`, `VcsCommitLogEntry`,
@@ -131,6 +133,37 @@ prompts, `productionBranch` (default `environment/production`), and the two temp
 deployment config lands where `determineDeployConfigFile` looks for the branch, so the deploy stages
 find it. Both functions refuse a dirty working tree before changing anything, never force a checkout,
 and check out a branch that's already on the remote instead of recreating it.
+
+### Merging the release after the production close-out
+
+`mergeReleaseMergeRequest` is behind the `merge-release` happy-soup deploy stage
+(`deployHappySoup({ stage: 'merge-release', ... })`). Run it after the production
+`deployment-close-out` job.
+
+It finds the release branch's merge request into production. It then checks that the merge request
+holds only the deployed commit plus close-out's own commits (`CLOSE_OUT_COMMIT_MESSAGES`), marks it
+ready if it's a draft, and waits for the platform to say it can merge. Finally it merges, passing the
+checked head SHA. A merge request that has already merged reports `Already merged`, so retrying is
+safe.
+
+```ts
+import { createVcsProvider, mergeReleaseMergeRequest } from '@simplysf/simply-cicd-core';
+
+const result = await mergeReleaseMergeRequest({
+  vcs: {
+    provider: createVcsProvider('gitlab', { token: process.env.PROJECT_ACCESS_TOKEN! }),
+    project: 'group/project',
+  },
+  sourceBranch: 'release/2026-10-19',
+  targetBranch: 'environment/production',
+  deployedSha: process.env.CI_COMMIT_SHA!,
+});
+console.log(result.status, result.mergeCommitSha);
+```
+
+The close-out commit is `[skip ci]`, so the merge request's head never runs a pipeline. On GitLab,
+"Pipelines must succeed" then also needs "Skipped pipelines are considered successful". On GitHub,
+required status checks on the production branch block the merge the same way.
 
 ### Environment variables and dotenv keys
 

@@ -19,8 +19,12 @@ import type {
   VcsCiContext,
   VcsCommit,
   VcsCommitLogEntry,
+  VcsMergeability,
+  VcsMergeOptions,
   VcsMergeRequest,
   VcsMergeRequestOptions,
+  VcsMergeRequestState,
+  VcsMergeResult,
   VcsProject,
   VcsProjectRef,
   VcsProjectVariable,
@@ -50,6 +54,13 @@ type GitLabMergeRequestResponse = {
   source_branch: string;
   target_branch: string;
   web_url?: string;
+  state?: string;
+  draft?: boolean;
+  work_in_progress?: boolean;
+  sha?: string;
+  detailed_merge_status?: string;
+  merge_commit_sha?: string | null;
+  squash_commit_sha?: string | null;
 };
 
 type GitLabProjectVariableResponse = {
@@ -95,9 +106,58 @@ function normalizeMergeRequest(mergeRequest: GitLabMergeRequestResponse): VcsMer
     sourceBranch: mergeRequest.source_branch,
     targetBranch: mergeRequest.target_branch,
     webUrl: mergeRequest.web_url,
+    state: normalizeMergeRequestState(mergeRequest.state),
+    draft: mergeRequest.draft ?? mergeRequest.work_in_progress,
+    headSha: mergeRequest.sha,
     raw: mergeRequest,
   };
 }
+
+/** GitLab's merge request states. A `locked` one is mid-merge, so it still reads as open. */
+const MERGE_REQUEST_STATES: Readonly<Record<string, VcsMergeRequestState>> = {
+  opened: 'open',
+  locked: 'open',
+  merged: 'merged',
+  closed: 'closed',
+};
+
+const normalizeMergeRequestState = (state: string | undefined): VcsMergeRequestState | undefined =>
+  state === undefined ? undefined : MERGE_REQUEST_STATES[state];
+
+/** What GitLab's `detailed_merge_status` means for whether, and why not, it can merge. */
+function mergeabilityFromStatus(status: string | undefined): VcsMergeability {
+  const detail = status ?? 'unknown';
+  switch (status) {
+    case 'mergeable':
+      return { state: 'mergeable', detail };
+    // Still being worked out after a push, or waiting on something that will finish by itself.
+    case undefined:
+    case 'unchecked':
+    case 'checking':
+    case 'preparing':
+    case 'approvals_syncing':
+    case 'ci_still_running':
+      return { state: 'checking', detail };
+    case 'not_approved':
+    case 'requested_changes':
+      return { state: 'blocked', reason: 'approvals', detail };
+    case 'ci_must_pass':
+    case 'external_status_checks':
+      return { state: 'blocked', reason: 'checks', detail };
+    case 'conflict':
+    case 'need_rebase':
+      return { state: 'blocked', reason: 'conflict', detail };
+    case 'discussions_not_resolved':
+      return { state: 'blocked', reason: 'discussions', detail };
+    case 'draft_status':
+      return { state: 'blocked', reason: 'draft', detail };
+    default:
+      return { state: 'blocked', reason: 'other', detail };
+  }
+}
+
+/** The title prefixes GitLab reads as "this is a draft". */
+const DRAFT_TITLE_PREFIX = /^\s*(?:\[draft\]|\(draft\)|draft:|draft\s+-)\s*/i;
 
 function normalizeRelease(release: GitLabReleaseResponse): VcsRelease {
   // eslint-disable-next-line no-underscore-dangle -- GitLab API field name
@@ -307,6 +367,62 @@ export class GitLabProvider implements VcsProvider {
     }
     const response = await this.request(endpoint, { method: 'PUT', body });
     return normalizeMergeRequest((await response.json()) as GitLabMergeRequestResponse);
+  }
+
+  public async getMergeRequest(project: VcsProjectRef, iid: number): Promise<VcsMergeRequest> {
+    return normalizeMergeRequest(
+      (await this.getJson(`/projects/${projectSegment(project)}/merge_requests/${iid}`)) as GitLabMergeRequestResponse,
+    );
+  }
+
+  public async findMergeRequests(
+    project: VcsProjectRef,
+    sourceBranch: string,
+    targetBranch: string,
+    state: 'open' | 'merged',
+  ): Promise<VcsMergeRequest[]> {
+    const endpoint = `/projects/${projectSegment(project)}/merge_requests?state=${
+      state === 'open' ? 'opened' : 'merged'
+    }&source_branch=${encodeURIComponent(sourceBranch)}&target_branch=${encodeURIComponent(
+      targetBranch,
+    )}&order_by=created_at&sort=desc`;
+    const mergeRequests = (await this.getJson(endpoint)) as GitLabMergeRequestResponse[];
+    return mergeRequests.map(normalizeMergeRequest);
+  }
+
+  public async getMergeability(project: VcsProjectRef, mergeRequest: VcsMergeRequest): Promise<VcsMergeability> {
+    // Asking for a recheck makes GitLab work the status out again, instead of returning a stale one.
+    const endpoint = `/projects/${projectSegment(project)}/merge_requests/${mergeRequest.iid}?with_merge_status_recheck=true`;
+    const response = (await this.getJson(endpoint)) as GitLabMergeRequestResponse;
+    return mergeabilityFromStatus(response.detailed_merge_status);
+  }
+
+  public async markMergeRequestReady(project: VcsProjectRef, mergeRequest: VcsMergeRequest): Promise<VcsMergeRequest> {
+    // GitLab has no draft field on update either: dropping the title prefix is what marks it ready.
+    const title = mergeRequest.title.replace(DRAFT_TITLE_PREFIX, '');
+    const endpoint = `/projects/${projectSegment(project)}/merge_requests/${mergeRequest.iid}`;
+    const response = await this.request(endpoint, { method: 'PUT', body: { title } });
+    return normalizeMergeRequest((await response.json()) as GitLabMergeRequestResponse);
+  }
+
+  public async mergeMergeRequest(
+    project: VcsProjectRef,
+    mergeRequest: VcsMergeRequest,
+    options: VcsMergeOptions = {},
+  ): Promise<VcsMergeResult> {
+    const endpoint = `/projects/${projectSegment(project)}/merge_requests/${mergeRequest.iid}/merge`;
+    /* eslint-disable camelcase -- GitLab API field names */
+    const body: Record<string, unknown> = { squash: options.squash ?? false };
+    if (options.sha) {
+      body.sha = options.sha;
+    }
+    if (options.removeSourceBranch !== undefined) {
+      body.should_remove_source_branch = options.removeSourceBranch;
+    }
+    /* eslint-enable camelcase */
+    const response = await this.request(endpoint, { method: 'PUT', body });
+    const raw = (await response.json()) as GitLabMergeRequestResponse;
+    return { mergeCommitSha: raw.merge_commit_sha ?? raw.squash_commit_sha ?? undefined, raw };
   }
 
   public async getProjectVariables(project: VcsProjectRef): Promise<VcsProjectVariable[]> {

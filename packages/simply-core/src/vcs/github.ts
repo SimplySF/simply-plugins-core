@@ -19,8 +19,11 @@ import type {
   VcsCiContext,
   VcsCommit,
   VcsCommitLogEntry,
+  VcsMergeability,
+  VcsMergeOptions,
   VcsMergeRequest,
   VcsMergeRequestOptions,
+  VcsMergeResult,
   VcsProject,
   VcsProjectRef,
   VcsProjectVariable,
@@ -43,13 +46,24 @@ type GitHubRepoResponse = {
 
 type GitHubPullRequestResponse = {
   id: number;
+  node_id?: string;
   number: number;
   title: string;
   body?: string;
-  head: { ref: string };
+  head: { ref: string; sha?: string };
   base: { ref: string };
   html_url?: string;
+  state?: 'open' | 'closed';
+  draft?: boolean;
+  merged?: boolean;
+  merged_at?: string | null;
+  mergeable?: boolean | null;
+  mergeable_state?: string;
 };
+
+type GitHubMergeResponse = { sha?: string; merged?: boolean; message?: string };
+
+type GitHubGraphQlResponse = { errors?: Array<{ message: string }> };
 
 type GitHubVariableResponse = { name: string; value: string };
 
@@ -88,8 +102,49 @@ function normalizePullRequest(pullRequest: GitHubPullRequestResponse): VcsMergeR
     sourceBranch: pullRequest.head.ref,
     targetBranch: pullRequest.base.ref,
     webUrl: pullRequest.html_url,
+    state: pullRequestState(pullRequest),
+    draft: pullRequest.draft,
+    headSha: pullRequest.head.sha,
     raw: pullRequest,
   };
+}
+
+/** GitHub only says open or closed. A closed pull request that merged has a merge time. */
+function pullRequestState(pullRequest: GitHubPullRequestResponse): VcsMergeRequest['state'] {
+  if (pullRequest.state === 'open') {
+    return 'open';
+  }
+  if (pullRequest.state === 'closed') {
+    return pullRequest.merged || pullRequest.merged_at ? 'merged' : 'closed';
+  }
+  return undefined;
+}
+
+/**
+ * What GitHub's `mergeable` and `mergeable_state` mean for whether, and why not, it can merge.
+ * `mergeable` is `null` until GitHub has finished its background check.
+ */
+function mergeabilityFromPullRequest(pullRequest: GitHubPullRequestResponse): VcsMergeability {
+  const detail = pullRequest.mergeable_state ?? 'unknown';
+  if (pullRequest.mergeable === null || pullRequest.mergeable === undefined || detail === 'unknown') {
+    return { state: 'checking', detail };
+  }
+  switch (detail) {
+    // `unstable` means only checks that aren't required are failing, and `has_hooks` that a
+    // pre-receive hook will run. Neither stops the merge.
+    case 'clean':
+    case 'unstable':
+    case 'has_hooks':
+      return { state: 'mergeable', detail };
+    case 'dirty':
+    case 'behind':
+      return { state: 'blocked', reason: 'conflict', detail };
+    case 'draft':
+      return { state: 'blocked', reason: 'draft', detail };
+    default:
+      // `blocked`: branch protection, which covers both missing reviews and missing required checks.
+      return { state: 'blocked', reason: 'other', detail };
+  }
 }
 
 /** GitHub addresses repos as `owner/repo`, so each segment is encoded separately. */
@@ -335,6 +390,80 @@ export class GitHubProvider implements VcsProvider {
     return updated;
   }
 
+  public async getMergeRequest(project: VcsProjectRef, iid: number): Promise<VcsMergeRequest> {
+    return normalizePullRequest((await this.getJson(`${repoPath(project)}/pulls/${iid}`)) as GitHubPullRequestResponse);
+  }
+
+  public async findMergeRequests(
+    project: VcsProjectRef,
+    sourceBranch: string,
+    targetBranch: string,
+    state: 'open' | 'merged',
+  ): Promise<VcsMergeRequest[]> {
+    const { owner } = splitProject(project);
+    const head = `${owner}:${sourceBranch}`;
+    // GitHub has no "merged" filter: merged pull requests are closed ones with a merge time.
+    const endpoint = `${repoPath(project)}/pulls?state=${state === 'open' ? 'open' : 'closed'}&head=${encodeURIComponent(
+      head,
+    )}&base=${encodeURIComponent(targetBranch)}&sort=created&direction=desc`;
+    const pullRequests = ((await this.getJson(endpoint)) as GitHubPullRequestResponse[]).map(normalizePullRequest);
+    return state === 'open' ? pullRequests : pullRequests.filter((pullRequest) => pullRequest.state === 'merged');
+  }
+
+  public async getMergeability(project: VcsProjectRef, mergeRequest: VcsMergeRequest): Promise<VcsMergeability> {
+    // Only the single-pull-request endpoint reports `mergeable`, and fetching it is what starts the check.
+    const response = (await this.getJson(
+      `${repoPath(project)}/pulls/${mergeRequest.iid}`,
+    )) as GitHubPullRequestResponse;
+    return mergeabilityFromPullRequest(response);
+  }
+
+  public async markMergeRequestReady(project: VcsProjectRef, mergeRequest: VcsMergeRequest): Promise<VcsMergeRequest> {
+    // REST can't take a pull request out of draft, so this is the one GraphQL call.
+    const current = (await this.getJson(`${repoPath(project)}/pulls/${mergeRequest.iid}`)) as GitHubPullRequestResponse;
+    if (!current.node_id) {
+      throw new Error(`GitHub did not return a node ID for pull request #${mergeRequest.iid}.`);
+    }
+    const response = await this.request(this.graphQlUrl(), {
+      method: 'POST',
+      body: {
+        query:
+          'mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { id } } }',
+        variables: { id: current.node_id },
+      },
+    });
+    // GraphQL reports failures in the body, with a 200.
+    const result = (await response.json()) as GitHubGraphQlResponse;
+    if (result.errors?.length) {
+      throw new Error(`GitHub API error: ${result.errors.map((error) => error.message).join('; ')}`);
+    }
+    return this.getMergeRequest(project, mergeRequest.iid);
+  }
+
+  public async mergeMergeRequest(
+    project: VcsProjectRef,
+    mergeRequest: VcsMergeRequest,
+    options: VcsMergeOptions = {},
+  ): Promise<VcsMergeResult> {
+    // `options.removeSourceBranch` is ignored, as in `createMergeRequest`: branch cleanup is the
+    // repo-level `delete_branch_on_merge` setting.
+    /* eslint-disable camelcase -- GitHub API field names */
+    const body: Record<string, unknown> = { merge_method: options.squash ? 'squash' : 'merge' };
+    /* eslint-enable camelcase */
+    if (options.sha) {
+      body.sha = options.sha;
+    }
+    const response = await this.request(`${repoPath(project)}/pulls/${mergeRequest.iid}/merge`, {
+      method: 'PUT',
+      body,
+    });
+    const raw = (await response.json()) as GitHubMergeResponse;
+    if (raw.merged === false) {
+      throw new Error(`GitHub API error: ${raw.message ?? 'the pull request was not merged'}`);
+    }
+    return { mergeCommitSha: raw.sha, raw };
+  }
+
   public async getProjectVariables(project: VcsProjectRef): Promise<VcsProjectVariable[]> {
     try {
       const result = (await this.getJson(`${repoPath(project)}/actions/variables`)) as {
@@ -421,6 +550,13 @@ export class GitHubProvider implements VcsProvider {
     }
 
     return response;
+  }
+
+  /** github.com serves GraphQL from api.github.com/graphql; Enterprise Server from /api/graphql. */
+  private graphQlUrl(): string {
+    return this.apiUrl.endsWith('/api/v3')
+      ? `${this.apiUrl.slice(0, -'/v3'.length)}/graphql`
+      : `${this.apiUrl}/graphql`;
   }
 
   private async getJson(endpoint: string): Promise<unknown> {

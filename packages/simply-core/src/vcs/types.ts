@@ -74,6 +74,55 @@ export type VcsMergeRequest = {
   sourceBranch: string;
   targetBranch: string;
   webUrl?: string;
+  /** Whether it is still open, merged, or closed without merging. GitLab's `locked` reads as open. */
+  state?: VcsMergeRequestState;
+  /** Whether it is a draft (GitLab) or a draft pull request (GitHub). */
+  draft?: boolean;
+  /** The source branch's commit the merge request currently points at. */
+  headSha?: string;
+  raw: unknown;
+};
+
+/** The lifecycle state of a merge/pull request, normalized across VCS platforms. */
+export type VcsMergeRequestState = 'open' | 'merged' | 'closed';
+
+/**
+ * Why a platform won't merge a merge/pull request right now, normalized across VCS platforms.
+ * GitHub reports missing reviews and missing required checks both as `blocked`, so it reads as
+ * `other`, with the platform's wording in `detail`.
+ */
+export type VcsMergeBlockReason = 'approvals' | 'checks' | 'conflict' | 'discussions' | 'draft' | 'other';
+
+/**
+ * Whether a merge/pull request can merge. `checking` means the platform is still working it out,
+ * which it does in the background after every push, so callers should ask again shortly.
+ */
+export type VcsMergeability =
+  | { state: 'checking'; detail: string }
+  | { state: 'mergeable'; detail: string }
+  | { state: 'blocked'; reason: VcsMergeBlockReason; detail: string };
+
+/** Optional behavior for {@link VcsProvider.mergeMergeRequest}. */
+export type VcsMergeOptions = {
+  /**
+   * The source commit the caller checked. The platform refuses the merge if the branch has moved
+   * since then, rather than merging commits the caller never saw.
+   */
+  sha?: string;
+  /** Squash the commits into one on merge. Defaults to `false`. */
+  squash?: boolean;
+  /**
+   * Delete the source branch after merging. Only GitLab sets this per merge request; GitHub follows
+   * the repository's `delete_branch_on_merge` setting. Left unset, GitLab uses the merge request's
+   * own setting.
+   */
+  removeSourceBranch?: boolean;
+};
+
+/** What {@link VcsProvider.mergeMergeRequest} reports back. */
+export type VcsMergeResult = {
+  /** The merge (or squash) commit on the target branch, when the platform returns one. */
+  mergeCommitSha?: string;
   raw: unknown;
 };
 
@@ -241,6 +290,32 @@ export interface VcsProvider {
 
   /** Makes a branch the project's default branch. */
   setDefaultBranch?(project: VcsProjectRef, branchName: string): Promise<void>;
+
+  // Merging, for `merge-release`. See docs/design/0065-happy-soup-merge-release.md.
+
+  /** Fetches one merge/pull request by the number the platform shows users. */
+  getMergeRequest?(project: VcsProjectRef, iid: number): Promise<VcsMergeRequest>;
+
+  /** Lists the merge/pull requests from one branch into another, in one state, most recent first. */
+  findMergeRequests?(
+    project: VcsProjectRef,
+    sourceBranch: string,
+    targetBranch: string,
+    state: 'open' | 'merged',
+  ): Promise<VcsMergeRequest[]>;
+
+  /** Asks the platform whether a merge/pull request can merge now. */
+  getMergeability?(project: VcsProjectRef, mergeRequest: VcsMergeRequest): Promise<VcsMergeability>;
+
+  /** Takes a merge/pull request out of draft. Returns it as it now stands. */
+  markMergeRequestReady?(project: VcsProjectRef, mergeRequest: VcsMergeRequest): Promise<VcsMergeRequest>;
+
+  /** Merges a merge/pull request. Throws if the platform refuses. */
+  mergeMergeRequest?(
+    project: VcsProjectRef,
+    mergeRequest: VcsMergeRequest,
+    options?: VcsMergeOptions,
+  ): Promise<VcsMergeResult>;
 }
 
 /** Constructs a provider for one instance of a platform. */

@@ -317,4 +317,120 @@ describe('GitLabProvider', () => {
       expect((error as Error).message).not.toContain(token);
     });
   });
+
+  describe('merging', () => {
+    /* eslint-disable camelcase -- GitLab API field names */
+    const mergeRequestFixture = {
+      id: 9001,
+      iid: 12,
+      title: 'Draft: Release 2026-10-19',
+      source_branch: 'release/2026-10-19',
+      target_branch: 'environment/production',
+      web_url: 'https://gitlab.example.com/group/proj/-/merge_requests/12',
+      state: 'opened',
+      draft: true,
+      sha: 'abc123',
+    };
+    /* eslint-enable camelcase */
+
+    const provider = (): GitLabProvider => new GitLabProvider({ host, token });
+    const call = (index = 0): [string, RequestInit] => fetchMock.mock.calls[index] as [string, RequestInit];
+    const bodyOf = (index = 0): unknown => JSON.parse(call(index)[1].body as string);
+
+    it('getMergeRequest normalizes state, draft, and the head SHA', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(mergeRequestFixture));
+
+      const mergeRequest = await provider().getMergeRequest('group/proj', 12);
+
+      expect(call()[0]).toBe(`${apiUrl}/projects/group%2Fproj/merge_requests/12`);
+      expect(mergeRequest).toMatchObject({ iid: 12, state: 'open', draft: true, headSha: 'abc123' });
+    });
+
+    it.each([
+      ['locked', 'open'],
+      ['merged', 'merged'],
+      ['closed', 'closed'],
+    ])('reads GitLab state %s as %s', async (state, expected) => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ ...mergeRequestFixture, state }));
+
+      expect((await provider().getMergeRequest('123', 12)).state).toBe(expected);
+    });
+
+    it('findMergeRequests filters by GitLab state and both branches', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse([mergeRequestFixture])).mockResolvedValueOnce(jsonResponse([]));
+
+      const open = await provider().findMergeRequests('123', 'release/2026-10-19', 'environment/production', 'open');
+      await provider().findMergeRequests('123', 'release/2026-10-19', 'environment/production', 'merged');
+
+      expect(open).toHaveLength(1);
+      expect(call(0)[0]).toBe(
+        `${apiUrl}/projects/123/merge_requests?state=opened&source_branch=release%2F2026-10-19&target_branch=environment%2Fproduction&order_by=created_at&sort=desc`,
+      );
+      expect(call(1)[0]).toContain('state=merged&');
+    });
+
+    it.each([
+      ['mergeable', { state: 'mergeable' }],
+      ['checking', { state: 'checking' }],
+      ['unchecked', { state: 'checking' }],
+      ['ci_still_running', { state: 'checking' }],
+      ['not_approved', { state: 'blocked', reason: 'approvals' }],
+      ['ci_must_pass', { state: 'blocked', reason: 'checks' }],
+      ['need_rebase', { state: 'blocked', reason: 'conflict' }],
+      ['discussions_not_resolved', { state: 'blocked', reason: 'discussions' }],
+      ['draft_status', { state: 'blocked', reason: 'draft' }],
+      ['jira_association_missing', { state: 'blocked', reason: 'other' }],
+    ])('getMergeability maps %s', async (status, expected) => {
+      // eslint-disable-next-line camelcase -- GitLab API field name
+      fetchMock.mockResolvedValueOnce(jsonResponse({ ...mergeRequestFixture, detailed_merge_status: status }));
+
+      const mergeability = await provider().getMergeability('123', { iid: 12 } as never);
+
+      expect(call()[0]).toBe(`${apiUrl}/projects/123/merge_requests/12?with_merge_status_recheck=true`);
+      expect(mergeability).toMatchObject({ ...expected, detail: status });
+    });
+
+    it('markMergeRequestReady drops the draft prefix from the title', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ ...mergeRequestFixture, title: 'Release 2026-10-19', draft: false }),
+      );
+
+      const ready = await provider().markMergeRequestReady('123', {
+        iid: 12,
+        title: 'Draft: Release 2026-10-19',
+      } as never);
+
+      expect(call()[0]).toBe(`${apiUrl}/projects/123/merge_requests/12`);
+      expect(call()[1].method).toBe('PUT');
+      expect(bodyOf()).toEqual({ title: 'Release 2026-10-19' });
+      expect(ready.draft).toBe(false);
+    });
+
+    it('mergeMergeRequest sends the SHA guard and options, and returns the merge commit', async () => {
+      fetchMock.mockResolvedValueOnce(
+        // eslint-disable-next-line camelcase -- GitLab API field name
+        jsonResponse({ ...mergeRequestFixture, state: 'merged', merge_commit_sha: 'm1' }),
+      );
+
+      const result = await provider().mergeMergeRequest('123', { iid: 12 } as never, {
+        sha: 'abc123',
+        squash: true,
+        removeSourceBranch: false,
+      });
+
+      expect(call()[0]).toBe(`${apiUrl}/projects/123/merge_requests/12/merge`);
+      expect(call()[1].method).toBe('PUT');
+      // eslint-disable-next-line camelcase -- GitLab API field name
+      expect(bodyOf()).toEqual({ sha: 'abc123', squash: true, should_remove_source_branch: false });
+      expect(result.mergeCommitSha).toBe('m1');
+    });
+
+    it('mergeMergeRequest leaves the source-branch setting to the merge request when not given', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(mergeRequestFixture));
+
+      await provider().mergeMergeRequest('123', { iid: 12 } as never);
+
+      expect(bodyOf()).toEqual({ squash: false });
+    });
+  });
 });
