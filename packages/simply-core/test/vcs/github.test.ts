@@ -432,4 +432,129 @@ describe('GitHubProvider', () => {
       expect(bodyOf()).toEqual({ default_branch: 'release/v1.3.0' });
     });
   });
+
+  describe('merging', () => {
+    /* eslint-disable camelcase -- GitHub API field names */
+    const openDraft = {
+      ...pullRequestFixture,
+      node_id: 'PR_node',
+      head: { ref: 'release/2026-10-19', sha: 'abc123' },
+      base: { ref: 'environment/production' },
+      state: 'open',
+      draft: true,
+    };
+    const mergedAt = { state: 'closed', merged_at: '2026-11-16T00:00:00Z' };
+    /* eslint-enable camelcase */
+    const provider = (): GitHubProvider => new GitHubProvider({ host, token });
+
+    it('getMergeRequest normalizes state, draft, and the head SHA', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(openDraft));
+
+      const pullRequest = await provider().getMergeRequest(project, 7);
+
+      expect(lastCall().url).toBe('https://api.github.com/repos/my-org/downstream/pulls/7');
+      expect(pullRequest).toMatchObject({ iid: 7, state: 'open', draft: true, headSha: 'abc123' });
+    });
+
+    it('reads a closed pull request with a merge time as merged', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ ...openDraft, ...mergedAt }));
+
+      expect((await provider().getMergeRequest(project, 7)).state).toBe('merged');
+    });
+
+    it('findMergeRequests looks merged ones up among closed pull requests', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse([
+          { ...openDraft, ...mergedAt, number: 8 },
+          // eslint-disable-next-line camelcase -- GitHub API field name
+          { ...openDraft, number: 9, state: 'closed', merged_at: null },
+        ]),
+      );
+
+      const merged = await provider().findMergeRequests(
+        project,
+        'release/2026-10-19',
+        'environment/production',
+        'merged',
+      );
+
+      expect(lastCall().url).toBe(
+        'https://api.github.com/repos/my-org/downstream/pulls?state=closed&head=my-org%3Arelease%2F2026-10-19&base=environment%2Fproduction&sort=created&direction=desc',
+      );
+      expect(merged.map((pullRequest) => pullRequest.iid)).toEqual([8]);
+    });
+
+    it.each([
+      [null, 'unknown', { state: 'checking' }],
+      [true, 'clean', { state: 'mergeable' }],
+      [true, 'unstable', { state: 'mergeable' }],
+      [false, 'dirty', { state: 'blocked', reason: 'conflict' }],
+      [true, 'behind', { state: 'blocked', reason: 'conflict' }],
+      [true, 'draft', { state: 'blocked', reason: 'draft' }],
+      [true, 'blocked', { state: 'blocked', reason: 'other' }],
+    ])('getMergeability maps mergeable %s / %s', async (mergeable, mergeableState, expected) => {
+      // eslint-disable-next-line camelcase -- GitHub API field name
+      fetchMock.mockResolvedValueOnce(jsonResponse({ ...openDraft, mergeable, mergeable_state: mergeableState }));
+
+      expect(await provider().getMergeability(project, { iid: 7 } as never)).toMatchObject(expected);
+    });
+
+    it('markMergeRequestReady calls the GraphQL mutation with the node ID, then re-reads it', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(openDraft))
+        .mockResolvedValueOnce(jsonResponse({ data: { markPullRequestReadyForReview: { pullRequest: { id: 'x' } } } }))
+        .mockResolvedValueOnce(jsonResponse({ ...openDraft, draft: false }));
+
+      const ready = await provider().markMergeRequestReady(project, { iid: 7 } as never);
+
+      expect(lastCall(1).url).toBe('https://api.github.com/graphql');
+      expect(lastCall(1).options.method).toBe('POST');
+      expect(bodyOf(1)).toMatchObject({ variables: { id: 'PR_node' } });
+      expect(String(bodyOf(1).query)).toContain('markPullRequestReadyForReview');
+      expect(ready.draft).toBe(false);
+    });
+
+    it('markMergeRequestReady uses /api/graphql on Enterprise Server', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(openDraft))
+        .mockResolvedValueOnce(jsonResponse({ data: {} }))
+        .mockResolvedValueOnce(jsonResponse(openDraft));
+
+      await new GitHubProvider({ host: 'github.example.com', token }).markMergeRequestReady(project, {
+        iid: 7,
+      } as never);
+
+      expect(lastCall(1).url).toBe('https://github.example.com/api/graphql');
+    });
+
+    it('markMergeRequestReady throws GraphQL errors returned with a 200', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(openDraft))
+        .mockResolvedValueOnce(jsonResponse({ errors: [{ message: 'Resource not accessible by integration' }] }));
+
+      await expect(provider().markMergeRequestReady(project, { iid: 7 } as never)).rejects.toThrow(
+        'GitHub API error: Resource not accessible by integration',
+      );
+    });
+
+    it('mergeMergeRequest sends the SHA guard and merge method, and returns the merge commit', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ sha: 'm1', merged: true, message: 'Merged' }));
+
+      const result = await provider().mergeMergeRequest(project, { iid: 7 } as never, { sha: 'abc123', squash: true });
+
+      expect(lastCall().url).toBe('https://api.github.com/repos/my-org/downstream/pulls/7/merge');
+      expect(lastCall().options.method).toBe('PUT');
+      // eslint-disable-next-line camelcase -- GitHub API field name
+      expect(bodyOf()).toEqual({ merge_method: 'squash', sha: 'abc123' });
+      expect(result.mergeCommitSha).toBe('m1');
+    });
+
+    it('mergeMergeRequest throws when GitHub answers merged: false', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ merged: false, message: 'Base branch was modified' }));
+
+      await expect(provider().mergeMergeRequest(project, { iid: 7 } as never)).rejects.toThrow(
+        'Base branch was modified',
+      );
+    });
+  });
 });

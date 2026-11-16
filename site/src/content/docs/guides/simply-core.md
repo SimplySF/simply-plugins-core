@@ -166,6 +166,15 @@ await vcs.createMergeRequest(
     removeSourceBranch: false,
   },
 );
+
+// Merging is optional too. Pass the head SHA you checked, so a branch that moved isn't merged.
+if (vcs.getMergeRequest && vcs.getMergeability && vcs.mergeMergeRequest) {
+  const mergeRequest = await vcs.getMergeRequest(projectId!, 42);
+  const mergeability = await vcs.getMergeability(projectId!, mergeRequest);
+  if (mergeability.state === 'mergeable') {
+    await vcs.mergeMergeRequest(projectId!, mergeRequest, { sha: mergeRequest.headSha });
+  }
+}
 ```
 
 ## Retrying a flaky call
