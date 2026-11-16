@@ -1,8 +1,9 @@
 # 0065 — Merging the release merge request after the production close-out
 
-**Status:** In progress (`simply-plugins-core` done; the `simply-plugins` command is next)
+**Status:** In progress (both sides implemented; `simply-plugins` waits on this repo's release)
 **Package:** `packages/simply-core` (VCS provider methods) and `packages/simply-cicd-core` (the
-operation and the deploy stage); `packages/simply-cicd` (the command, in `simply-plugins`)
+operation and the deploy stage); `packages/simply-cicd` (the command, in `simply-plugins`, where this
+doc is duplicated as its 0067)
 **Date:** 2026-11-16
 
 ## Problem
@@ -60,7 +61,12 @@ sf simply cicd deploy happy-soup merge-release \
 | `--vcs-provider`, `--vcs-host` | as the other happy-soup stages | Which platform and instance to talk to.                                                          |
 | `--dry-run`                    | `false`                        | Resolve and check everything, then report what would be merged.                                  |
 
-Every flag is also backed by a `SIMPLY_CICD_*` variable, as the other stages' flags are.
+Every flag is also backed by a `SIMPLY_CICD_*` variable, as the other stages' flags are. The new ones
+are `SIMPLY_CICD_TARGET_BRANCH`, `SIMPLY_CICD_MERGE_REQUEST_IID`, `SIMPLY_CICD_SQUASH`,
+`SIMPLY_CICD_REMOVE_SOURCE_BRANCH`, and `SIMPLY_CICD_MERGE_WAIT`. `--dry-run` shares
+`SIMPLY_CICD_DRY_RUN` with `sfdx-dependabot`. `--merge-request-iid` deliberately doesn't read
+`SIMPLY_CICD_CI_MERGE_REQUEST_IID`: a pipeline that sets that variable for `tag-deployment` shouldn't
+also decide which merge request gets merged.
 
 Steps, in order:
 
