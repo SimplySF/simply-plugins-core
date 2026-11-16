@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.7](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-project-setup-core%400.4.6...%40simplysf%2Fsimply-project-setup-core%400.4.7) (2026-11-16)
+
+### Bug Fixes
+
+- **deps:** bump minimatch from 11.0.4 to 11.0.8 ([#295](https://github.com/SimplySF/simply-plugins-core/issues/295)) ([59e8253](https://github.com/SimplySF/simply-plugins-core/commit/59e8253f5a8cbf2228f75eb8455de812e176e5ee))
+
 ## [0.4.6](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-project-setup-core%400.4.5...%40simplysf%2Fsimply-project-setup-core%400.4.6) (2026-11-06)
 
 ### Bug Fixes

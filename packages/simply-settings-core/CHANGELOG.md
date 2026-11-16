@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.10](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-settings-core%400.3.9...%40simplysf%2Fsimply-settings-core%400.3.10) (2026-11-16)
+
+### Bug Fixes
+
+- **deps:** bump undici from 8.12.2 to 8.12.4 ([#293](https://github.com/SimplySF/simply-plugins-core/issues/293)) ([d412cac](https://github.com/SimplySF/simply-plugins-core/commit/d412caca6d6e436444b1bc1c9b58c204a051a890))
+
 ## [0.3.9](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-settings-core%400.3.8...%40simplysf%2Fsimply-settings-core%400.3.9) (2026-11-13)
 
 **Note:** Version bump only for package @simplysf/simply-settings-core
