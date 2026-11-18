@@ -170,6 +170,21 @@ function projectSegment(project: VcsProjectRef): string {
   return encodeURIComponent(key);
 }
 
+/**
+ * Waits before each retry of a default-branch change GitLab rejected because it hasn't seen the
+ * branch yet. GitLab refreshes its cached branch list in a background job after a push, so a
+ * branch pushed a moment ago can be missing for a few seconds. These add up to 15 seconds.
+ */
+const DEFAULT_BRANCH_RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 7500];
+
+/** GitLab's 400 for a `default_branch` it can't find, e.g. `Could not change HEAD: branch 'x' does not exist`. */
+const UNKNOWN_BRANCH_ERROR = /^GitLab API error: 400 .*Could not change HEAD: branch .* does not exist/s;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
 /** A `VcsProvider` implementation for GitLab, backed by the GitLab REST API v4. */
 export class GitLabProvider implements VcsProvider {
   /** Used when no `--vcs-host` is supplied, so selecting a provider is enough to reach its SaaS instance. */
@@ -462,9 +477,29 @@ export class GitLabProvider implements VcsProvider {
     return normalizeRelease((await response.json()) as GitLabReleaseResponse);
   }
 
+  /**
+   * Makes `branchName` the project's default branch. A branch pushed just before this call may not
+   * be in GitLab's branch cache yet, so a "branch does not exist" rejection is retried for up to 15
+   * seconds before it is thrown. Any other error is thrown straight away.
+   */
   public async setDefaultBranch(project: VcsProjectRef, branchName: string): Promise<void> {
+    const endpoint = `/projects/${projectSegment(project)}`;
     // eslint-disable-next-line camelcase -- GitLab API field name
-    await this.request(`/projects/${projectSegment(project)}`, { method: 'PUT', body: { default_branch: branchName } });
+    const options = { method: 'PUT', body: { default_branch: branchName } };
+    for (const delay of DEFAULT_BRANCH_RETRY_DELAYS_MS) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- each attempt must finish before deciding to retry
+        await this.request(endpoint, options);
+        return;
+      } catch (error) {
+        if (!(error instanceof Error) || !UNKNOWN_BRANCH_ERROR.test(error.message)) {
+          throw error;
+        }
+      }
+      // eslint-disable-next-line no-await-in-loop -- the wait is the point
+      await sleep(delay);
+    }
+    await this.request(endpoint, options);
   }
 
   // eslint-disable-next-line class-methods-use-this -- part of the VcsProvider instance contract; the path scheme needs no instance state
