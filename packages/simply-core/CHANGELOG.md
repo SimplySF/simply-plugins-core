@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.10.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.9.1...%40simplysf%2Fsimply-core%401.10.0) (2026-11-18)
+
+### Bug Fixes
+
+- **simply-core:** retry GitLab default-branch change while a just-pushed branch is still unknown ([#300](https://github.com/SimplySF/simply-plugins-core/issues/300)) ([78bca43](https://github.com/SimplySF/simply-plugins-core/commit/78bca436fee29efd32fc6c112804b2fe71b3b66a))
+
+### Features
+
+- **simply-cicd-core:** merge-release stage merges the happy-soup release after the PROD close-out ([#299](https://github.com/SimplySF/simply-plugins-core/issues/299)) ([41f7a67](https://github.com/SimplySF/simply-plugins-core/commit/41f7a67fc84f2da019c18b152d4d0698d675b17e))
+
 ## [1.9.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-core%401.9.0...%40simplysf%2Fsimply-core%401.9.1) (2026-11-16)
 
 ### Bug Fixes

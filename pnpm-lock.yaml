@@ -136,7 +136,7 @@ importers:
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       zod:
         specifier: ^4.6.7
@@ -167,16 +167,16 @@ importers:
         specifier: ^7.8.20
         version: 7.8.20(supports-color@8.1.1)
       '@simplysf/simply-apex-core':
-        specifier: workspace:^0.4.8
+        specifier: workspace:^0.4.9
         version: link:../simply-apex-core
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       '@simplysf/simply-package-core':
-        specifier: workspace:^0.5.8
+        specifier: workspace:^0.5.9
         version: link:../simply-package-core
       '@simplysf/simply-permissions-core':
-        specifier: workspace:^0.10.10
+        specifier: workspace:^0.10.11
         version: link:../simply-permissions-core
       chalk:
         specifier: ^5.6.2
@@ -216,7 +216,7 @@ importers:
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       glob:
         specifier: ^13.0.6
@@ -272,7 +272,7 @@ importers:
         specifier: ^8.30.0
         version: 8.32.6
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       csv-parse:
         specifier: ^7.0.2
@@ -304,7 +304,7 @@ importers:
         specifier: ^8.30.0
         version: 8.32.6
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       glob:
         specifier: ^13.0.6
@@ -329,7 +329,7 @@ importers:
         specifier: ^4.22.16
         version: 4.27.8(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       zod:
         specifier: ^4.6.7
@@ -348,7 +348,7 @@ importers:
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       '@simplysf/simply-report':
         specifier: workspace:^1.0.8
@@ -373,7 +373,7 @@ importers:
   packages/simply-project-core:
     dependencies:
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       chalk:
         specifier: ^5.6.2
@@ -449,7 +449,7 @@ importers:
         specifier: ^12.37.2
         version: 12.37.2(supports-color@8.1.1)
       '@simplysf/simply-core':
-        specifier: workspace:^1.9.1
+        specifier: workspace:^1.10.0
         version: link:../simply-core
       fast-xml-parser:
         specifier: ^5.12.0

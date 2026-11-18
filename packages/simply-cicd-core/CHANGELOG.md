@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.18.0](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.17.1...%40simplysf%2Fsimply-cicd-core%400.18.0) (2026-11-18)
+
+### Features
+
+- **simply-cicd-core:** merge-release stage merges the happy-soup release after the PROD close-out ([#299](https://github.com/SimplySF/simply-plugins-core/issues/299)) ([41f7a67](https://github.com/SimplySF/simply-plugins-core/commit/41f7a67fc84f2da019c18b152d4d0698d675b17e))
+
 ## [0.17.1](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-cicd-core%400.17.0...%40simplysf%2Fsimply-cicd-core%400.17.1) (2026-11-16)
 
 **Note:** Version bump only for package @simplysf/simply-cicd-core
