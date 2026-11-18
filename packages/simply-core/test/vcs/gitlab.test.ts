@@ -307,6 +307,59 @@ describe('GitLabProvider', () => {
       expect(JSON.parse(options.body as string)).toEqual({ default_branch: 'release/v1.3.0' });
     });
 
+    describe('when GitLab has not seen a just-pushed branch yet', () => {
+      const unknownBranch = (): Response =>
+        jsonResponse(
+          { message: { base: ["Could not change HEAD: branch 'release/v1.3.0' does not exist"] } },
+          { ok: false, status: 400, statusText: 'Bad Request' },
+        );
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('retries until GitLab accepts the branch', async () => {
+        fetchMock
+          .mockResolvedValueOnce(unknownBranch())
+          .mockResolvedValueOnce(unknownBranch())
+          .mockResolvedValueOnce(jsonResponse({ id: 123 }));
+
+        const done = new GitLabProvider({ host, token }).setDefaultBranch('123', 'release/v1.3.0');
+        await vi.runAllTimersAsync();
+        await done;
+
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+      });
+
+      it('gives up with GitLab’s error after the last retry', async () => {
+        fetchMock.mockResolvedValue(unknownBranch());
+
+        const done = new GitLabProvider({ host, token })
+          .setDefaultBranch('123', 'release/v1.3.0')
+          .catch((caught: unknown) => caught as Error);
+        await vi.runAllTimersAsync();
+        const error = await done;
+
+        expect((error as Error).message).toContain("branch 'release/v1.3.0' does not exist");
+        expect(fetchMock).toHaveBeenCalledTimes(6);
+      });
+    });
+
+    it('does not retry other errors', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ message: '403 Forbidden' }, { ok: false, status: 403, statusText: 'Forbidden' }),
+      );
+
+      await expect(new GitLabProvider({ host, token }).setDefaultBranch('123', 'release/v1.3.0')).rejects.toThrow(
+        'GitLab API error: 403',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it('never puts the token in an error message', async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse('boom', { ok: false, status: 500, statusText: 'Server Error' }));
 
