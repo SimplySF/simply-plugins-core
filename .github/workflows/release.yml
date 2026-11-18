@@ -67,7 +67,30 @@ jobs:
       # unconditional (not gated on the version steps above having run): this makes it self-healing
       # if a *previous* run's version step succeeded (git tagged/pushed) but its npm publish step
       # failed partway through a batch, since lerna version and npm publish are not atomic together.
+      #
+      # Retries only Sigstore's TLOG_CREATE_ENTRY_ERROR (409). When Rekor is slow to answer, npm's
+      # Sigstore client re-sends the provenance entry it already logged, gets "an equivalent entry
+      # already exists", and aborts before uploading (npm/cli#10078, sigstore/sigstore-js#1708).
+      # Retrying is safe: npm signs before it uploads, so the failed package was never published,
+      # and from-package skips every version that already is.
       - name: Publish
-        run: pnpm exec lerna publish from-package --yes
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/lerna-publish.log"
+          for attempt in 1 2 3; do
+            if pnpm exec lerna publish from-package --yes 2>&1 | tee "$log"; then
+              exit 0
+            fi
+            if ! grep -q TLOG_CREATE_ENTRY_ERROR "$log"; then
+              exit 1
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Sigstore rejected a re-sent provenance entry (attempt $attempt of 3). Retrying in 30 seconds."
+              sleep 30
+            fi
+          done
+          echo "::error::Sigstore kept rejecting the provenance entry after 3 attempts. Re-run the workflow; from-package picks up what's left."
+          exit 1
         env:
           NPM_CONFIG_PROVENANCE: true
