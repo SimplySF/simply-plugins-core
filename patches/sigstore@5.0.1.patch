@@ -1,0 +1,15 @@
+diff --git a/dist/config.js b/dist/config.js
+index 373149fe22fb750faeefba5d20a0e432bb91df14..d7a65bd5566c92c07aaf2c6c3dc28196426b38cc 100644
+--- a/dist/config.js
++++ b/dist/config.js
+@@ -102,7 +102,9 @@ function initWitnesses(options) {
+         witnesses.push(new sign_1.RekorWitness({
+             rekorBaseURL: options.rekorURL,
+             entryType: options.legacyCompatibility ? 'intoto' : 'dsse',
+-            fetchOnConflict: false,
++            // Patched (simply-plugins): when a slow Rekor makes the client re-send an entry it already
++            // logged, fetch that entry instead of failing with a 409. See sigstore/sigstore-js#1791.
++            fetchOnConflict: true,
+             retry: options.retry ?? exports.DEFAULT_RETRY,
+             timeout: options.timeout ?? exports.DEFAULT_TIMEOUT,
+         }));
