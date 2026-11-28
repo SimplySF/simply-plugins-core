@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.24](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-community-core%400.2.23...%40simplysf%2Fsimply-community-core%400.2.24) (2026-11-28)
+
+### Bug Fixes
+
+- **deps:** bump glob from 13.0.7 to 14.0.2 ([#308](https://github.com/SimplySF/simply-plugins-core/issues/308)) ([d81754f](https://github.com/SimplySF/simply-plugins-core/commit/d81754f3e0e6bb6a80e47b89bedeef73f7cb75af))
+
 ## [0.2.23](https://github.com/SimplySF/simply-plugins-core/compare/%40simplysf%2Fsimply-community-core%400.2.22...%40simplysf%2Fsimply-community-core%400.2.23) (2026-11-28)
 
 ### Bug Fixes
