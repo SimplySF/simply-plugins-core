@@ -38,7 +38,7 @@
   },
   "type": "module",
   "dependencies": {
-    "glob": "^13.0.6",
+    "glob": "^13.0.7",
     "minimatch": "^11.0.9"
   },
   "devDependencies": {
