@@ -42,7 +42,7 @@
     "@salesforce/kit": "^3.2.6",
     "@salesforce/source-deploy-retrieve": "^12.37.2",
     "@simplysf/simply-core": "workspace:^1.10.0",
-    "glob": "^13.0.6",
+    "glob": "^13.0.7",
     "xmlbuilder2": "^4.0.3"
   },
   "devDependencies": {

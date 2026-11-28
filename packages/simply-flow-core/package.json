@@ -39,7 +39,7 @@
   "dependencies": {
     "@salesforce/core": "^8.30.0",
     "@simplysf/simply-core": "workspace:^1.10.0",
-    "glob": "^13.0.6"
+    "glob": "^13.0.7"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.12",
